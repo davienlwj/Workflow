@@ -75,6 +75,10 @@ test('summaries count done and remaining', () => {
   assert.equal(summaryText(tasks), '3 tasks · 1 done');
   assert.equal(summaryText([{ done: false }]), '1 task');
   assert.equal(summaryText([]), '');
+  // Holidays are counted alongside, never folded into the task total.
+  assert.equal(summaryText(tasks, 2), '3 tasks · 1 done · 2 holidays');
+  assert.equal(summaryText([], 1), '1 holiday');
+  assert.equal(summaryText([{ done: false }], 1), '1 task · 1 holiday');
 });
 
 test('grouping keeps days in order', () => {

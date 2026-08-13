@@ -100,6 +100,44 @@ month and year group what they list under a heading per day, so a month reads
 as a run of days rather than one long column. The choice sticks between
 launches.
 
+## Public holidays
+
+Malaysian public holidays are built in and appear on the calendar as coloured
+dots, and in the list with the same colour beside them:
+
+- 🔴 **Red** — national holidays, and state holidays Selangor observes. Days
+  you actually get off.
+- 🟡 **Yellow** — holidays that only apply to other states.
+
+A day can carry both (1 February 2026 is Thaipusam in Selangor *and* Federal
+Territory Day in KL), and red always sorts first. Holidays are counted
+separately from your own tasks — `1 task · 4 holidays` — and have no checkbox,
+since they are not yours to tick off.
+
+To colour the calendar for a different state, change `HOME_STATE` at the top of
+`js/holidays.js` to any code in `STATES` (`PNG`, `JHR`, `SWK`, …). Nothing else
+needs touching.
+
+### Keeping the dates right
+
+`js/holidays.js` holds the data as a plain sorted list. Adding a year means
+appending entries in the same shape:
+
+```js
+{ date: '2027-01-01', name: "New Year's Day", states: 'national' },
+{ date: '2027-12-11', name: "Sultan of Selangor's Birthday", states: ['SGR'] },
+```
+
+`states` is either the string `'national'` or an array of state codes; add
+`lunar: true` to anything set by moon sighting. `npm test` checks the shape:
+real calendar dates, known state codes, sorted, no duplicates.
+
+Two caveats worth knowing. Entries marked `lunar` — Hari Raya, Thaipusam,
+Wesak, Deepavali, Awal Muharram, Maulidur Rasul, Nuzul Al-Quran — are published
+estimates and occasionally shift by a day once confirmed officially. And the
+bundled list covers **2026 only**; other years show an empty calendar rather
+than wrong dates.
+
 ## Using it
 
 - **Tap a day** to see it; the dots under a date show how many tasks it holds.
@@ -115,6 +153,7 @@ launches.
 index.html                 markup and the two sheets
 css/style.css              the whole design: one accent, system font
 js/parser.js               text in, {subject, date, time, location} out
+js/holidays.js             Malaysian public holidays and their colour rule
 js/ranges.js               day/week/month/year windows and their totals
 js/store.js                localStorage CRUD and settings
 js/app.js                  rendering and events

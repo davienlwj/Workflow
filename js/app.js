@@ -2,6 +2,7 @@
 
 import { parseTask, formatTime, formatDate, toISODate, fromISODate } from './parser.js';
 import { SCOPES, rangeFor, groupByDate, summaryText, emptyText } from './ranges.js';
+import { holidaysBetween, tonesByDate, toneOf, observedLabel } from './holidays.js';
 import * as store from './store.js';
 
 const $ = (id) => document.getElementById(id);
@@ -50,6 +51,7 @@ function renderGrid() {
   const first = new Date(view.getFullYear(), view.getMonth(), 1);
   const offset = (first.getDay() - store.settings.weekStart + 7) % 7;
   const counts = store.countsByDate();
+  const tones = tonesByDate();
   const todayISO = toISODate(today());
   // Showing a week? Mark it on the grid so the summary's span is obvious.
   const week = scope === 'week' ? currentRange() : null;
@@ -60,6 +62,7 @@ function renderGrid() {
     d.setDate(1 - offset + i);
     const iso = toISODate(d);
     const count = counts.get(iso) || 0;
+    const dayTones = tones.get(iso) || [];
 
     const cell = document.createElement('button');
     cell.type = 'button';
@@ -69,8 +72,11 @@ function renderGrid() {
     if (iso === todayISO) cell.classList.add('today');
     if (week && iso >= week.start && iso <= week.end) cell.classList.add('in-range');
     if (iso === selected) cell.classList.add('selected');
-    cell.setAttribute('aria-label',
-      `${d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}${count ? `, ${count} task${count > 1 ? 's' : ''}` : ''}`);
+    const spoken = [d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })];
+    if (count) spoken.push(`${count} task${count > 1 ? 's' : ''}`);
+    if (dayTones.includes('local')) spoken.push('public holiday');
+    else if (dayTones.length) spoken.push('holiday in another state');
+    cell.setAttribute('aria-label', spoken.join(', '));
 
     const num = document.createElement('span');
     num.className = 'num';
@@ -79,7 +85,13 @@ function renderGrid() {
 
     const dots = document.createElement('span');
     dots.className = 'dots-row';
-    for (let k = 0; k < Math.min(count, 3); k++) {
+    // Holidays lead, so their colour is what catches the eye on a busy day.
+    for (const tone of dayTones) {
+      const dot = document.createElement('i');
+      dot.className = `dot dot-${tone}`;
+      dots.append(dot);
+    }
+    for (let k = 0; k < Math.min(count, 3 - dayTones.length); k++) {
       const dot = document.createElement('i');
       dot.className = 'dot';
       dots.append(dot);
@@ -148,22 +160,56 @@ function dayHeading(iso) {
   return li;
 }
 
+/** A public holiday: no checkbox, just a coloured dot and who it applies to. */
+function holidayRow(h) {
+  const li = document.createElement('li');
+  li.className = `item holiday ${toneOf(h) === 'local' ? 'holiday-local' : 'holiday-other'}`;
+
+  const mark = document.createElement('span');
+  mark.className = 'holiday-dot';
+  mark.setAttribute('aria-hidden', 'true');
+
+  const body = document.createElement('div');
+  body.className = 'body';
+
+  const title = document.createElement('div');
+  title.className = 'title';
+  title.textContent = h.name;
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.textContent = observedLabel(h);
+
+  body.append(title, meta);
+  li.append(mark, body);
+  return li;
+}
+
 function renderList() {
   const { start, end, label } = currentRange();
   const tasks = store.tasksBetween(start, end);
+  const holidays = holidaysBetween(start, end);
 
   el.dayTitle.textContent = label;
-  el.counts.textContent = summaryText(tasks);
+  el.counts.textContent = summaryText(tasks, holidays.length);
   el.empty.textContent = emptyText(scope);
-  el.empty.hidden = tasks.length > 0;
+  el.empty.hidden = tasks.length + holidays.length > 0;
 
   const rows = [];
   if (scope === 'day') {
-    rows.push(...tasks.map(taskRow));
+    rows.push(...holidays.map(holidayRow), ...tasks.map(taskRow));
   } else {
     // Longer ranges get a heading per day, so a month reads as a list of days.
+    const byDate = new Map();
+    for (const [iso, ofDay] of groupByDate(holidays)) byDate.set(iso, { holidays: ofDay, tasks: [] });
     for (const [iso, ofDay] of groupByDate(tasks)) {
-      rows.push(dayHeading(iso), ...ofDay.map(taskRow));
+      const entry = byDate.get(iso) || { holidays: [], tasks: [] };
+      entry.tasks = ofDay;
+      byDate.set(iso, entry);
+    }
+    for (const iso of [...byDate.keys()].sort()) {
+      const { holidays: hs, tasks: ts } = byDate.get(iso);
+      rows.push(dayHeading(iso), ...hs.map(holidayRow), ...ts.map(taskRow));
     }
   }
   el.list.replaceChildren(...rows);

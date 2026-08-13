@@ -88,12 +88,14 @@ export function groupByDate(tasks) {
   return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
-/** "3 tasks · 1 done", or empty when the range holds nothing. */
-export function summaryText(tasks) {
+/** "3 tasks · 1 done · 2 holidays", dropping whatever does not apply. */
+export function summaryText(tasks, holidays = 0) {
   const { total, done } = summarize(tasks);
-  if (!total) return '';
-  const noun = total === 1 ? 'task' : 'tasks';
-  return done ? `${total} ${noun} · ${done} done` : `${total} ${noun}`;
+  const parts = [];
+  if (total) parts.push(`${total} ${total === 1 ? 'task' : 'tasks'}`);
+  if (done) parts.push(`${done} done`);
+  if (holidays) parts.push(`${holidays} ${holidays === 1 ? 'holiday' : 'holidays'}`);
+  return parts.join(' · ');
 }
 
 export function emptyText(scope) {

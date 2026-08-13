@@ -10,6 +10,9 @@
   --accent: #101013;
   --on-accent: #ffffff;
   --danger: #c0392b;
+  /* Holidays: red where it applies here, yellow where it is another state's. */
+  --holiday-local: #d92d20;
+  --holiday-other: #e3a008;
   --radius: 14px;
   --tap: 44px;
 }
@@ -25,6 +28,9 @@
     --accent: #f2f2f4;
     --on-accent: #000000;
     --danger: #ff6b5e;
+    /* Lifted for contrast against black. */
+    --holiday-local: #ff5c4d;
+    --holiday-other: #f5c045;
   }
 }
 
@@ -167,6 +173,9 @@ main {
   background: var(--muted);
 }
 
+.dot-local { background: var(--holiday-local); }
+.dot-other { background: var(--holiday-other); }
+
 /* ------------------------------------------------------------------- list */
 
 .day {
@@ -272,6 +281,21 @@ main {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+
+/* Public holidays sit in the same list but are not yours to tick off. */
+.holiday-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin: 7px 5px 0;
+  border-radius: 50%;
+}
+
+.holiday-local .holiday-dot { background: var(--holiday-local); }
+.holiday-other .holiday-dot { background: var(--holiday-other); }
+
+.holiday .title { color: var(--muted); }
+.holiday-local .title { color: var(--fg); }
 
 .empty {
   margin: 4px 2px;
