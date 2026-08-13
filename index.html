@@ -109,6 +109,20 @@
     <span>Week starts Monday</span>
     <input id="sWeekStart" type="checkbox">
   </label>
+  <label class="toggle">
+    <span>Holiday colour &mdash; applies here</span>
+    <span class="swatch-pair">
+      <input id="sHolidayLocal" type="color" aria-label="Colour for holidays that apply here">
+      <button type="button" id="sHolidayLocalReset" class="reset-dot" aria-label="Reset to default">&#8635;</button>
+    </span>
+  </label>
+  <label class="toggle">
+    <span>Holiday colour &mdash; other states</span>
+    <span class="swatch-pair">
+      <input id="sHolidayOther" type="color" aria-label="Colour for holidays in other states">
+      <button type="button" id="sHolidayOtherReset" class="reset-dot" aria-label="Reset to default">&#8635;</button>
+    </span>
+  </label>
   <div class="actions">
     <button type="button" id="sExport" class="ghost-btn">Export</button>
     <button type="button" id="sImport" class="ghost-btn">Import</button>

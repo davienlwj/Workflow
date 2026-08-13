@@ -8,6 +8,11 @@ const DEFAULT_SETTINGS = {
   use24: false,     // show 3pm rather than 15:00
   weekStart: 1,     // 0 = Sunday, 1 = Monday
   scope: 'day',     // the summary range last looked at
+  // null = follow the built-in red/yellow, which already adjusts for dark
+  // mode. Once set, a colour is fixed and no longer follows the theme - that
+  // is the point of overriding it.
+  holidayLocal: null,
+  holidayOther: null,
 };
 
 function read(key, fallback) {

@@ -16,7 +16,10 @@ const el = {
   fTitle: $('fTitle'), fDate: $('fDate'), fTime: $('fTime'), fLocation: $('fLocation'),
   fRaw: $('fRaw'), fDelete: $('fDelete'), fCancel: $('fCancel'), fSave: $('fSave'),
   settingsSheet: $('settingsSheet'), sDayFirst: $('sDayFirst'), sUse24: $('sUse24'),
-  sWeekStart: $('sWeekStart'), sExport: $('sExport'), sImport: $('sImport'),
+  sWeekStart: $('sWeekStart'),
+  sHolidayLocal: $('sHolidayLocal'), sHolidayLocalReset: $('sHolidayLocalReset'),
+  sHolidayOther: $('sHolidayOther'), sHolidayOtherReset: $('sHolidayOtherReset'),
+  sExport: $('sExport'), sImport: $('sImport'),
   sClose: $('sClose'), sFile: $('sFile'), toast: $('toast'),
 };
 
@@ -432,10 +435,38 @@ el.grid.addEventListener('touchend', (e) => {
 
 /* --------------------------------------------------------------- settings */
 
+// A custom property's computed value is its literal text (already "#d92d20",
+// unlike a resolved colour property), but fall back through rgb() too in
+// case a browser ever normalises it that way.
+function toHex(cssColor) {
+  const text = cssColor.trim();
+  if (/^#[0-9a-f]{6}$/i.test(text)) return text;
+  const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(text);
+  if (!m) return '#000000';
+  return `#${m.slice(1, 4).map((n) => Number(n).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** Push the stored overrides onto :root, or clear them to fall back to the
+ *  built-in red/yellow (which still adapts to light/dark on its own). */
+function applyHolidayColors() {
+  const root = document.documentElement.style;
+  if (store.settings.holidayLocal) root.setProperty('--holiday-local', store.settings.holidayLocal);
+  else root.removeProperty('--holiday-local');
+  if (store.settings.holidayOther) root.setProperty('--holiday-other', store.settings.holidayOther);
+  else root.removeProperty('--holiday-other');
+}
+
+function holidayColorInputs() {
+  const computed = getComputedStyle(document.documentElement);
+  el.sHolidayLocal.value = store.settings.holidayLocal || toHex(computed.getPropertyValue('--holiday-local'));
+  el.sHolidayOther.value = store.settings.holidayOther || toHex(computed.getPropertyValue('--holiday-other'));
+}
+
 el.settingsBtn.addEventListener('click', () => {
   el.sDayFirst.checked = store.settings.dayFirst;
   el.sUse24.checked = store.settings.use24;
   el.sWeekStart.checked = store.settings.weekStart === 1;
+  holidayColorInputs();
   el.scrim.hidden = false;
   el.settingsSheet.hidden = false;
 });
@@ -451,6 +482,26 @@ el.sWeekStart.addEventListener('change', () => {
   renderGrid();
   renderList(); // a week summary now spans different days
 });
+
+el.sHolidayLocal.addEventListener('input', () => {
+  store.saveSettings({ holidayLocal: el.sHolidayLocal.value });
+  applyHolidayColors();
+});
+el.sHolidayLocalReset.addEventListener('click', () => {
+  store.saveSettings({ holidayLocal: null });
+  applyHolidayColors();
+  holidayColorInputs();
+});
+el.sHolidayOther.addEventListener('input', () => {
+  store.saveSettings({ holidayOther: el.sHolidayOther.value });
+  applyHolidayColors();
+});
+el.sHolidayOtherReset.addEventListener('click', () => {
+  store.saveSettings({ holidayOther: null });
+  applyHolidayColors();
+  holidayColorInputs();
+});
+
 el.sClose.addEventListener('click', closeSheet);
 
 el.sExport.addEventListener('click', () => {
@@ -502,4 +553,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+applyHolidayColors();
 render();

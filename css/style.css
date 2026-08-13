@@ -466,6 +466,40 @@ main {
 
 .toggle input { width: 44px; height: 26px; accent-color: var(--accent); }
 
+.swatch-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.swatch-pair input[type="color"] {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+/* Colour inputs render their own swatch inside a browser-drawn frame; strip
+   that frame so it reads as a plain round dot. */
+.swatch-pair input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.swatch-pair input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.swatch-pair input[type="color"]::-moz-color-swatch { border: 0; border-radius: 50%; }
+
+.reset-dot {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.reset-dot:active { background: var(--card); }
+
 .toast {
   position: fixed;
   left: 50%;

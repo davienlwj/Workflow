@@ -118,6 +118,12 @@ To colour the calendar for a different state, change `HOME_STATE` at the top of
 `js/holidays.js` to any code in `STATES` (`PNG`, `JHR`, `SWK`, …). Nothing else
 needs touching.
 
+The two colours themselves are also yours to pick: `···` → tap either swatch
+next to *Holiday colour* to open the system colour picker, or tap ↻ beside it
+to go back to the built-in red/yellow (which is the only setting that still
+adjusts itself between light and dark mode — a colour you pick stays fixed
+once chosen).
+
 ### Keeping the dates right
 
 `js/holidays.js` holds the data as a plain sorted list. Adding a year means
