@@ -25,10 +25,14 @@ Screen*. It launches full screen with no browser chrome.
 
 ### Hosting it on GitHub Pages
 
-`.github/workflows/pages.yml` publishes the repo on every push to `main`.
-Turn it on once: **Settings → Pages → Build and deployment → Source: GitHub
-Actions**. The app then lives at
-`https://<username>.github.io/<repo>/`.
+`.github/workflows/pages.yml` runs the tests and publishes the site on every
+push. Turn it on once: **Settings → Pages → Build and deployment → Source:
+GitHub Actions**. The app then lives at `https://<username>.github.io/<repo>/`.
+
+GitHub Pages only serves **public** repositories on the free plan. If the repo
+is private, either make it public — nothing here is secret, and your tasks
+never leave your phone — or deploy the same folder to Cloudflare Pages or
+Netlify, which both serve private repos over HTTPS for free.
 
 ### Running it locally
 
