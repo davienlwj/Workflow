@@ -83,6 +83,23 @@ A few sensible defaults, all changeable in the review sheet before saving:
   August is next January.
 - No date in the text means the day you have selected on the calendar.
 
+## Day, week, month, year
+
+Under the calendar sit four buttons. They change how much the list below
+shows, all anchored on the day you have selected:
+
+| | Shows | Heading |
+| --- | --- | --- |
+| **Day** | that one day | `Today · Thu, 13 Aug` |
+| **Week** | the week around it, highlighted on the grid | `Aug 10 – 16` |
+| **Month** | the whole month | `August 2026` |
+| **Year** | the whole year | `2026` |
+
+Alongside the heading is the tally for that span — `12 tasks · 5 done`. Week,
+month and year group what they list under a heading per day, so a month reads
+as a run of days rather than one long column. The choice sticks between
+launches.
+
 ## Using it
 
 - **Tap a day** to see it; the dots under a date show how many tasks it holds.
@@ -98,11 +115,12 @@ A few sensible defaults, all changeable in the review sheet before saving:
 index.html                 markup and the two sheets
 css/style.css              the whole design: one accent, system font
 js/parser.js               text in, {subject, date, time, location} out
+js/ranges.js               day/week/month/year windows and their totals
 js/store.js                localStorage CRUD and settings
 js/app.js                  rendering and events
 sw.js                      offline cache
 tools/gen-icons.mjs        draws the icons, no dependencies
-tests/parser.test.mjs      parser test suite
+tests/                     parser and range test suites
 ```
 
 The parser has no dependencies and does not talk to a network, so the app

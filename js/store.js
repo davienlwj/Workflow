@@ -7,6 +7,7 @@ const DEFAULT_SETTINGS = {
   dayFirst: true,   // read "12/8" as 12 August
   use24: false,     // show 3pm rather than 15:00
   weekStart: 1,     // 0 = Sunday, 1 = Monday
+  scope: 'day',     // the summary range last looked at
 };
 
 function read(key, fallback) {
@@ -49,6 +50,19 @@ export function tasksOn(iso) {
   return tasks
     .filter((t) => t.date === iso)
     .sort((a, b) => {
+      if (a.time && b.time) return a.time.localeCompare(b.time);
+      if (a.time) return -1;
+      if (b.time) return 1;
+      return a.createdAt - b.createdAt;
+    });
+}
+
+/** Tasks between two inclusive ISO days, in date then time order. */
+export function tasksBetween(startISO, endISO) {
+  return tasks
+    .filter((t) => t.date && t.date >= startISO && t.date <= endISO)
+    .sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
       if (a.time && b.time) return a.time.localeCompare(b.time);
       if (a.time) return -1;
       if (b.time) return 1;

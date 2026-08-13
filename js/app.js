@@ -1,13 +1,15 @@
 /* Workflow - UI wiring. */
 
-import { parseTask, formatTime, toISODate, fromISODate } from './parser.js';
+import { parseTask, formatTime, formatDate, toISODate, fromISODate } from './parser.js';
+import { SCOPES, rangeFor, groupByDate, summaryText, emptyText } from './ranges.js';
 import * as store from './store.js';
 
 const $ = (id) => document.getElementById(id);
 
 const el = {
   prev: $('prev'), next: $('next'), title: $('title'), settingsBtn: $('settingsBtn'),
-  weekdays: $('weekdays'), grid: $('grid'), dayTitle: $('dayTitle'), list: $('list'), empty: $('empty'),
+  weekdays: $('weekdays'), grid: $('grid'), scopes: $('scopes'), dayTitle: $('dayTitle'),
+  counts: $('counts'), list: $('list'), empty: $('empty'),
   composer: $('composer'), input: $('input'), mic: $('mic'), send: $('send'),
   scrim: $('scrim'), sheet: $('sheet'), sheetForm: $('sheetForm'),
   fTitle: $('fTitle'), fDate: $('fDate'), fTime: $('fTime'), fLocation: $('fLocation'),
@@ -20,6 +22,7 @@ const el = {
 const today = () => new Date();
 let view = new Date(today().getFullYear(), today().getMonth(), 1);
 let selected = toISODate(today());
+let scope = SCOPES.includes(store.settings.scope) ? store.settings.scope : 'day';
 let editingId = null;
 
 // Fields the sheet does not expose, carried from the parse to the save.
@@ -48,6 +51,8 @@ function renderGrid() {
   const offset = (first.getDay() - store.settings.weekStart + 7) % 7;
   const counts = store.countsByDate();
   const todayISO = toISODate(today());
+  // Showing a week? Mark it on the grid so the summary's span is obvious.
+  const week = scope === 'week' ? currentRange() : null;
   const cells = [];
 
   for (let i = 0; i < 42; i++) {
@@ -62,6 +67,7 @@ function renderGrid() {
     cell.dataset.date = iso;
     if (d.getMonth() !== view.getMonth()) cell.classList.add('outside');
     if (iso === todayISO) cell.classList.add('today');
+    if (week && iso >= week.start && iso <= week.end) cell.classList.add('in-range');
     if (iso === selected) cell.classList.add('selected');
     cell.setAttribute('aria-label',
       `${d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}${count ? `, ${count} task${count > 1 ? 's' : ''}` : ''}`);
@@ -84,58 +90,90 @@ function renderGrid() {
   el.grid.replaceChildren(...cells);
 }
 
-function renderDay() {
-  const d = fromISODate(selected);
-  const isToday = selected === toISODate(today());
-  const label = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-  el.dayTitle.textContent = isToday ? `Today · ${label}` : label;
+/** The window the summary is showing: the selected day, or its week/month/year. */
+function currentRange() {
+  return rangeFor(scope, selected, store.settings.weekStart, today());
+}
 
-  const tasks = store.tasksOn(selected);
+function renderScopes() {
+  for (const button of el.scopes.querySelectorAll('.scope')) {
+    button.setAttribute('aria-selected', String(button.dataset.scope === scope));
+  }
+}
+
+function taskRow(t) {
+  const li = document.createElement('li');
+  li.className = `item${t.done ? ' done' : ''}`;
+
+  const check = document.createElement('button');
+  check.type = 'button';
+  check.className = 'check';
+  check.setAttribute('aria-label', t.done ? 'Mark as not done' : 'Mark as done');
+  check.addEventListener('click', () => {
+    store.toggleDone(t.id);
+    renderList();
+  });
+
+  const body = document.createElement('button');
+  body.type = 'button';
+  body.className = 'body';
+
+  const title = document.createElement('div');
+  title.className = 'title';
+  title.textContent = t.title;
+  body.append(title);
+
+  const bits = [];
+  if (t.time) bits.push(formatTime(t.time, store.settings.use24)
+    + (t.endTime ? `–${formatTime(t.endTime, store.settings.use24)}` : ''));
+  if (t.location) bits.push(t.location);
+  if (bits.length) {
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = bits.join('  ·  ');
+    body.append(meta);
+  }
+  body.addEventListener('click', () => openSheet(t, t.id));
+
+  li.append(check, body);
+  return li;
+}
+
+function dayHeading(iso) {
+  const li = document.createElement('li');
+  li.className = 'group';
+  const d = fromISODate(iso);
+  const label = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  li.textContent = iso === toISODate(today()) ? `Today · ${label}` : label;
+  return li;
+}
+
+function renderList() {
+  const { start, end, label } = currentRange();
+  const tasks = store.tasksBetween(start, end);
+
+  el.dayTitle.textContent = label;
+  el.counts.textContent = summaryText(tasks);
+  el.empty.textContent = emptyText(scope);
   el.empty.hidden = tasks.length > 0;
 
-  el.list.replaceChildren(...tasks.map((t) => {
-    const li = document.createElement('li');
-    li.className = `item${t.done ? ' done' : ''}`;
-
-    const check = document.createElement('button');
-    check.type = 'button';
-    check.className = 'check';
-    check.setAttribute('aria-label', t.done ? 'Mark as not done' : 'Mark as done');
-    check.addEventListener('click', () => {
-      store.toggleDone(t.id);
-      renderDay();
-    });
-
-    const body = document.createElement('button');
-    body.type = 'button';
-    body.className = 'body';
-
-    const title = document.createElement('div');
-    title.className = 'title';
-    title.textContent = t.title;
-    body.append(title);
-
-    const bits = [];
-    if (t.time) bits.push(formatTime(t.time, store.settings.use24)
-      + (t.endTime ? `–${formatTime(t.endTime, store.settings.use24)}` : ''));
-    if (t.location) bits.push(t.location);
-    if (bits.length) {
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.textContent = bits.join('  ·  ');
-      body.append(meta);
+  const rows = [];
+  if (scope === 'day') {
+    rows.push(...tasks.map(taskRow));
+  } else {
+    // Longer ranges get a heading per day, so a month reads as a list of days.
+    for (const [iso, ofDay] of groupByDate(tasks)) {
+      rows.push(dayHeading(iso), ...ofDay.map(taskRow));
     }
-    body.addEventListener('click', () => openSheet(t, t.id));
-
-    li.append(check, body);
-    return li;
-  }));
+  }
+  el.list.replaceChildren(...rows);
 }
 
 function render() {
+  renderScopes();
   renderWeekdays();
   renderGrid();
-  renderDay();
+  renderList();
 }
 
 let toastTimer;
@@ -199,7 +237,7 @@ el.sheetForm.addEventListener('submit', (e) => {
   pendingRaw = '';
   closeSheet();
   render();
-  toast(isEdit ? 'Saved' : `Added · ${el.dayTitle.textContent.replace('Today · ', '')}`);
+  toast(isEdit ? 'Saved' : `Added · ${formatDate(fields.date, today())}`);
 });
 
 el.fDelete.addEventListener('click', () => {
@@ -295,6 +333,16 @@ if (SpeechRecognition) {
 
 /* ------------------------------------------------------------- navigation */
 
+el.scopes.addEventListener('click', (e) => {
+  const button = e.target.closest('.scope');
+  if (!button || button.dataset.scope === scope) return;
+  scope = button.dataset.scope;
+  store.saveSettings({ scope });
+  renderScopes();
+  renderGrid();   // the week highlight follows the scope
+  renderList();
+});
+
 function shiftMonth(delta) {
   view = new Date(view.getFullYear(), view.getMonth() + delta, 1);
   renderGrid();
@@ -319,7 +367,7 @@ el.grid.addEventListener('click', (e) => {
     view = new Date(d.getFullYear(), d.getMonth(), 1);
   }
   renderGrid();
-  renderDay();
+  renderList();
 });
 
 // Swipe the grid sideways to change month.
@@ -349,12 +397,13 @@ el.settingsBtn.addEventListener('click', () => {
 el.sDayFirst.addEventListener('change', () => store.saveSettings({ dayFirst: el.sDayFirst.checked }));
 el.sUse24.addEventListener('change', () => {
   store.saveSettings({ use24: el.sUse24.checked });
-  renderDay();
+  renderList();
 });
 el.sWeekStart.addEventListener('change', () => {
   store.saveSettings({ weekStart: el.sWeekStart.checked ? 1 : 0 });
   renderWeekdays();
   renderGrid();
+  renderList(); // a week summary now spans different days
 });
 el.sClose.addEventListener('click', closeSheet);
 

@@ -144,6 +144,8 @@ main {
   font-weight: 700;
 }
 
+.cell.in-range .num { background: var(--card); }
+
 .cell.selected .num {
   background: var(--accent);
   color: var(--on-accent);
@@ -173,14 +175,62 @@ main {
   margin-top: 12px;
 }
 
+.scopes {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.scope {
+  flex: 1;
+  height: 32px;
+  border-radius: 9px;
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--card);
+}
+
+.scope[aria-selected="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
 .day h2 {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
 }
+
+.counts {
+  margin: 0;
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+}
+
+/* Day heading inside a week/month/year list. */
+.group {
+  padding: 16px 2px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.group:first-child { padding-top: 4px; }
 
 .list { list-style: none; margin: 0; padding: 0; }
 

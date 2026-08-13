@@ -1,6 +1,6 @@
 /* Workflow - offline shell. Bump CACHE when the app files change. */
 
-const CACHE = 'workflow-v1';
+const CACHE = 'workflow-v2';
 
 const SHELL = [
   './',
@@ -8,6 +8,7 @@ const SHELL = [
   './css/style.css',
   './js/app.js',
   './js/parser.js',
+  './js/ranges.js',
   './js/store.js',
   './manifest.webmanifest',
   './icons/icon.svg',

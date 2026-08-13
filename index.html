@@ -34,7 +34,16 @@
   <div id="grid" class="grid" role="grid" aria-label="Calendar"></div>
 
   <section class="day">
-    <h2 id="dayTitle">Today</h2>
+    <div id="scopes" class="scopes" role="tablist" aria-label="Summary range">
+      <button type="button" class="scope" role="tab" data-scope="day">Day</button>
+      <button type="button" class="scope" role="tab" data-scope="week">Week</button>
+      <button type="button" class="scope" role="tab" data-scope="month">Month</button>
+      <button type="button" class="scope" role="tab" data-scope="year">Year</button>
+    </div>
+    <div class="summary">
+      <h2 id="dayTitle">Today</h2>
+      <p id="counts" class="counts"></p>
+    </div>
     <ul id="list" class="list"></ul>
     <p id="empty" class="empty">Nothing yet.</p>
   </section>
