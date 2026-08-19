@@ -26,6 +26,14 @@
    survive a tab switch and land the next view mid-scroll. */
 html {
   height: 100%;
+  /* dvh tracks the actual visible viewport as iOS Safari's toolbar shows
+     and hides; 100% is a fallback for browsers without dvh support and is
+     overridden by the line below wherever dvh is understood. Without this,
+     a page too short to scroll (an empty tab) keeps Safari's toolbar
+     expanded while a longer one lets it collapse, so a plain height:100%
+     resolves to a different pixel value per tab — and since the bottom
+     nav is fixed to the viewport, it visibly jumps between tabs. */
+  height: 100dvh;
   background: var(--bg);
   overflow-x: hidden;
   overflow-y: auto;
@@ -44,6 +52,7 @@ html::-webkit-scrollbar, .sheet::-webkit-scrollbar {
 body {
   margin: 0;
   min-height: 100%;
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-mono);
