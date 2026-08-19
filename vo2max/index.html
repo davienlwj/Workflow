@@ -119,6 +119,17 @@
   <!-- HISTORY -->
   <section id="view-history" class="view" hidden>
     <h1 class="view-title">History</h1>
+
+    <div class="cal-header">
+      <button type="button" id="calPrev" class="cal-nav" aria-label="Previous month">‹</button>
+      <span id="calMonthLabel" class="cal-month mono"></span>
+      <button type="button" id="calNext" class="cal-nav" aria-label="Next month">›</button>
+    </div>
+    <div id="calWeekdays" class="cal-weekdays"></div>
+    <div id="calGrid" class="cal-grid"></div>
+    <div id="calDayPanel" class="cal-day-panel" hidden></div>
+
+    <h2 class="section-title">All sessions</h2>
     <ul id="historyList" class="history-list"></ul>
     <p id="historyEmpty" class="empty" hidden>No sessions logged yet.</p>
   </section>
@@ -139,9 +150,6 @@
       <button type="button" class="scope" role="tab" data-scope="year" aria-selected="false">Year</button>
     </div>
     <div id="mileageChartWrap" class="chart-wrap"></div>
-
-    <h2 class="section-title">Block checklist</h2>
-    <div id="checklist" class="checklist"></div>
   </section>
 
   <!-- ZONES -->

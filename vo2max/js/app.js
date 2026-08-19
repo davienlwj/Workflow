@@ -5,7 +5,7 @@ import {
 } from './store.js';
 import { lthrZoneTable, rhrZoneTable, targetZone } from './zones.js';
 import {
-  todayIso, currentWeek, retestWeeks, sessionChecklist,
+  todayIso, currentWeek, retestWeeks,
   daysSinceLastSession, averageIntervalHR, vo2maxSeries,
   mileageBuckets, totalMileage,
 } from './block.js';
@@ -303,6 +303,123 @@ function escapeHTML(str) {
   return div.innerHTML;
 }
 
+/* ------------------------------------------------------------- calendar */
+
+const now = new Date();
+let calYear = now.getFullYear();
+let calMonth = now.getMonth();
+let calSelectedDate = null;
+
+const CAL_WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function isoOf(y, m, d) { return `${y}-${pad2(m + 1)}-${pad2(d)}`; }
+
+function sessionsByDate() {
+  const map = new Map();
+  for (const s of sessions) {
+    if (!map.has(s.date)) map.set(s.date, []);
+    map.get(s.date).push(s);
+  }
+  return map;
+}
+
+function renderCalendar() {
+  const byDate = sessionsByDate();
+
+  $('calMonthLabel').textContent = new Date(calYear, calMonth, 1)
+    .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  $('calWeekdays').innerHTML = CAL_WEEKDAY_LABELS.map((d) => `<span>${d}</span>`).join('');
+
+  const firstDow = (new Date(calYear, calMonth, 1).getDay() + 6) % 7; // Monday = 0
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const todayIsoStr = todayIso();
+
+  let html = '';
+  for (let i = 0; i < firstDow; i++) html += '<div class="cal-cell pad"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = isoOf(calYear, calMonth, d);
+    const has = byDate.has(iso);
+    const classes = ['cal-cell'];
+    if (has) classes.push('has-session');
+    if (iso === todayIsoStr) classes.push('today');
+    if (iso === calSelectedDate) classes.push('selected');
+    const tag = has ? 'button' : 'div';
+    html += `<${tag} class="${classes.join(' ')}" ${has ? `type="button" data-date="${iso}"` : ''}>
+      <span>${d}</span>
+      ${has ? '<span class="cal-dot"></span>' : ''}
+    </${tag}>`;
+  }
+  $('calGrid').innerHTML = html;
+
+  renderCalDayPanel(byDate);
+}
+
+function renderCalDayPanel(byDate) {
+  const panel = $('calDayPanel');
+  const daySessions = calSelectedDate ? (byDate.get(calSelectedDate) || []) : [];
+  if (!daySessions.length) {
+    panel.hidden = true;
+    panel.innerHTML = '';
+    return;
+  }
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="cal-day-panel-date mono">${fmtDateLong(calSelectedDate)}</div>
+    ${daySessions.map((s) => calDaySummaryHTML(s)).join('')}
+  `;
+  panel.querySelectorAll('.cal-day-item').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const s = sessions.find((x) => x.id === btn.dataset.id);
+      if (s) openEditSheet(s);
+    });
+  });
+}
+
+/** A simplified, at-a-glance summary of one session for the calendar day panel. */
+function calDaySummaryHTML(s) {
+  const type = sessionTypeOf(s);
+  const isInterval = type === 'interval';
+  let badgeHTML;
+  let metaHTML;
+  if (isInterval) {
+    const avgs = (s.intervals || []).map((iv) => iv.avgHR).filter((v) => v != null);
+    const avgHR = avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
+    badgeHTML = `<span class="pill pill-${s.recovery}">${recoverySymbol[s.recovery] ?? ''} ${recoveryLabel[s.recovery] ?? s.recovery}</span>`;
+    metaHTML = `<span class="mono">${s.intervalsCompleted} interval${s.intervalsCompleted === 1 ? '' : 's'}${avgHR != null ? ` · avg ${avgHR}` : ''}</span>`;
+  } else {
+    badgeHTML = `<span class="pill pill-run">${runTypeLabel[type] ?? type}</span>`;
+    metaHTML = `<span class="mono">${[
+      s.distanceKm != null ? `${s.distanceKm}km` : null,
+      s.durationMin != null ? `${s.durationMin}min` : null,
+    ].filter(Boolean).join(' · ')}</span>`;
+  }
+  return `
+    <button type="button" class="cal-day-item" data-id="${s.id}">
+      ${badgeHTML}
+      ${metaHTML}
+    </button>
+  `;
+}
+
+$('calPrev').addEventListener('click', () => {
+  calMonth -= 1;
+  if (calMonth < 0) { calMonth = 11; calYear -= 1; }
+  renderCalendar();
+});
+$('calNext').addEventListener('click', () => {
+  calMonth += 1;
+  if (calMonth > 11) { calMonth = 0; calYear += 1; }
+  renderCalendar();
+});
+$('calGrid').addEventListener('click', (e) => {
+  const cell = e.target.closest('.cal-cell.has-session');
+  if (!cell) return;
+  const iso = cell.dataset.date;
+  calSelectedDate = calSelectedDate === iso ? null : iso;
+  renderCalendar();
+});
+
 /* --------------------------------------------------------- edit sheet */
 
 function openEditSheet(session) {
@@ -406,13 +523,6 @@ function renderProgress() {
 
   $('mileageTotal').textContent = `${totalMileage(sessions)} km total`;
   $('mileageChartWrap').innerHTML = mileageBarChartSVG(mileageBuckets(sessions, mileageScope));
-
-  const checklist = sessionChecklist(settings, sessions);
-  $('checklist').innerHTML = checklist.map((c) => {
-    const cls = c.done ? 'done' : c.overdue ? 'overdue' : '';
-    const title = c.done ? `Week ${c.week} · ${c.date}` : c.overdue ? `Week ${c.week} · missed` : `Week ${c.week} · upcoming`;
-    return `<div class="checklist-cell ${cls}" title="${title}">${c.index}</div>`;
-  }).join('');
 }
 
 $('mileageScope').addEventListener('click', (e) => {
@@ -548,6 +658,7 @@ $('sReset').addEventListener('click', () => {
 function renderAll() {
   renderHeaderZone();
   renderHistory();
+  renderCalendar();
   renderProgress();
   renderZones();
   renderSettingsForm();

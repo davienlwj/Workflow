@@ -192,7 +192,16 @@ input[type="date"] {
      its row — max-width plus clipping keeps that overflow inside the box
      instead of stretching it past the screen edge. */
   max-width: 100%;
+  min-width: 0;
   overflow: hidden;
+  /* iOS Safari sizes a native date control's box from its own locale-format
+     content and ignores an authored width while -webkit-appearance stays
+     "auto" (the default for date inputs) — width:100% above is silently
+     dropped, which is what let the box itself, not just its text, run past
+     the edge of narrow rows. appearance:none hands sizing back to normal
+     CSS box layout; the tap-to-open-picker behavior is unaffected. */
+  -webkit-appearance: none;
+  appearance: none;
 }
 input[type="date"]::-webkit-date-and-time-value {
   text-align: left;
@@ -381,38 +390,100 @@ button { font-family: var(--font-mono); }
   font-weight: 700;
 }
 
-/* ------------------------------------------------------------- checklist */
+/* -------------------------------------------------------------- calendar */
 
-.checklist {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 6px;
-}
-
-.checklist-cell {
-  aspect-ratio: 1;
-  border-radius: 6px;
-  border: 1px solid var(--line);
-  background: var(--panel);
+.cal-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  margin: 4px 0 10px;
+}
+
+.cal-month { font-size: 15px; font-weight: 700; }
+
+.cal-nav {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 11px;
+  color: var(--dimmer);
+  margin-bottom: 4px;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.cal-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  gap: 3px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--panel);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--dimmer);
 }
 
-.checklist-cell.done {
+.cal-cell.pad { background: transparent; visibility: hidden; }
+
+.cal-cell.has-session { color: var(--ink); border-color: var(--line); }
+
+.cal-cell.today { border-color: var(--dim); }
+
+.cal-cell.selected {
   background: var(--accent-dim);
   border-color: var(--accent);
   color: var(--bg);
   font-weight: 700;
 }
 
-.checklist-cell.overdue {
-  border-color: var(--dim);
-  border-style: dashed;
+.cal-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+
+.cal-day-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.cal-day-panel-date {
+  font-size: 13px;
+  font-weight: 700;
   color: var(--dim);
+}
+
+.cal-day-item {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  text-align: left;
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
 }
 
 /* --------------------------------------------------------------- history */
@@ -575,8 +646,4 @@ button { font-family: var(--font-mono); }
   border-radius: 10px;
   font-size: 13px;
   z-index: 30;
-}
-
-@media (min-width: 640px) {
-  .checklist { grid-template-columns: repeat(8, 1fr); }
 }
