@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  currentWeek, retestWeeks, totalPlannedSessions, sessionChecklist,
   daysSinceLastSession, averageIntervalHR, vo2maxSeries,
   mileageBuckets, totalMileage,
 } from '../vo2max/js/block.js';
@@ -9,70 +8,8 @@ import {
 const settings = {
   baselineDate: '2026-08-01',
   baselineVO2max: 46,
-  protocolStartDate: '2026-08-03',
-  protocol: { reps: 4, freqPerWeek: 2, blockWeeks: 8 },
+  protocol: { reps: 4, freqPerWeek: 2 },
 };
-
-test('currentWeek advances every 7 days and clamps to the block length', () => {
-  assert.equal(currentWeek(settings, '2026-08-03'), 1);
-  assert.equal(currentWeek(settings, '2026-08-09'), 1);
-  assert.equal(currentWeek(settings, '2026-08-10'), 2);
-  assert.equal(currentWeek(settings, '2027-01-01'), 8); // clamped
-});
-
-test('retestWeeks is the block midpoint and end', () => {
-  assert.deepEqual(retestWeeks(settings), [4, 8]);
-  assert.deepEqual(retestWeeks({ protocol: { blockWeeks: 6 } }), [3, 6]);
-});
-
-test('totalPlannedSessions multiplies frequency by block length', () => {
-  assert.equal(totalPlannedSessions(settings), 16);
-});
-
-test('sessionChecklist fills slots in date order and tags each with its week', () => {
-  const sessions = [
-    { id: 'a', date: '2026-08-04' },
-    { id: 'b', date: '2026-08-06' },
-    { id: 'c', date: '2026-08-11' },
-  ];
-  const list = sessionChecklist(settings, sessions);
-  assert.equal(list.length, 16);
-  assert.equal(list[0].done, true);
-  assert.equal(list[0].sessionId, 'a');
-  assert.equal(list[1].sessionId, 'b');
-  assert.equal(list[1].week, 1);
-  assert.equal(list[2].sessionId, 'c');
-  assert.equal(list[2].week, 2); // 3rd slot, freq=2 -> week 2
-  assert.equal(list[3].done, false);
-});
-
-test('sessionChecklist skips easy runs — only the interval block counts', () => {
-  const sessions = [
-    { id: 'a', type: 'interval', date: '2026-08-04' },
-    { id: 'run', type: 'easy-run', date: '2026-08-05' },
-    { id: 'b', type: 'interval', date: '2026-08-06' },
-    { id: 'legacy', date: '2026-08-07' }, // no type field: pre-dates the feature, treated as interval
-  ];
-  const list = sessionChecklist(settings, sessions);
-  assert.equal(list.filter((c) => c.done).length, 3);
-  assert.equal(list[0].sessionId, 'a');
-  assert.equal(list[1].sessionId, 'b');
-  assert.equal(list[2].sessionId, 'legacy');
-});
-
-test('sessionChecklist flags unfilled slots from a fully-elapsed week as overdue', () => {
-  // freq=2, so week 1 = slots 1-2, week 2 = slots 3-4. Now is in week 3
-  // (2026-08-17), so week 1 and 2 have both fully elapsed.
-  const sessions = [{ id: 'a', type: 'interval', date: '2026-08-04' }]; // fills slot 1 only
-  const list = sessionChecklist(settings, sessions, '2026-08-17');
-  assert.equal(list[0].done, true);
-  assert.equal(list[0].overdue, false); // done slots are never overdue
-  assert.equal(list[1].done, false);
-  assert.equal(list[1].overdue, true); // week 1, missed
-  assert.equal(list[2].overdue, true); // week 2, missed
-  assert.equal(list[3].overdue, true); // week 2, missed
-  assert.equal(list[4].overdue, false); // week 3 — current week, not overdue yet
-});
 
 test('daysSinceLastSession looks at the most recent date', () => {
   const sessions = [{ date: '2026-08-01' }, { date: '2026-08-10' }];

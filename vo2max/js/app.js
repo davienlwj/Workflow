@@ -5,7 +5,7 @@ import {
 } from './store.js';
 import { lthrZoneTable, rhrZoneTable, targetZone } from './zones.js';
 import {
-  todayIso, currentWeek, retestWeeks,
+  todayIso,
   daysSinceLastSession, averageIntervalHR, vo2maxSeries,
   mileageBuckets, totalMileage,
 } from './block.js';
@@ -219,19 +219,30 @@ function readSessionForm(prefix) {
   return base;
 }
 
+/** Opens the Log session popup for a given date (from a calendar day). */
+function openLogSheet(dateIso) {
+  resetLogForm();
+  $('logDate').value = dateIso;
+  $('scrim').hidden = false;
+  $('logSheet').hidden = false;
+  $('logSheet').scrollTop = 0;
+}
+
+function closeLogSheet() {
+  $('scrim').hidden = true;
+  $('logSheet').hidden = true;
+}
+
+$('logCancel').addEventListener('click', closeLogSheet);
+
 $('logForm').addEventListener('submit', (e) => {
   e.preventDefault();
   addSession(readSessionForm('log'));
   sessions = loadSessions();
-  resetLogForm();
+  closeLogSheet();
   renderAll();
-  markSaved($('logSaveBtn'), 'Session Saved');
+  toast('Session saved');
 });
-
-// Any edit to the form (not the programmatic reset above, which doesn't
-// fire input/change) means there's something new to save again.
-$('logForm').addEventListener('input', () => clearSaved($('logSaveBtn')));
-$('logForm').addEventListener('change', () => clearSaved($('logSaveBtn')));
 
 /* ------------------------------------------------------------- HISTORY */
 
@@ -344,11 +355,10 @@ function renderCalendar() {
     if (has) classes.push('has-session');
     if (iso === todayIsoStr) classes.push('today');
     if (iso === calSelectedDate) classes.push('selected');
-    const tag = has ? 'button' : 'div';
-    html += `<${tag} class="${classes.join(' ')}" ${has ? `type="button" data-date="${iso}"` : ''}>
+    html += `<button type="button" class="${classes.join(' ')}" data-date="${iso}">
       <span>${d}</span>
       ${has ? '<span class="cal-dot"></span>' : ''}
-    </${tag}>`;
+    </button>`;
   }
   $('calGrid').innerHTML = html;
 
@@ -357,16 +367,17 @@ function renderCalendar() {
 
 function renderCalDayPanel(byDate) {
   const panel = $('calDayPanel');
-  const daySessions = calSelectedDate ? (byDate.get(calSelectedDate) || []) : [];
-  if (!daySessions.length) {
+  if (!calSelectedDate) {
     panel.hidden = true;
     panel.innerHTML = '';
     return;
   }
+  const daySessions = byDate.get(calSelectedDate) || [];
   panel.hidden = false;
   panel.innerHTML = `
     <div class="cal-day-panel-date mono">${fmtDateLong(calSelectedDate)}</div>
     ${daySessions.map((s) => calDaySummaryHTML(s)).join('')}
+    <button type="button" id="calLogBtn" class="ghost-btn block">+ Log session on this day</button>
   `;
   panel.querySelectorAll('.cal-day-item').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -374,6 +385,7 @@ function renderCalDayPanel(byDate) {
       if (s) openEditSheet(s);
     });
   });
+  $('calLogBtn').addEventListener('click', () => openLogSheet(calSelectedDate));
 }
 
 /** A simplified, at-a-glance summary of one session for the calendar day panel. */
@@ -413,7 +425,7 @@ $('calNext').addEventListener('click', () => {
   renderCalendar();
 });
 $('calGrid').addEventListener('click', (e) => {
-  const cell = e.target.closest('.cal-cell.has-session');
+  const cell = e.target.closest('.cal-cell:not(.pad)');
   if (!cell) return;
   const iso = cell.dataset.date;
   calSelectedDate = calSelectedDate === iso ? null : iso;
@@ -452,7 +464,10 @@ function closeEditSheet() {
   $('editSheet').hidden = true;
 }
 
-$('scrim').addEventListener('click', closeEditSheet);
+$('scrim').addEventListener('click', () => {
+  closeEditSheet();
+  closeLogSheet();
+});
 $('editCancel').addEventListener('click', closeEditSheet);
 
 $('editType').addEventListener('change', () => toggleTypeFields('edit', $('editType').value));
@@ -502,14 +517,11 @@ $('editDelete').addEventListener('click', () => {
 /* ------------------------------------------------------------- PROGRESS */
 
 function renderProgress() {
-  const week = currentWeek(settings);
-  const total = settings.protocol.blockWeeks;
   const avgHR = averageIntervalHR(sessions);
   const daysSince = daysSinceLastSession(sessions);
 
   $('statGrid').innerHTML = [
     [String(sessions.length), 'Sessions logged'],
-    [`Week ${week} of ${total}`, 'Block progress'],
     [avgHR != null ? `${avgHR}` : '—', 'Avg interval HR'],
     [daysSince != null ? String(daysSince) : '—', 'Days since last session'],
   ].map(([value, label]) => `
@@ -557,15 +569,12 @@ function renderZones() {
   $('rhrPrimaryBadge').hidden = settings.primaryZoneModel !== 'rhr';
 
   const p = settings.protocol;
-  const [midWeek, endWeek] = retestWeeks(settings);
   $('protocolCard').innerHTML = `
     <div><span class="k">Structure</span><span class="v">${p.reps} × ${p.workMin}min</span></div>
     <div><span class="k">Recovery between</span><span class="v">${p.restMin}min</span></div>
     <div><span class="k">Warm-up</span><span class="v">${p.warmupMin}min</span></div>
     <div><span class="k">Cool-down</span><span class="v">${p.cooldownMin}min</span></div>
     <div><span class="k">Frequency</span><span class="v">${p.freqPerWeek}×/week</span></div>
-    <div><span class="k">Block length</span><span class="v">${p.blockWeeks} weeks</span></div>
-    <div class="full"><span class="k">Retest VO2max</span><span class="v">Week ${midWeek} &amp; Week ${endWeek}</span></div>
   `;
 }
 
@@ -585,14 +594,12 @@ function renderSettingsForm() {
   $('sMaxHR').value = settings.maxHR;
   $('sLTHR').value = settings.lthr;
   $('sPrimaryModel').value = settings.primaryZoneModel;
-  $('sStartDate').value = settings.protocolStartDate;
   $('sReps').value = settings.protocol.reps;
   $('sWorkMin').value = settings.protocol.workMin;
   $('sRestMin').value = settings.protocol.restMin;
   $('sWarmupMin').value = settings.protocol.warmupMin;
   $('sCooldownMin').value = settings.protocol.cooldownMin;
   $('sFreq').value = settings.protocol.freqPerWeek;
-  $('sBlockWeeks').value = settings.protocol.blockWeeks;
 }
 
 $('settingsForm').addEventListener('submit', (e) => {
@@ -605,7 +612,6 @@ $('settingsForm').addEventListener('submit', (e) => {
     maxHR: Number($('sMaxHR').value),
     lthr: Number($('sLTHR').value),
     primaryZoneModel: $('sPrimaryModel').value,
-    protocolStartDate: $('sStartDate').value,
     protocol: {
       reps: Number($('sReps').value),
       workMin: Number($('sWorkMin').value),
@@ -613,7 +619,6 @@ $('settingsForm').addEventListener('submit', (e) => {
       warmupMin: Number($('sWarmupMin').value),
       cooldownMin: Number($('sCooldownMin').value),
       freqPerWeek: Number($('sFreq').value),
-      blockWeeks: Number($('sBlockWeeks').value),
     },
   };
   saveSettings(settings);
@@ -666,7 +671,7 @@ function renderAll() {
 
 resetLogForm();
 renderAll();
-switchView('log');
+switchView('dashboard');
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

@@ -1,7 +1,6 @@
 /*
- * Training-block math: which week the protocol is in, retest weeks, the
- * session checklist, and aggregate stats for the Progress view. Pure
- * functions of settings + sessions so they stay in sync as either changes.
+ * Aggregate stats for the Progress view — pure functions of settings +
+ * sessions so they stay in sync as either changes.
  */
 
 const DAY_MS = 86400000;
@@ -19,52 +18,6 @@ export function todayIso(now = new Date()) {
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
-}
-
-/** 1-indexed current week of the block; clamped to [1, blockWeeks]. */
-export function currentWeek(settings, now = todayIso()) {
-  const elapsedDays = daysBetween(settings.protocolStartDate, now);
-  const week = Math.floor(elapsedDays / 7) + 1;
-  return Math.min(Math.max(week, 1), settings.protocol.blockWeeks);
-}
-
-/** Weeks (1-indexed) at which VO2max should be retested: block midpoint and end. */
-export function retestWeeks(settings) {
-  const total = settings.protocol.blockWeeks;
-  const mid = Math.round(total / 2);
-  return [...new Set([mid, total])].sort((a, b) => a - b);
-}
-
-export function totalPlannedSessions(settings) {
-  return settings.protocol.freqPerWeek * settings.protocol.blockWeeks;
-}
-
-/**
- * Checklist of the whole block, one entry per planned session slot, filled
- * in order as sessions are logged (oldest first). Easy runs are logged
- * separately and don't count toward the interval block. A slot is
- * "overdue" if its week has fully elapsed and it's still unfilled — this
- * only flags whole missed weeks, since we track slots by week, not by an
- * exact planned day within the week.
- */
-export function sessionChecklist(settings, sessions, now = todayIso()) {
-  const total = totalPlannedSessions(settings);
-  const week = currentWeek(settings, now);
-  const sorted = sessions
-    .filter((s) => (s.type ?? 'interval') === 'interval')
-    .sort((a, b) => a.date.localeCompare(b.date));
-  return Array.from({ length: total }, (_, i) => {
-    const done = sorted[i];
-    const slotWeek = Math.floor(i / settings.protocol.freqPerWeek) + 1;
-    return {
-      index: i + 1,
-      week: slotWeek,
-      done: Boolean(done),
-      overdue: !done && slotWeek < week,
-      date: done ? done.date : null,
-      sessionId: done ? done.id : null,
-    };
-  });
 }
 
 export function daysSinceLastSession(sessions, now = todayIso()) {

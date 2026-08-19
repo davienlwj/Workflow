@@ -14,7 +14,6 @@ export const DEFAULT_SETTINGS = {
   restingHR: 54,
   maxHR: 194,
   lthr: 181,
-  protocolStartDate: '2026-08-19',
   primaryZoneModel: 'lthr', // 'lthr' | 'rhr'
   protocol: {
     reps: 4,
@@ -23,7 +22,6 @@ export const DEFAULT_SETTINGS = {
     warmupMin: 10,
     cooldownMin: 8,
     freqPerWeek: 2,
-    blockWeeks: 8,
   },
 };
 

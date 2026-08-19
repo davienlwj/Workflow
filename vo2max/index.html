@@ -33,92 +33,9 @@
 
 <main id="main">
 
-  <!-- LOG -->
-  <section id="view-log" class="view">
-    <h1 class="view-title">Log session</h1>
-    <form id="logForm" class="form" autocomplete="off">
-      <label class="field">
-        <span>Date</span>
-        <input id="logDate" type="date" required>
-      </label>
-
-      <label class="field">
-        <span>Session type</span>
-        <select id="logType">
-          <option value="interval">Interval (Norwegian 4x4)</option>
-          <option value="easy-run">Easy run</option>
-          <option value="long-run">Long run</option>
-        </select>
-      </label>
-
-      <div id="logIntervalFields" class="form">
-        <label class="field">
-          <span>Intervals completed</span>
-          <input id="logIntervals" type="number" min="0" max="20" required>
-        </label>
-
-        <div class="interval-row interval-row-heading" aria-hidden="true">
-          <span></span><span>avg HR</span><span>peak HR</span><span>min</span>
-        </div>
-        <div id="logIntervalRows" class="interval-rows"></div>
-
-        <p id="logAvgHR" class="computed-readout"></p>
-
-        <label class="field">
-          <span>Recovery quality</span>
-          <select id="logRecovery">
-            <option value="easy">Easy</option>
-            <option value="moderate" selected>Moderate</option>
-            <option value="hard">Hard</option>
-          </select>
-        </label>
-      </div>
-
-      <div id="logRunFields" class="form" hidden>
-        <div class="row">
-          <label class="field">
-            <span>Duration (min)</span>
-            <input id="logDurationMin" type="number" min="0" max="600" placeholder="e.g. 45">
-          </label>
-          <label class="field">
-            <span>Avg pace (min/km) <em>(optional)</em></span>
-            <input id="logAvgPace" type="number" step="0.1" min="0" placeholder="e.g. 6.5">
-          </label>
-        </div>
-        <label class="field">
-          <span>Distance (km) <em>(auto from duration + pace)</em></span>
-          <input id="logDistanceKm" type="number" step="0.1" min="0" placeholder="e.g. 8.2">
-        </label>
-        <div class="row">
-          <label class="field">
-            <span>Average HR <em>(optional)</em></span>
-            <input id="logRunAvgHR" type="number" min="60" max="230" placeholder="bpm">
-          </label>
-          <label class="field">
-            <span>Max HR <em>(optional)</em></span>
-            <input id="logRunMaxHR" type="number" min="60" max="230" placeholder="bpm">
-          </label>
-        </div>
-      </div>
-
-      <label class="field">
-        <span>Session RPE <output id="logRPEOut" class="mono"></output>/10</span>
-        <input id="logRPE" type="range" min="1" max="10" step="1" value="6">
-        <span class="range-anchors"><span>Easy</span><span>Max effort</span></span>
-      </label>
-
-      <label class="field">
-        <span>Notes</span>
-        <textarea id="logNotes" rows="3" placeholder="How it felt, conditions, anything worth remembering"></textarea>
-      </label>
-
-      <button type="submit" id="logSaveBtn" class="primary block">Save session</button>
-    </form>
-  </section>
-
-  <!-- HISTORY -->
-  <section id="view-history" class="view" hidden>
-    <h1 class="view-title">History</h1>
+  <!-- DASHBOARD -->
+  <section id="view-dashboard" class="view">
+    <h1 class="view-title">Dashboard</h1>
 
     <div class="cal-header">
       <button type="button" id="calPrev" class="cal-nav" aria-label="Previous month">‹</button>
@@ -128,15 +45,6 @@
     <div id="calWeekdays" class="cal-weekdays"></div>
     <div id="calGrid" class="cal-grid"></div>
     <div id="calDayPanel" class="cal-day-panel" hidden></div>
-
-    <h2 class="section-title">All sessions</h2>
-    <ul id="historyList" class="history-list"></ul>
-    <p id="historyEmpty" class="empty" hidden>No sessions logged yet.</p>
-  </section>
-
-  <!-- PROGRESS -->
-  <section id="view-progress" class="view" hidden>
-    <h1 class="view-title">Progress</h1>
 
     <div id="statGrid" class="stat-grid"></div>
 
@@ -150,6 +58,10 @@
       <button type="button" class="scope" role="tab" data-scope="year" aria-selected="false">Year</button>
     </div>
     <div id="mileageChartWrap" class="chart-wrap"></div>
+
+    <h2 class="section-title">All sessions</h2>
+    <ul id="historyList" class="history-list"></ul>
+    <p id="historyEmpty" class="empty" hidden>No sessions logged yet.</p>
   </section>
 
   <!-- ZONES -->
@@ -211,10 +123,6 @@
       </label>
 
       <h2 class="section-title">Protocol</h2>
-      <label class="field">
-        <span>Block start date</span>
-        <input id="sStartDate" type="date">
-      </label>
       <div class="row">
         <label class="field">
           <span>Reps</span>
@@ -239,16 +147,10 @@
           <input id="sCooldownMin" type="number" min="0" max="30">
         </label>
       </div>
-      <div class="row">
-        <label class="field">
-          <span>Sessions / week</span>
-          <input id="sFreq" type="number" min="1" max="7">
-        </label>
-        <label class="field">
-          <span>Block length (weeks)</span>
-          <input id="sBlockWeeks" type="number" min="1" max="52">
-        </label>
-      </div>
+      <label class="field">
+        <span>Sessions / week</span>
+        <input id="sFreq" type="number" min="1" max="7">
+      </label>
 
       <button type="submit" id="settingsSaveBtn" class="primary block">Save settings</button>
     </form>
@@ -264,9 +166,7 @@
 </main>
 
 <nav id="tabs" class="tabs" role="tablist" aria-label="Sections">
-  <button type="button" class="tab" data-view="log" role="tab" aria-selected="true">Log</button>
-  <button type="button" class="tab" data-view="history" role="tab" aria-selected="false">History</button>
-  <button type="button" class="tab" data-view="progress" role="tab" aria-selected="false">Progress</button>
+  <button type="button" class="tab" data-view="dashboard" role="tab" aria-selected="true">Dashboard</button>
   <button type="button" class="tab" data-view="zones" role="tab" aria-selected="false">Zones</button>
   <button type="button" class="tab" data-view="settings" role="tab" aria-selected="false">Settings</button>
 </nav>
@@ -362,6 +262,92 @@
       <button type="button" id="editDelete" class="danger-btn">Delete</button>
       <button type="button" id="editCancel" class="ghost-btn">Cancel</button>
       <button type="submit" id="editSave" class="primary">Save</button>
+    </div>
+  </form>
+</section>
+
+<!-- Log session sheet (popup, opened from a calendar day) -->
+<section id="logSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Log session">
+  <div class="grabber"></div>
+  <form id="logForm" class="form" autocomplete="off">
+    <label class="field">
+      <span>Date</span>
+      <input id="logDate" type="date" required>
+    </label>
+
+    <label class="field">
+      <span>Session type</span>
+      <select id="logType">
+        <option value="interval">Interval (Norwegian 4x4)</option>
+        <option value="easy-run">Easy run</option>
+        <option value="long-run">Long run</option>
+      </select>
+    </label>
+
+    <div id="logIntervalFields" class="form">
+      <label class="field">
+        <span>Intervals completed</span>
+        <input id="logIntervals" type="number" min="0" max="20" required>
+      </label>
+
+      <div class="interval-row interval-row-heading" aria-hidden="true">
+        <span></span><span>avg HR</span><span>peak HR</span><span>min</span>
+      </div>
+      <div id="logIntervalRows" class="interval-rows"></div>
+
+      <p id="logAvgHR" class="computed-readout"></p>
+
+      <label class="field">
+        <span>Recovery quality</span>
+        <select id="logRecovery">
+          <option value="easy">Easy</option>
+          <option value="moderate" selected>Moderate</option>
+          <option value="hard">Hard</option>
+        </select>
+      </label>
+    </div>
+
+    <div id="logRunFields" class="form" hidden>
+      <div class="row">
+        <label class="field">
+          <span>Duration (min)</span>
+          <input id="logDurationMin" type="number" min="0" max="600" placeholder="e.g. 45">
+        </label>
+        <label class="field">
+          <span>Avg pace (min/km) <em>(optional)</em></span>
+          <input id="logAvgPace" type="number" step="0.1" min="0" placeholder="e.g. 6.5">
+        </label>
+      </div>
+      <label class="field">
+        <span>Distance (km) <em>(auto from duration + pace)</em></span>
+        <input id="logDistanceKm" type="number" step="0.1" min="0" placeholder="e.g. 8.2">
+      </label>
+      <div class="row">
+        <label class="field">
+          <span>Average HR <em>(optional)</em></span>
+          <input id="logRunAvgHR" type="number" min="60" max="230" placeholder="bpm">
+        </label>
+        <label class="field">
+          <span>Max HR <em>(optional)</em></span>
+          <input id="logRunMaxHR" type="number" min="60" max="230" placeholder="bpm">
+        </label>
+      </div>
+    </div>
+
+    <label class="field">
+      <span>Session RPE <output id="logRPEOut" class="mono"></output>/10</span>
+      <input id="logRPE" type="range" min="1" max="10" step="1" value="6">
+      <span class="range-anchors"><span>Easy</span><span>Max effort</span></span>
+    </label>
+
+    <label class="field">
+      <span>Notes</span>
+      <textarea id="logNotes" rows="3" placeholder="How it felt, conditions, anything worth remembering"></textarea>
+    </label>
+
+    <div class="actions">
+      <button type="button" id="logCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" id="logSaveBtn" class="primary">Save session</button>
     </div>
   </form>
 </section>
