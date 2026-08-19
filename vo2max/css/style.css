@@ -522,11 +522,7 @@ button { font-family: var(--font-mono); }
   border: 1px solid var(--line);
 }
 
-/* Recovery intensity reads through lightness/weight, not hue. */
-.pill-easy { color: var(--dimmer); border-color: var(--line); }
-.pill-moderate { color: var(--dim); border-color: var(--dimmer); }
-.pill-hard { color: var(--ink); border-color: var(--dim); font-weight: 700; }
-.pill-run { color: var(--dim); border-color: var(--line); }
+.pill-type { color: var(--dim); border-color: var(--line); }
 
 /* ------------------------------------------------------------- zone table */
 

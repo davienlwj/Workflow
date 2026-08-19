@@ -250,7 +250,7 @@ const recoveryLabel = { easy: 'Easy', moderate: 'Moderate', hard: 'Hard' };
 // A filled-vs-outline glyph so recovery intensity reads at a glance without
 // relying on color (monotone theme) or having to read the word.
 const recoverySymbol = { easy: '○', moderate: '◐', hard: '●' };
-const runTypeLabel = { 'easy-run': 'Easy run', 'long-run': 'Long run' };
+const typeLabel = { interval: '4x4', 'easy-run': 'Easy run', 'long-run': 'Long run' };
 
 function renderHistory() {
   const list = $('historyList');
@@ -269,16 +269,17 @@ function renderHistory() {
       const peaks = (s.intervals || []).map((iv) => iv.peakHR).filter((v) => v != null);
       const avgHR = avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
       const peakHR = peaks.length ? Math.max(...peaks) : null;
-      badgeHTML = `<span class="pill pill-${s.recovery}">${recoverySymbol[s.recovery] ?? ''} ${recoveryLabel[s.recovery] ?? s.recovery}</span>`;
+      badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
       metaHTML = `
         <span>${s.intervalsCompleted} interval${s.intervalsCompleted === 1 ? '' : 's'}</span>
         ${avgHR != null ? `<span class="mono">avg ${avgHR}</span>` : ''}
         ${peakHR != null ? `<span class="mono">peak ${peakHR}</span>` : ''}
+        ${s.recovery ? `<span>${recoverySymbol[s.recovery] ?? ''} ${recoveryLabel[s.recovery] ?? s.recovery}</span>` : ''}
         <span class="mono">RPE ${s.rpe}</span>
         ${s.vo2max != null ? `<span class="mono">VO2 ${s.vo2max}</span>` : ''}
       `;
     } else {
-      badgeHTML = `<span class="pill pill-run">${runTypeLabel[type] ?? type}</span>`;
+      badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
       metaHTML = `
         ${s.durationMin != null ? `<span class="mono">${s.durationMin}min</span>` : ''}
         ${s.distanceKm != null ? `<span class="mono">${s.distanceKm}km</span>` : ''}
@@ -397,10 +398,10 @@ function calDaySummaryHTML(s) {
   if (isInterval) {
     const avgs = (s.intervals || []).map((iv) => iv.avgHR).filter((v) => v != null);
     const avgHR = avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
-    badgeHTML = `<span class="pill pill-${s.recovery}">${recoverySymbol[s.recovery] ?? ''} ${recoveryLabel[s.recovery] ?? s.recovery}</span>`;
+    badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
     metaHTML = `<span class="mono">${s.intervalsCompleted} interval${s.intervalsCompleted === 1 ? '' : 's'}${avgHR != null ? ` · avg ${avgHR}` : ''}</span>`;
   } else {
-    badgeHTML = `<span class="pill pill-run">${runTypeLabel[type] ?? type}</span>`;
+    badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
     metaHTML = `<span class="mono">${[
       s.distanceKm != null ? `${s.distanceKm}km` : null,
       s.durationMin != null ? `${s.durationMin}min` : null,
