@@ -101,6 +101,7 @@ main {
 /* ------------------------------------------------------------------ form */
 
 .form { display: flex; flex-direction: column; gap: 14px; }
+.form[hidden] { display: none; }
 
 .row { display: flex; gap: 10px; }
 .row .field { flex: 1; min-width: 0; }
