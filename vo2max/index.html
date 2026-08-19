@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>VO2max Tracker</title>
+<meta name="description" content="Norwegian 4x4 VO2max training tracker — log sessions, watch the trend, offline.">
+
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#05080a">
+
+<!-- Add to Home Screen on iOS -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VO2max">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+
+<link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+
+<header class="bar">
+  <span class="brand">VO<sub>2</sub>max</span>
+  <span id="headerZone" class="header-zone mono"></span>
+</header>
+
+<main id="main">
+
+  <!-- LOG -->
+  <section id="view-log" class="view">
+    <h1 class="view-title">Log session</h1>
+    <form id="logForm" class="form" autocomplete="off">
+      <label class="field">
+        <span>Date</span>
+        <input id="logDate" type="date" required>
+      </label>
+
+      <label class="field">
+        <span>Intervals completed</span>
+        <input id="logIntervals" type="number" min="0" max="20" required>
+      </label>
+
+      <div id="logIntervalRows" class="interval-rows"></div>
+
+      <div class="row">
+        <label class="field">
+          <span>Recovery quality</span>
+          <select id="logRecovery">
+            <option value="easy">Easy</option>
+            <option value="moderate" selected>Moderate</option>
+            <option value="hard">Hard</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Session RPE <output id="logRPEOut" class="mono"></output>/10</span>
+          <input id="logRPE" type="range" min="1" max="10" step="1" value="6">
+        </label>
+      </div>
+
+      <label class="field">
+        <span>VO2max reading <em>(optional)</em></span>
+        <input id="logVO2max" type="number" step="0.1" min="0" placeholder="ml/kg/min">
+      </label>
+
+      <label class="field">
+        <span>Notes</span>
+        <textarea id="logNotes" rows="3" placeholder="How it felt, conditions, anything worth remembering"></textarea>
+      </label>
+
+      <button type="submit" class="primary block">Save session</button>
+    </form>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="view-history" class="view" hidden>
+    <h1 class="view-title">History</h1>
+    <ul id="historyList" class="history-list"></ul>
+    <p id="historyEmpty" class="empty" hidden>No sessions logged yet.</p>
+  </section>
+
+  <!-- PROGRESS -->
+  <section id="view-progress" class="view" hidden>
+    <h1 class="view-title">Progress</h1>
+
+    <div id="statGrid" class="stat-grid"></div>
+
+    <h2 class="section-title">VO<sub>2</sub>max trend</h2>
+    <div id="chartWrap" class="chart-wrap"></div>
+
+    <h2 class="section-title">Block checklist</h2>
+    <div id="checklist" class="checklist"></div>
+  </section>
+
+  <!-- ZONES -->
+  <section id="view-zones" class="view" hidden>
+    <h1 class="view-title">Zones &amp; protocol</h1>
+
+    <div id="protocolCard" class="card protocol-card"></div>
+
+    <h2 class="section-title">LTHR-based zones <span id="lthrPrimaryBadge" class="badge" hidden>primary</span></h2>
+    <div id="lthrZoneTable" class="zone-table"></div>
+
+    <h2 class="section-title">RHR-based zones (Karvonen) <span id="rhrPrimaryBadge" class="badge" hidden>primary</span></h2>
+    <div id="rhrZoneTable" class="zone-table"></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="view-settings" class="view" hidden>
+    <h1 class="view-title">Settings</h1>
+
+    <form id="settingsForm" class="form">
+      <h2 class="section-title">Baseline</h2>
+      <div class="row">
+        <label class="field">
+          <span>Baseline VO2max</span>
+          <input id="sBaselineVO2max" type="number" step="0.1" min="0">
+        </label>
+        <label class="field">
+          <span>Recorded on</span>
+          <input id="sBaselineDate" type="date">
+        </label>
+      </div>
+      <label class="field">
+        <span>Device</span>
+        <input id="sDevice" type="text" placeholder="Watch / app used to measure">
+      </label>
+
+      <h2 class="section-title">Heart rate</h2>
+      <div class="row">
+        <label class="field">
+          <span>Resting HR</span>
+          <input id="sRestingHR" type="number" min="20" max="120">
+        </label>
+        <label class="field">
+          <span>Max HR</span>
+          <input id="sMaxHR" type="number" min="100" max="230">
+        </label>
+        <label class="field">
+          <span>LTHR</span>
+          <input id="sLTHR" type="number" min="80" max="220">
+        </label>
+      </div>
+
+      <label class="field">
+        <span>Primary zone model</span>
+        <select id="sPrimaryModel">
+          <option value="lthr">LTHR-based</option>
+          <option value="rhr">RHR-based (Karvonen)</option>
+        </select>
+      </label>
+
+      <h2 class="section-title">Protocol</h2>
+      <label class="field">
+        <span>Block start date</span>
+        <input id="sStartDate" type="date">
+      </label>
+      <div class="row">
+        <label class="field">
+          <span>Reps</span>
+          <input id="sReps" type="number" min="1" max="10">
+        </label>
+        <label class="field">
+          <span>Work (min)</span>
+          <input id="sWorkMin" type="number" min="1" max="20">
+        </label>
+        <label class="field">
+          <span>Rest (min)</span>
+          <input id="sRestMin" type="number" min="1" max="20">
+        </label>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>Warm-up (min)</span>
+          <input id="sWarmupMin" type="number" min="0" max="30">
+        </label>
+        <label class="field">
+          <span>Cool-down (min)</span>
+          <input id="sCooldownMin" type="number" min="0" max="30">
+        </label>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>Sessions / week</span>
+          <input id="sFreq" type="number" min="1" max="7">
+        </label>
+        <label class="field">
+          <span>Block length (weeks)</span>
+          <input id="sBlockWeeks" type="number" min="1" max="52">
+        </label>
+      </div>
+
+      <button type="submit" class="primary block">Save settings</button>
+    </form>
+
+    <div class="actions-row">
+      <button type="button" id="sExport" class="ghost-btn">Export data</button>
+      <button type="button" id="sImport" class="ghost-btn">Import data</button>
+      <button type="button" id="sReset" class="danger-btn">Reset to defaults</button>
+    </div>
+    <input id="sFile" type="file" accept="application/json" hidden>
+  </section>
+
+</main>
+
+<nav id="tabs" class="tabs" role="tablist" aria-label="Sections">
+  <button type="button" class="tab" data-view="log" role="tab" aria-selected="true">Log</button>
+  <button type="button" class="tab" data-view="history" role="tab" aria-selected="false">History</button>
+  <button type="button" class="tab" data-view="progress" role="tab" aria-selected="false">Progress</button>
+  <button type="button" class="tab" data-view="zones" role="tab" aria-selected="false">Zones</button>
+  <button type="button" class="tab" data-view="settings" role="tab" aria-selected="false">Settings</button>
+</nav>
+
+<!-- Edit session sheet -->
+<div id="scrim" class="scrim" hidden></div>
+<section id="editSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Edit session">
+  <div class="grabber"></div>
+  <form id="editForm" class="form">
+    <label class="field">
+      <span>Date</span>
+      <input id="editDate" type="date" required>
+    </label>
+
+    <label class="field">
+      <span>Intervals completed</span>
+      <input id="editIntervals" type="number" min="0" max="20" required>
+    </label>
+
+    <div id="editIntervalRows" class="interval-rows"></div>
+
+    <div class="row">
+      <label class="field">
+        <span>Recovery quality</span>
+        <select id="editRecovery">
+          <option value="easy">Easy</option>
+          <option value="moderate">Moderate</option>
+          <option value="hard">Hard</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Session RPE <output id="editRPEOut" class="mono"></output>/10</span>
+        <input id="editRPE" type="range" min="1" max="10" step="1">
+      </label>
+    </div>
+
+    <label class="field">
+      <span>VO2max reading <em>(optional)</em></span>
+      <input id="editVO2max" type="number" step="0.1" min="0">
+    </label>
+
+    <label class="field">
+      <span>Notes</span>
+      <textarea id="editNotes" rows="3"></textarea>
+    </label>
+
+    <div class="actions">
+      <button type="button" id="editDelete" class="danger-btn">Delete</button>
+      <button type="button" id="editCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" id="editSave" class="primary">Save</button>
+    </div>
+  </form>
+</section>
+
+<div id="toast" class="toast" hidden></div>
+
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>

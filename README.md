@@ -4,6 +4,11 @@ A minimal calendar you add to your Home Screen. Type or dictate one line;
 it works out the subject, date, time and place, shows you what it understood,
 and files it.
 
+This repo also hosts [**VO2max Tracker**](vo2max/), a second, independent
+Home Screen app for logging a Norwegian 4x4 training block — see
+`vo2max/README.md` for its own install and usage notes. Both apps share the
+same GitHub Pages deployment and live at `/` and `/vo2max/` respectively.
+
 > "meeting with Tom at KLCC at 3pm on 12/8"
 
 | Subject | Date | Time | Location |
