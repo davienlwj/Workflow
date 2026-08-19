@@ -374,11 +374,12 @@ function renderCalDayPanel(byDate) {
     return;
   }
   const daySessions = byDate.get(calSelectedDate) || [];
+  const logBtnLabel = daySessions.length ? '+ Log another session on this day' : '+ Log session on this day';
   panel.hidden = false;
   panel.innerHTML = `
     <div class="cal-day-panel-date mono">${fmtDateLong(calSelectedDate)}</div>
     ${daySessions.map((s) => calDaySummaryHTML(s)).join('')}
-    <button type="button" id="calLogBtn" class="ghost-btn block">+ Log session on this day</button>
+    <button type="button" id="calLogBtn" class="ghost-btn block">${logBtnLabel}</button>
   `;
   panel.querySelectorAll('.cal-day-item').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -429,15 +430,6 @@ $('calGrid').addEventListener('click', (e) => {
   const cell = e.target.closest('.cal-cell:not(.pad)');
   if (!cell) return;
   const iso = cell.dataset.date;
-  // An empty day has nothing to show, so go straight to logging one; a day
-  // that already has a session opens the day panel to view/edit it (which
-  // also offers "+ Log session" for a second entry the same day).
-  if (!cell.classList.contains('has-session')) {
-    calSelectedDate = iso;
-    renderCalendar();
-    openLogSheet(iso);
-    return;
-  }
   calSelectedDate = calSelectedDate === iso ? null : iso;
   renderCalendar();
 });
