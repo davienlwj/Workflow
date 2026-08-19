@@ -429,6 +429,15 @@ $('calGrid').addEventListener('click', (e) => {
   const cell = e.target.closest('.cal-cell:not(.pad)');
   if (!cell) return;
   const iso = cell.dataset.date;
+  // An empty day has nothing to show, so go straight to logging one; a day
+  // that already has a session opens the day panel to view/edit it (which
+  // also offers "+ Log session" for a second entry the same day).
+  if (!cell.classList.contains('has-session')) {
+    calSelectedDate = iso;
+    renderCalendar();
+    openLogSheet(iso);
+    return;
+  }
   calSelectedDate = calSelectedDate === iso ? null : iso;
   renderCalendar();
 });

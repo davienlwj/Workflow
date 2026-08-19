@@ -1,6 +1,6 @@
 /* VO2max Tracker - offline shell. Bump CACHE when the app files change. */
 
-const CACHE = 'vo2max-v14';
+const CACHE = 'vo2max-v15';
 
 const SHELL = [
   './',
