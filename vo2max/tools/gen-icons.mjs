@@ -12,8 +12,8 @@ import { fileURLToPath } from 'node:url';
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'icons');
 
-const INK = [5, 8, 10];        // near black, matches --bg
-const PULSE = [53, 255, 160];  // phosphor green, matches --accent
+const INK = [10, 10, 10];      // near black, matches --bg
+const PULSE = [245, 245, 245]; // near white, matches --accent (monotone)
 
 /* ------------------------------------------------------------ PNG writing */
 
@@ -160,9 +160,9 @@ for (const [name, size, opts] of targets) {
 
 // Vector version, for browsers that prefer it.
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-  <rect width="100" height="100" rx="22" fill="#05080a"/>
+  <rect width="100" height="100" rx="22" fill="#0a0a0a"/>
   <polyline points="14,50 34,50 42,28 50,72 58,50 86,50" fill="none"
-            stroke="#35ffa0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+            stroke="#f5f5f5" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 `;
 writeFileSync(join(OUT, 'icon.svg'), svg);
