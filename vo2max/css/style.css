@@ -219,6 +219,15 @@ button { font-family: var(--font-mono); }
   padding: 13px 18px;
   font-weight: 700;
   font-size: 15px;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+/* A save button in its saved state: darker fill instead of the bright
+   "ready to submit" white, so the button itself confirms the save without
+   a separate toast. Reverts the moment the form it belongs to changes. */
+.primary.saved {
+  background: var(--accent-dim);
+  color: var(--ink);
 }
 
 .primary.block, .ghost-btn.block, .danger-btn.block { width: 100%; }

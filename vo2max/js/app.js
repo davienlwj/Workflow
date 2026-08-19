@@ -45,6 +45,20 @@ function toast(msg) {
   toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
 }
 
+/** Swap a save button into its "saved" state: darker fill, confirming text. */
+function markSaved(btn, savedText) {
+  if (!btn.dataset.originalLabel) btn.dataset.originalLabel = btn.textContent;
+  btn.textContent = savedText;
+  btn.classList.add('saved');
+}
+
+/** Reverts a save button to its normal label/color — called on any edit to its form. */
+function clearSaved(btn) {
+  if (!btn.classList.contains('saved')) return;
+  btn.classList.remove('saved');
+  btn.textContent = btn.dataset.originalLabel;
+}
+
 function downloadFile(filename, content, mime) {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -207,8 +221,13 @@ $('logForm').addEventListener('submit', (e) => {
   sessions = loadSessions();
   resetLogForm();
   renderAll();
-  toast('Session saved');
+  markSaved($('logSaveBtn'), 'Session Saved');
 });
+
+// Any edit to the form (not the programmatic reset above, which doesn't
+// fire input/change) means there's something new to save again.
+$('logForm').addEventListener('input', () => clearSaved($('logSaveBtn')));
+$('logForm').addEventListener('change', () => clearSaved($('logSaveBtn')));
 
 /* ------------------------------------------------------------- HISTORY */
 
@@ -485,8 +504,11 @@ $('settingsForm').addEventListener('submit', (e) => {
   };
   saveSettings(settings);
   renderAll();
-  toast('Settings saved');
+  markSaved($('settingsSaveBtn'), 'Settings Saved');
 });
+
+$('settingsForm').addEventListener('input', () => clearSaved($('settingsSaveBtn')));
+$('settingsForm').addEventListener('change', () => clearSaved($('settingsSaveBtn')));
 
 $('sExport').addEventListener('click', () => {
   downloadFile(`vo2max-export-${todayIso()}.json`, exportAll(), 'application/json');
@@ -501,6 +523,7 @@ $('sFile').addEventListener('change', async () => {
     settings = loadSettings();
     sessions = loadSessions();
     renderAll();
+    clearSaved($('settingsSaveBtn'));
     toast('Data imported');
   } catch {
     toast('Import failed — invalid file');
@@ -512,6 +535,7 @@ $('sReset').addEventListener('click', () => {
   if (!confirm('Reset all settings to defaults? Sessions are not affected.')) return;
   settings = resetSettings();
   renderAll();
+  clearSaved($('settingsSaveBtn'));
   toast('Settings reset');
 });
 
