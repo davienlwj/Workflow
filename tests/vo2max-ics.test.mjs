@@ -24,6 +24,7 @@ const easyRunSession = {
   type: 'easy-run',
   date: '2026-08-17',
   durationMin: 45,
+  avgPace: 5.5,
   distanceKm: 8.2,
   avgHR: 148,
   rpe: 4,
@@ -69,16 +70,31 @@ test('sessionToICS omits the VO2max line when no reading was logged', () => {
 
 test('sessionToICS includes each interval\'s logged duration', () => {
   const unfolded = sessionToICS(baseSession).replaceAll('\r\n ', '');
-  assert.match(unfolded, /R1 182\/190 \(4min\)/);
-  assert.match(unfolded, /R2 183\/191 \(4\.1min\)/);
+  assert.match(unfolded, /S1 182\/190 \(4min\)/);
+  assert.match(unfolded, /S2 183\/191 \(4\.1min\)/);
 });
 
 test('sessionToICS builds an easy-run summary and description', () => {
   const unfolded = sessionToICS(easyRunSession).replaceAll('\r\n ', '');
   assert.match(unfolded, /SUMMARY:Easy run: 45min\\, 8\.2km/);
   assert.match(unfolded, /Duration: 45 min/);
+  assert.match(unfolded, /Avg pace: 5\.5 min\/km/);
   assert.match(unfolded, /Distance: 8\.2 km/);
   assert.match(unfolded, /Average HR: 148 bpm/);
   assert.doesNotMatch(unfolded, /Intervals completed/);
   assert.doesNotMatch(unfolded, /VO2max reading/);
+});
+
+test('sessionToICS builds a long-run summary distinct from an easy run', () => {
+  const longRun = { ...easyRunSession, type: 'long-run', durationMin: 110, distanceKm: 18 };
+  const unfolded = sessionToICS(longRun).replaceAll('\r\n ', '');
+  assert.match(unfolded, /SUMMARY:Long run: 110min\\, 18km/);
+});
+
+test('sessionToICS treats a session with no type field as interval (pre-dates the type field)', () => {
+  const legacy = { ...baseSession };
+  delete legacy.type;
+  const unfolded = sessionToICS(legacy).replaceAll('\r\n ', '');
+  assert.match(unfolded, /SUMMARY:VO2max: 4 intervals \(Moderate\)/);
+  assert.match(unfolded, /Intervals completed: 4/);
 });

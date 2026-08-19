@@ -28,21 +28,27 @@ npm run icons:vo2max                # regenerate the app icons
 
 ## What's in it
 
-- **Log** — record either an **interval session** (Norwegian 4x4: intervals
-  completed, per-interval avg/peak HR and actual duration, recovery quality)
-  or an **easy run** (duration, distance, avg/max HR) — plus session RPE, an
-  optional VO2max reading, and notes, shared by both. Each interval's
-  duration input defaults to the protocol's planned work time but is
-  editable per rep, for when an actual set ran long or short.
+- **Log** — record an **interval session** (Norwegian 4x4: intervals
+  completed, per-set avg/peak HR and actual duration, recovery quality), an
+  **easy run**, or a **long run** (duration, avg pace, distance, avg/max
+  HR) — plus session RPE and notes, shared by all three. Each interval
+  set's duration input defaults to the protocol's planned work time but is
+  editable per set, for when an actual set ran long or short; the session's
+  average HR is calculated live from whatever sets are filled in. For a
+  run, key in avg pace and duration and distance fills in automatically
+  (still editable by hand if you'd rather enter it directly). A VO2max
+  reading isn't captured here — add one after the fact from History if your
+  watch reports it, so the Log form stays focused on the workout itself.
 - **History** — every session, tap one to edit or delete it. From there,
   *Add to Calendar* downloads a standard `.ics` file for that session (date,
   intervals, HR, RPE, notes) that Apple Calendar, Google Calendar, or
   Outlook can all import directly — no account or sync setup involved.
-- **Progress** — sessions logged (interval + easy run combined), current
-  week of the block, average interval HR, days since your last session, a
-  VO2max trend chart, and a 16-slot block checklist that fills in as you log
-  interval sessions — easy runs are tracked but don't count toward the
-  block, since they're not part of the 4x4 protocol.
+- **Progress** — sessions logged (all types combined), current week of the
+  block, average interval HR, days since your last session, a VO2max trend
+  chart labeling each point with its exact value, a total-mileage bar chart
+  filterable by week/month/year, and a 16-slot block checklist that fills
+  in as you log interval sessions — runs are tracked but don't count toward
+  the block, since they're not part of the 4x4 protocol.
 - **Zones** — both the LTHR-based and RHR-based (Karvonen) zone tables, the
   interval target zone highlighted, and a protocol quick-reference card.
 - **Settings** — every number above (baseline VO2max, resting/max/threshold
@@ -74,10 +80,10 @@ css/style.css               the whole dark theme
 js/store.js                 localStorage CRUD for settings and sessions
 js/zones.js                 zone tables, computed from settings
 js/block.js                 current week, checklist, stats — pure functions
-js/chart.js                 dependency-free SVG line chart for the VO2max trend
+js/chart.js                 dependency-free SVG charts: VO2max trend line, mileage bars
 js/ics.js                   builds a per-session .ics file for calendar export
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/gen-icons.mjs          draws the icons, no dependencies
-../tests/vo2max-*.test.mjs   zone, block-math and ics-export test suites
+../tests/vo2max-*.test.mjs   zone, block-math, chart and ics-export test suites
 ```

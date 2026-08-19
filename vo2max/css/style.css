@@ -125,6 +125,13 @@ main {
 
 .field em { color: var(--dimmer); font-style: normal; }
 
+.computed-readout {
+  font-size: 12px;
+  color: var(--dim);
+  margin: -4px 0 2px;
+}
+.computed-readout .mono { color: var(--ink); font-weight: 700; }
+
 input, select, textarea {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -270,11 +277,34 @@ button { font-family: var(--font-mono); }
 
 .chart-svg { width: 100%; height: auto; display: block; }
 .chart-grid { stroke: var(--line); stroke-width: 1; }
-.chart-axis { fill: var(--dimmer); font-size: 8px; font-family: var(--font-mono); }
+.chart-axis { fill: var(--dimmer); font-size: 8px; }
+.chart-value-label { fill: var(--ink); font-size: 9px; font-weight: 700; }
 .chart-line { stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .chart-dot { fill: var(--bg); stroke: var(--accent); stroke-width: 2; }
 .chart-dot-baseline { fill: var(--ink); stroke: var(--ink); }
+.chart-bar { fill: var(--accent-dim); stroke: var(--accent); stroke-width: 1; }
 .chart-empty { color: var(--dimmer); font-size: 13px; text-align: center; padding: 40px 0; }
+
+/* -------------------------------------------------------------- scopes */
+
+.scopes { display: flex; gap: 8px; margin: 8px 0 10px; }
+
+.scope {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--dim);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+}
+
+.scope[aria-selected="true"] {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 700;
+}
 
 /* ------------------------------------------------------------- checklist */
 
@@ -409,7 +439,7 @@ button { font-family: var(--font-mono); }
   background: transparent;
   border: none;
   color: var(--dimmer);
-  font-size: 11px;
+  font-size: 14px;
   padding: 10px 4px 8px;
   display: flex;
   flex-direction: column;

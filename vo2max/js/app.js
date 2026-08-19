@@ -7,13 +7,15 @@ import { lthrZoneTable, rhrZoneTable, targetZone } from './zones.js';
 import {
   todayIso, currentWeek, retestWeeks, sessionChecklist,
   daysSinceLastSession, averageIntervalHR, vo2maxSeries,
+  mileageBuckets, totalMileage,
 } from './block.js';
-import { vo2maxTrendSVG } from './chart.js';
+import { vo2maxTrendSVG, mileageBarChartSVG } from './chart.js';
 import { sessionToICS } from './ics.js';
 
 let settings = loadSettings();
 let sessions = loadSessions();
 let editingId = null;
+let mileageScope = 'week';
 
 const $ = (id) => document.getElementById(id);
 
@@ -74,7 +76,7 @@ function buildIntervalRows(container, count, existing = []) {
     const peakVal = existing[i]?.peakHR ?? prevPeak[i] ?? '';
     const durationVal = existing[i]?.durationMin ?? prevDuration[i] ?? defaultDuration;
     row.innerHTML = `
-      <span class="iv-label">R${i + 1}</span>
+      <span class="iv-label">S${i + 1}</span>
       <input class="iv-avg" type="number" inputmode="numeric" min="60" max="230" placeholder="avg" value="${avgVal}">
       <input class="iv-peak" type="number" inputmode="numeric" min="60" max="230" placeholder="peak" value="${peakVal}">
       <input class="iv-duration" type="number" inputmode="decimal" step="0.1" min="0" max="60" placeholder="min" value="${durationVal}">
@@ -97,11 +99,34 @@ function numOrNull(v) {
   return Number.isNaN(n) ? null : n;
 }
 
+/** Live "Average HR" readout under the interval rows, from whatever avg values are filled in so far. */
+function updateComputedAvgHR(prefix) {
+  const el = $(`${prefix}AvgHR`);
+  if (!el) return;
+  const vals = [...$(`${prefix}IntervalRows`).querySelectorAll('.iv-avg')]
+    .map((i) => numOrNull(i.value))
+    .filter((v) => v != null);
+  el.innerHTML = vals.length
+    ? `Average HR: <span class="mono">${Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)}</span> bpm`
+    : '';
+}
+
+/** Distance = duration / pace, whenever both are present; otherwise left alone for manual entry. */
+function updateComputedDistance(prefix) {
+  const duration = numOrNull($(`${prefix}DurationMin`).value);
+  const pace = numOrNull($(`${prefix}AvgPace`).value);
+  if (duration != null && pace != null && pace > 0) {
+    // Rounded to 1 decimal to match the field's step="0.1" (2dp would fail
+    // the browser's native validation and silently block form submission).
+    $(`${prefix}DistanceKm`).value = Math.round((duration / pace) * 10) / 10;
+  }
+}
+
 /* --------------------------------------------------------------- LOG tab */
 
 function toggleTypeFields(prefix, type) {
   $(`${prefix}IntervalFields`).hidden = type !== 'interval';
-  $(`${prefix}EasyRunFields`).hidden = type !== 'easy-run';
+  $(`${prefix}RunFields`).hidden = type === 'interval';
 }
 
 function sessionTypeOf(session) {
@@ -114,14 +139,15 @@ function resetLogForm() {
   toggleTypeFields('log', 'interval');
   $('logIntervals').value = settings.protocol.reps;
   buildIntervalRows($('logIntervalRows'), settings.protocol.reps);
+  updateComputedAvgHR('log');
   $('logRecovery').value = 'moderate';
   $('logDurationMin').value = '';
+  $('logAvgPace').value = '';
   $('logDistanceKm').value = '';
   $('logRunAvgHR').value = '';
   $('logRunMaxHR').value = '';
   $('logRPE').value = 6;
   $('logRPEOut').textContent = '6';
-  $('logVO2max').value = '';
   $('logNotes').value = '';
 }
 
@@ -130,22 +156,33 @@ $('logType').addEventListener('change', () => toggleTypeFields('log', $('logType
 $('logIntervals').addEventListener('input', () => {
   const n = Math.max(0, Math.min(20, Number($('logIntervals').value) || 0));
   buildIntervalRows($('logIntervalRows'), n);
+  updateComputedAvgHR('log');
 });
+
+$('logIntervalRows').addEventListener('input', (e) => {
+  if (e.target.classList.contains('iv-avg')) updateComputedAvgHR('log');
+});
+
+$('logDurationMin').addEventListener('input', () => updateComputedDistance('log'));
+$('logAvgPace').addEventListener('input', () => updateComputedDistance('log'));
 
 $('logRPE').addEventListener('input', () => { $('logRPEOut').textContent = $('logRPE').value; });
 
 function readSessionForm(prefix) {
   const type = $(`${prefix}Type`).value;
+  // The Log form has no VO2max field (only Edit does, for filling one in after the fact).
+  const vo2maxEl = $(`${prefix}VO2max`);
   const base = {
     type,
     date: $(`${prefix}Date`).value,
     rpe: Number($(`${prefix}RPE`).value),
-    vo2max: numOrNull($(`${prefix}VO2max`).value),
+    vo2max: vo2maxEl ? numOrNull(vo2maxEl.value) : null,
     notes: $(`${prefix}Notes`).value.trim(),
     intervalsCompleted: 0,
     intervals: [],
     recovery: null,
     durationMin: null,
+    avgPace: null,
     distanceKm: null,
     avgHR: null,
     maxHR: null,
@@ -156,6 +193,7 @@ function readSessionForm(prefix) {
     base.recovery = $(`${prefix}Recovery`).value;
   } else {
     base.durationMin = numOrNull($(`${prefix}DurationMin`).value);
+    base.avgPace = numOrNull($(`${prefix}AvgPace`).value);
     base.distanceKm = numOrNull($(`${prefix}DistanceKm`).value);
     base.avgHR = numOrNull($(`${prefix}RunAvgHR`).value);
     base.maxHR = numOrNull($(`${prefix}RunMaxHR`).value);
@@ -175,6 +213,7 @@ $('logForm').addEventListener('submit', (e) => {
 /* ------------------------------------------------------------- HISTORY */
 
 const recoveryLabel = { easy: 'Easy', moderate: 'Moderate', hard: 'Hard' };
+const runTypeLabel = { 'easy-run': 'Easy run', 'long-run': 'Long run' };
 
 function renderHistory() {
   const list = $('historyList');
@@ -183,7 +222,8 @@ function renderHistory() {
   $('historyEmpty').hidden = sorted.length > 0;
 
   for (const s of sorted) {
-    const isInterval = sessionTypeOf(s) === 'interval';
+    const type = sessionTypeOf(s);
+    const isInterval = type === 'interval';
     let metaHTML;
     let badgeHTML;
 
@@ -201,10 +241,11 @@ function renderHistory() {
         ${s.vo2max != null ? `<span class="mono">VO2 ${s.vo2max}</span>` : ''}
       `;
     } else {
-      badgeHTML = '<span class="pill pill-run">Easy run</span>';
+      badgeHTML = `<span class="pill pill-run">${runTypeLabel[type] ?? type}</span>`;
       metaHTML = `
         ${s.durationMin != null ? `<span class="mono">${s.durationMin}min</span>` : ''}
         ${s.distanceKm != null ? `<span class="mono">${s.distanceKm}km</span>` : ''}
+        ${s.avgPace != null ? `<span class="mono">${s.avgPace}/km</span>` : ''}
         ${s.avgHR != null ? `<span class="mono">avg ${s.avgHR}</span>` : ''}
         ${s.maxHR != null ? `<span class="mono">max ${s.maxHR}</span>` : ''}
         <span class="mono">RPE ${s.rpe}</span>
@@ -246,8 +287,10 @@ function openEditSheet(session) {
   toggleTypeFields('edit', type);
   $('editIntervals').value = session.intervalsCompleted || 0;
   buildIntervalRows($('editIntervalRows'), session.intervalsCompleted || 0, session.intervals || []);
+  updateComputedAvgHR('edit');
   $('editRecovery').value = session.recovery ?? 'moderate';
   $('editDurationMin').value = session.durationMin ?? '';
+  $('editAvgPace').value = session.avgPace ?? '';
   $('editDistanceKm').value = session.distanceKm ?? '';
   $('editRunAvgHR').value = session.avgHR ?? '';
   $('editRunMaxHR').value = session.maxHR ?? '';
@@ -273,7 +316,15 @@ $('editType').addEventListener('change', () => toggleTypeFields('edit', $('editT
 $('editIntervals').addEventListener('input', () => {
   const n = Math.max(0, Math.min(20, Number($('editIntervals').value) || 0));
   buildIntervalRows($('editIntervalRows'), n);
+  updateComputedAvgHR('edit');
 });
+
+$('editIntervalRows').addEventListener('input', (e) => {
+  if (e.target.classList.contains('iv-avg')) updateComputedAvgHR('edit');
+});
+
+$('editDurationMin').addEventListener('input', () => updateComputedDistance('edit'));
+$('editAvgPace').addEventListener('input', () => updateComputedDistance('edit'));
 
 $('editRPE').addEventListener('input', () => { $('editRPEOut').textContent = $('editRPE').value; });
 
@@ -326,6 +377,9 @@ function renderProgress() {
 
   $('chartWrap').innerHTML = vo2maxTrendSVG(vo2maxSeries(settings, sessions));
 
+  $('mileageTotal').textContent = `${totalMileage(sessions)} km total`;
+  $('mileageChartWrap').innerHTML = mileageBarChartSVG(mileageBuckets(sessions, mileageScope));
+
   const checklist = sessionChecklist(settings, sessions);
   $('checklist').innerHTML = checklist.map((c) => `
     <div class="checklist-cell ${c.done ? 'done' : ''}" title="Week ${c.week}${c.date ? ` · ${c.date}` : ''}">
@@ -333,6 +387,16 @@ function renderProgress() {
     </div>
   `).join('');
 }
+
+$('mileageScope').addEventListener('click', (e) => {
+  const btn = e.target.closest('.scope');
+  if (!btn) return;
+  mileageScope = btn.dataset.scope;
+  $('mileageScope').querySelectorAll('.scope').forEach((b) => {
+    b.setAttribute('aria-selected', String(b === btn));
+  });
+  $('mileageChartWrap').innerHTML = mileageBarChartSVG(mileageBuckets(sessions, mileageScope));
+});
 
 /* --------------------------------------------------------------- ZONES */
 

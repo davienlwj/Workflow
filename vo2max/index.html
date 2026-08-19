@@ -47,6 +47,7 @@
         <select id="logType">
           <option value="interval">Interval (Norwegian 4x4)</option>
           <option value="easy-run">Easy run</option>
+          <option value="long-run">Long run</option>
         </select>
       </label>
 
@@ -57,9 +58,11 @@
         </label>
 
         <div class="interval-row interval-row-heading" aria-hidden="true">
-          <span></span><span>avg</span><span>peak</span><span>min</span>
+          <span></span><span>avg HR</span><span>peak HR</span><span>min</span>
         </div>
         <div id="logIntervalRows" class="interval-rows"></div>
+
+        <p id="logAvgHR" class="computed-readout"></p>
 
         <label class="field">
           <span>Recovery quality</span>
@@ -71,17 +74,21 @@
         </label>
       </div>
 
-      <div id="logEasyRunFields" class="form" hidden>
+      <div id="logRunFields" class="form" hidden>
         <div class="row">
           <label class="field">
             <span>Duration (min)</span>
             <input id="logDurationMin" type="number" min="0" max="600" placeholder="e.g. 45">
           </label>
           <label class="field">
-            <span>Distance (km) <em>(optional)</em></span>
-            <input id="logDistanceKm" type="number" step="0.1" min="0" placeholder="e.g. 8.2">
+            <span>Avg pace (min/km) <em>(optional)</em></span>
+            <input id="logAvgPace" type="number" step="0.1" min="0" placeholder="e.g. 6.5">
           </label>
         </div>
+        <label class="field">
+          <span>Distance (km) <em>(auto from duration + pace)</em></span>
+          <input id="logDistanceKm" type="number" step="0.1" min="0" placeholder="e.g. 8.2">
+        </label>
         <div class="row">
           <label class="field">
             <span>Average HR <em>(optional)</em></span>
@@ -97,11 +104,6 @@
       <label class="field">
         <span>Session RPE <output id="logRPEOut" class="mono"></output>/10</span>
         <input id="logRPE" type="range" min="1" max="10" step="1" value="6">
-      </label>
-
-      <label class="field">
-        <span>VO2max reading <em>(optional)</em></span>
-        <input id="logVO2max" type="number" step="0.1" min="0" placeholder="ml/kg/min">
       </label>
 
       <label class="field">
@@ -128,6 +130,14 @@
 
     <h2 class="section-title">VO<sub>2</sub>max trend</h2>
     <div id="chartWrap" class="chart-wrap"></div>
+
+    <h2 class="section-title">Total mileage <span id="mileageTotal" class="mono"></span></h2>
+    <div id="mileageScope" class="scopes" role="tablist" aria-label="Mileage range">
+      <button type="button" class="scope" role="tab" data-scope="week" aria-selected="true">Week</button>
+      <button type="button" class="scope" role="tab" data-scope="month" aria-selected="false">Month</button>
+      <button type="button" class="scope" role="tab" data-scope="year" aria-selected="false">Year</button>
+    </div>
+    <div id="mileageChartWrap" class="chart-wrap"></div>
 
     <h2 class="section-title">Block checklist</h2>
     <div id="checklist" class="checklist"></div>
@@ -267,6 +277,7 @@
       <select id="editType">
         <option value="interval">Interval (Norwegian 4x4)</option>
         <option value="easy-run">Easy run</option>
+        <option value="long-run">Long run</option>
       </select>
     </label>
 
@@ -277,9 +288,11 @@
       </label>
 
       <div class="interval-row interval-row-heading" aria-hidden="true">
-        <span></span><span>avg</span><span>peak</span><span>min</span>
+        <span></span><span>avg HR</span><span>peak HR</span><span>min</span>
       </div>
       <div id="editIntervalRows" class="interval-rows"></div>
+
+      <p id="editAvgHR" class="computed-readout"></p>
 
       <label class="field">
         <span>Recovery quality</span>
@@ -291,17 +304,21 @@
       </label>
     </div>
 
-    <div id="editEasyRunFields" class="form" hidden>
+    <div id="editRunFields" class="form" hidden>
       <div class="row">
         <label class="field">
           <span>Duration (min)</span>
           <input id="editDurationMin" type="number" min="0" max="600">
         </label>
         <label class="field">
-          <span>Distance (km) <em>(optional)</em></span>
-          <input id="editDistanceKm" type="number" step="0.1" min="0">
+          <span>Avg pace (min/km) <em>(optional)</em></span>
+          <input id="editAvgPace" type="number" step="0.1" min="0">
         </label>
       </div>
+      <label class="field">
+        <span>Distance (km) <em>(auto from duration + pace)</em></span>
+        <input id="editDistanceKm" type="number" step="0.1" min="0">
+      </label>
       <div class="row">
         <label class="field">
           <span>Average HR <em>(optional)</em></span>

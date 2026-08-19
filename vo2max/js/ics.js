@@ -53,7 +53,7 @@ function intervalDescriptionText(session) {
     const perInterval = intervals
       .map((iv, i) => {
         const duration = iv.durationMin != null ? ` (${iv.durationMin}min)` : '';
-        return `R${i + 1} ${iv.avgHR ?? '—'}/${iv.peakHR ?? '—'}${duration}`;
+        return `S${i + 1} ${iv.avgHR ?? '—'}/${iv.peakHR ?? '—'}${duration}`;
       })
       .join(', ');
     lines.push(`Per-interval HR (avg/peak): ${perInterval}`);
@@ -68,6 +68,7 @@ function intervalDescriptionText(session) {
 function easyRunDescriptionText(session) {
   const lines = [];
   if (session.durationMin != null) lines.push(`Duration: ${session.durationMin} min`);
+  if (session.avgPace != null) lines.push(`Avg pace: ${session.avgPace} min/km`);
   if (session.distanceKm != null) lines.push(`Distance: ${session.distanceKm} km`);
   if (session.avgHR != null) lines.push(`Average HR: ${session.avgHR} bpm`);
   if (session.maxHR != null) lines.push(`Max HR: ${session.maxHR} bpm`);
@@ -77,15 +78,23 @@ function easyRunDescriptionText(session) {
   return lines.join('\n');
 }
 
+const runTypeLabel = { 'easy-run': 'Easy run', 'long-run': 'Long run' };
+
+// Sessions logged before the type field existed have no `type` at all — treat as interval.
+function typeOf(session) {
+  return session.type ?? 'interval';
+}
+
 function descriptionText(session) {
-  return session.type === 'easy-run' ? easyRunDescriptionText(session) : intervalDescriptionText(session);
+  return typeOf(session) === 'interval' ? intervalDescriptionText(session) : easyRunDescriptionText(session);
 }
 
 function summaryText(session) {
-  if (session.type === 'easy-run') {
+  const type = typeOf(session);
+  if (type !== 'interval') {
     const duration = session.durationMin != null ? `${session.durationMin}min` : 'run';
     const distance = session.distanceKm != null ? `, ${session.distanceKm}km` : '';
-    return `Easy run: ${duration}${distance}`;
+    return `${runTypeLabel[type] ?? 'Run'}: ${duration}${distance}`;
   }
   const recovery = recoveryLabel[session.recovery] ?? session.recovery;
   return `VO2max: ${session.intervalsCompleted} interval${session.intervalsCompleted === 1 ? '' : 's'} (${recovery})`;
