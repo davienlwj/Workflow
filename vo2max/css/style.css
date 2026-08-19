@@ -147,8 +147,34 @@ input, select, textarea {
   color: var(--ink);
   padding: 10px 12px;
   font-size: 16px;
+  line-height: 1.2;
   font-family: var(--font-mono);
   width: 100%;
+}
+
+/* Explicit height on every text-like field (not textarea, which grows, or
+   range, which is its own shape) so a row of mixed input types — a date
+   next to a plain number, say — lines up exactly instead of each one
+   sizing itself from its own content. */
+input:not([type="range"]), select {
+  height: 44px;
+}
+
+/* iOS Safari renders a date input's own value (not the label, not other
+   input types) at the system Dynamic Type text size rather than this
+   font-size, which is why date fields alone could balloon well past their
+   siblings' height. -webkit-date-and-time-value is WebKit's own hook for
+   that inner value and does respect font-size; height+line-height on the
+   input are a backstop for engines that ignore it. */
+input[type="date"] {
+  height: 44px;
+  line-height: 44px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+  font-size: 16px;
 }
 
 textarea { resize: vertical; }
