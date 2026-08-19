@@ -1,6 +1,6 @@
 /* VO2max Tracker - offline shell. Bump CACHE when the app files change. */
 
-const CACHE = 'vo2max-v1';
+const CACHE = 'vo2max-v2';
 
 const SHELL = [
   './',
@@ -9,6 +9,7 @@ const SHELL = [
   './js/app.js',
   './js/block.js',
   './js/chart.js',
+  './js/ics.js',
   './js/store.js',
   './js/zones.js',
   './manifest.webmanifest',

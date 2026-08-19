@@ -9,6 +9,7 @@ import {
   daysSinceLastSession, averageIntervalHR, vo2maxSeries,
 } from './block.js';
 import { vo2maxTrendSVG } from './chart.js';
+import { sessionToICS } from './ics.js';
 
 let settings = loadSettings();
 let sessions = loadSessions();
@@ -40,6 +41,16 @@ function toast(msg) {
   el.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
+}
+
+function downloadFile(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function fmtDateLong(iso) {
@@ -197,6 +208,13 @@ $('editIntervals').addEventListener('input', () => {
 
 $('editRPE').addEventListener('input', () => { $('editRPEOut').textContent = $('editRPE').value; });
 
+$('editAddToCalendar').addEventListener('click', () => {
+  const session = sessions.find((s) => s.id === editingId);
+  if (!session) return;
+  downloadFile(`vo2max-session-${session.date}.ics`, sessionToICS(session), 'text/calendar');
+  toast('Calendar file downloaded');
+});
+
 $('editForm').addEventListener('submit', (e) => {
   e.preventDefault();
   if (!editingId) return;
@@ -343,13 +361,7 @@ $('settingsForm').addEventListener('submit', (e) => {
 });
 
 $('sExport').addEventListener('click', () => {
-  const blob = new Blob([exportAll()], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `vo2max-export-${todayIso()}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadFile(`vo2max-export-${todayIso()}.json`, exportAll(), 'application/json');
 });
 
 $('sImport').addEventListener('click', () => $('sFile').click());

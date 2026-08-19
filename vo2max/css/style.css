@@ -154,7 +154,7 @@ button { font-family: var(--font-sans); }
   font-size: 15px;
 }
 
-.primary.block { width: 100%; }
+.primary.block, .ghost-btn.block, .danger-btn.block { width: 100%; }
 
 .ghost-btn {
   background: transparent;

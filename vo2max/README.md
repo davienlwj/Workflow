@@ -30,7 +30,10 @@ npm run icons:vo2max                # regenerate the app icons
 
 - **Log** — record a session: date, intervals completed, per-interval avg +
   peak HR, recovery quality, session RPE, an optional VO2max reading, notes.
-- **History** — every session, tap one to edit or delete it.
+- **History** — every session, tap one to edit or delete it. From there,
+  *Add to Calendar* downloads a standard `.ics` file for that session (date,
+  intervals, HR, RPE, notes) that Apple Calendar, Google Calendar, or
+  Outlook can all import directly — no account or sync setup involved.
 - **Progress** — sessions logged, current week of the block, average
   interval HR, days since your last session, a VO2max trend chart, and a
   16-slot block checklist that fills in as you log.
@@ -66,8 +69,9 @@ js/store.js                 localStorage CRUD for settings and sessions
 js/zones.js                 zone tables, computed from settings
 js/block.js                 current week, checklist, stats — pure functions
 js/chart.js                 dependency-free SVG line chart for the VO2max trend
+js/ics.js                   builds a per-session .ics file for calendar export
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/gen-icons.mjs          draws the icons, no dependencies
-../tests/vo2max-*.test.mjs   zone and block-math test suites
+../tests/vo2max-*.test.mjs   zone, block-math and ics-export test suites
 ```
