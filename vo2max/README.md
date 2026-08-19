@@ -34,15 +34,6 @@ npm run icons:vo2max                # regenerate the app icons
   optional VO2max reading, and notes, shared by both. Each interval's
   duration input defaults to the protocol's planned work time but is
   editable per rep, for when an actual set ran long or short.
-- **Import from photo** — on the Log tab, paste or pick a screenshot from
-  the Zepp/Amazfit workout summary card and it OCRs the numbers (date,
-  duration, distance, avg/max HR, pace, calories, training load, HR zone
-  breakdown) straight into an easy-run entry for you to check and save.
-  Runs entirely on-device via [Tesseract.js](https://github.com/naptha/tesseract.js)
-  loaded from a CDN — nothing is uploaded anywhere, but the *first* use
-  needs an internet connection to fetch the ~5–8MB recognition engine
-  (cached by the browser afterwards). It's tuned specifically to this one
-  card layout; always glance over the fields it fills in before saving.
 - **History** — every session, tap one to edit or delete it. From there,
   *Add to Calendar* downloads a standard `.ics` file for that session (date,
   intervals, HR, RPE, notes) that Apple Calendar, Google Calendar, or
@@ -85,10 +76,8 @@ js/zones.js                 zone tables, computed from settings
 js/block.js                 current week, checklist, stats — pure functions
 js/chart.js                 dependency-free SVG line chart for the VO2max trend
 js/ics.js                   builds a per-session .ics file for calendar export
-js/ocr.js                   loads Tesseract.js from a CDN and runs OCR on a photo
-js/photoParse.js            turns OCR text into structured workout fields (pure, tested)
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/gen-icons.mjs          draws the icons, no dependencies
-../tests/vo2max-*.test.mjs   zone, block-math, ics-export and photo-parsing test suites
+../tests/vo2max-*.test.mjs   zone, block-math and ics-export test suites
 ```

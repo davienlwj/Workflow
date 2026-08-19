@@ -10,8 +10,6 @@ import {
 } from './block.js';
 import { vo2maxTrendSVG } from './chart.js';
 import { sessionToICS } from './ics.js';
-import { recognizeImageText } from './ocr.js';
-import { parseWorkoutText, summarizeForNotes } from './photoParse.js';
 
 let settings = loadSettings();
 let sessions = loadSessions();
@@ -163,60 +161,6 @@ function readSessionForm(prefix) {
     base.maxHR = numOrNull($(`${prefix}RunMaxHR`).value);
   }
   return base;
-}
-
-/* --------------------------------------------------------- photo import */
-
-$('logImportPhoto').addEventListener('click', () => $('logPhotoFile').click());
-
-$('logPhotoFile').addEventListener('change', () => {
-  const file = $('logPhotoFile').files[0];
-  if (file) importWorkoutPhoto(file);
-  $('logPhotoFile').value = '';
-});
-
-// Cmd+V / iOS paste of a copied screenshot, while the Log tab is open.
-document.addEventListener('paste', (e) => {
-  if ($('view-log').hidden) return;
-  const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith('image/'));
-  if (!item) return;
-  e.preventDefault();
-  importWorkoutPhoto(item.getAsFile());
-});
-
-async function importWorkoutPhoto(file) {
-  const status = $('logImportStatus');
-  status.hidden = false;
-  status.classList.remove('error');
-  status.textContent = 'Reading photo…';
-  try {
-    const text = await recognizeImageText(file, (label, pct) => {
-      status.textContent = pct != null ? `${label}… ${pct}%` : `${label}…`;
-    });
-    applyParsedWorkout(parseWorkoutText(text));
-    status.classList.remove('error');
-    status.textContent = 'Photo parsed — check the fields below before saving';
-    setTimeout(() => { status.hidden = true; }, 6000);
-  } catch (err) {
-    status.classList.add('error');
-    const detail = err?.message ? ` (${err.message})` : '';
-    status.textContent = `Couldn't read that photo${detail} — enter details manually`;
-  }
-}
-
-function applyParsedWorkout(parsed) {
-  $('logType').value = 'easy-run';
-  toggleTypeFields('log', 'easy-run');
-  if (parsed.date) $('logDate').value = parsed.date;
-  if (parsed.durationMin != null) $('logDurationMin').value = parsed.durationMin;
-  if (parsed.distanceKm != null) $('logDistanceKm').value = parsed.distanceKm;
-  if (parsed.avgHR != null) $('logRunAvgHR').value = parsed.avgHR;
-  if (parsed.maxHR != null) $('logRunMaxHR').value = parsed.maxHR;
-  const summary = summarizeForNotes(parsed);
-  if (summary) {
-    const existing = $('logNotes').value.trim();
-    $('logNotes').value = existing ? `${existing}\n${summary}` : summary;
-  }
 }
 
 $('logForm').addEventListener('submit', (e) => {

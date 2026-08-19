@@ -157,14 +157,6 @@ button { font-family: var(--font-sans); }
 
 .primary.block, .ghost-btn.block, .danger-btn.block { width: 100%; }
 
-.import-status {
-  font-size: 12px;
-  color: var(--dim);
-  text-align: center;
-  margin: 8px 0 0;
-}
-.import-status.error { color: var(--danger); }
-
 .ghost-btn {
   background: transparent;
   border: 1px solid var(--line);
