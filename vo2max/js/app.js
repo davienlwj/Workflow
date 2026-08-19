@@ -45,15 +45,19 @@ function toast(msg) {
   toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
 }
 
-/** Swap a save button into its "saved" state: darker fill, confirming text. */
+/** Swap a save button into its "saved" state: darker fill, confirming text.
+ *  Auto-reverts after 5s, or sooner if the form it belongs to changes. */
 function markSaved(btn, savedText) {
   if (!btn.dataset.originalLabel) btn.dataset.originalLabel = btn.textContent;
   btn.textContent = savedText;
   btn.classList.add('saved');
+  clearTimeout(btn._saveTimer);
+  btn._saveTimer = setTimeout(() => clearSaved(btn), 5000);
 }
 
-/** Reverts a save button to its normal label/color — called on any edit to its form. */
+/** Reverts a save button to its normal label/color — called on edit, timeout, or an out-of-band change. */
 function clearSaved(btn) {
+  clearTimeout(btn._saveTimer);
   if (!btn.classList.contains('saved')) return;
   btn.classList.remove('saved');
   btn.textContent = btn.dataset.originalLabel;

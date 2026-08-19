@@ -94,6 +94,11 @@ main {
   padding: 16px 16px calc(96px + var(--safe-b));
   max-width: 560px;
   margin: 0 auto;
+  /* Backstop alongside html's overflow-x: hidden — Safari doesn't always
+     honor a horizontal-scroll lock declared only on the document root
+     when a descendant (e.g. a native form control rendering wider than
+     asked) tries to overflow it. */
+  overflow-x: hidden;
 }
 
 .view-title {
@@ -129,7 +134,7 @@ main {
 .form { display: flex; flex-direction: column; gap: 14px; }
 .form[hidden] { display: none; }
 
-.row { display: flex; gap: 10px; }
+.row { display: flex; gap: 10px; max-width: 100%; }
 .row .field { flex: 1; min-width: 0; }
 
 .field {
@@ -138,6 +143,8 @@ main {
   gap: 6px;
   font-size: 13px;
   color: var(--dim);
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .field em { color: var(--dimmer); font-style: normal; }
@@ -180,10 +187,18 @@ input[type="date"] {
   line-height: 44px;
   padding-top: 0;
   padding-bottom: 0;
+  /* iOS can also render this control's value wider than font-size and
+     height alone account for, pushing the box itself past width:100% of
+     its row — max-width plus clipping keeps that overflow inside the box
+     instead of stretching it past the screen edge. */
+  max-width: 100%;
+  overflow: hidden;
 }
 input[type="date"]::-webkit-date-and-time-value {
   text-align: left;
   font-size: 16px;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 textarea { resize: vertical; }
