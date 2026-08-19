@@ -449,13 +449,36 @@ button { font-family: var(--font-mono); }
 
 .cal-cell.has-session { color: var(--ink); border-color: var(--line); }
 
-.cal-cell.today { border-color: var(--dim); }
+/* Diagonal hatching, not just a border, so today reads at a glance even
+   among a grid of otherwise-identical cells. */
+.cal-cell.today {
+  border-color: var(--dim);
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--line) 0,
+    var(--line) 2px,
+    transparent 2px,
+    transparent 7px
+  );
+}
 
 .cal-cell.selected {
   background: var(--accent-dim);
   border-color: var(--accent);
   color: var(--bg);
   font-weight: 700;
+}
+
+/* Re-applied after .selected's background shorthand clears it, in a
+   lighter stripe color so the hatch still shows on the accent fill. */
+.cal-cell.today.selected {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--accent) 0,
+    var(--accent) 2px,
+    transparent 2px,
+    transparent 7px
+  );
 }
 
 .cal-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
