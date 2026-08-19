@@ -197,9 +197,10 @@ async function importWorkoutPhoto(file) {
     status.classList.remove('error');
     status.textContent = 'Photo parsed — check the fields below before saving';
     setTimeout(() => { status.hidden = true; }, 6000);
-  } catch {
+  } catch (err) {
     status.classList.add('error');
-    status.textContent = "Couldn't read that photo — needs a connection the first time you use this, otherwise enter details manually";
+    const detail = err?.message ? ` (${err.message})` : '';
+    status.textContent = `Couldn't read that photo${detail} — enter details manually`;
   }
 }
 
