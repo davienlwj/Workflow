@@ -46,12 +46,15 @@ function nextDateOnly(iso) {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
 }
 
-function descriptionText(session) {
+function intervalDescriptionText(session) {
   const lines = [`Intervals completed: ${session.intervalsCompleted}`];
   const intervals = session.intervals || [];
-  if (intervals.some((iv) => iv.avgHR != null || iv.peakHR != null)) {
+  if (intervals.some((iv) => iv.avgHR != null || iv.peakHR != null || iv.durationMin != null)) {
     const perInterval = intervals
-      .map((iv, i) => `R${i + 1} ${iv.avgHR ?? '—'}/${iv.peakHR ?? '—'}`)
+      .map((iv, i) => {
+        const duration = iv.durationMin != null ? ` (${iv.durationMin}min)` : '';
+        return `R${i + 1} ${iv.avgHR ?? '—'}/${iv.peakHR ?? '—'}${duration}`;
+      })
       .join(', ');
     lines.push(`Per-interval HR (avg/peak): ${perInterval}`);
   }
@@ -62,9 +65,34 @@ function descriptionText(session) {
   return lines.join('\n');
 }
 
-export function sessionToICS(session) {
+function easyRunDescriptionText(session) {
+  const lines = [];
+  if (session.durationMin != null) lines.push(`Duration: ${session.durationMin} min`);
+  if (session.distanceKm != null) lines.push(`Distance: ${session.distanceKm} km`);
+  if (session.avgHR != null) lines.push(`Average HR: ${session.avgHR} bpm`);
+  if (session.maxHR != null) lines.push(`Max HR: ${session.maxHR} bpm`);
+  lines.push(`Session RPE: ${session.rpe}/10`);
+  if (session.vo2max != null) lines.push(`VO2max reading: ${session.vo2max} ml/kg/min`);
+  if (session.notes) lines.push(`Notes: ${session.notes}`);
+  return lines.join('\n');
+}
+
+function descriptionText(session) {
+  return session.type === 'easy-run' ? easyRunDescriptionText(session) : intervalDescriptionText(session);
+}
+
+function summaryText(session) {
+  if (session.type === 'easy-run') {
+    const duration = session.durationMin != null ? `${session.durationMin}min` : 'run';
+    const distance = session.distanceKm != null ? `, ${session.distanceKm}km` : '';
+    return `Easy run: ${duration}${distance}`;
+  }
   const recovery = recoveryLabel[session.recovery] ?? session.recovery;
-  const summary = `VO2max: ${session.intervalsCompleted} interval${session.intervalsCompleted === 1 ? '' : 's'} (${recovery})`;
+  return `VO2max: ${session.intervalsCompleted} interval${session.intervalsCompleted === 1 ? '' : 's'} (${recovery})`;
+}
+
+export function sessionToICS(session) {
+  const summary = summaryText(session);
 
   const lines = [
     'BEGIN:VCALENDAR',

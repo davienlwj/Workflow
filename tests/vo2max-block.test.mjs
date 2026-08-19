@@ -45,6 +45,20 @@ test('sessionChecklist fills slots in date order and tags each with its week', (
   assert.equal(list[3].done, false);
 });
 
+test('sessionChecklist skips easy runs — only the interval block counts', () => {
+  const sessions = [
+    { id: 'a', type: 'interval', date: '2026-08-04' },
+    { id: 'run', type: 'easy-run', date: '2026-08-05' },
+    { id: 'b', type: 'interval', date: '2026-08-06' },
+    { id: 'legacy', date: '2026-08-07' }, // no type field: pre-dates the feature, treated as interval
+  ];
+  const list = sessionChecklist(settings, sessions);
+  assert.equal(list.filter((c) => c.done).length, 3);
+  assert.equal(list[0].sessionId, 'a');
+  assert.equal(list[1].sessionId, 'b');
+  assert.equal(list[2].sessionId, 'legacy');
+});
+
 test('daysSinceLastSession looks at the most recent date', () => {
   const sessions = [{ date: '2026-08-01' }, { date: '2026-08-10' }];
   assert.equal(daysSinceLastSession(sessions, '2026-08-15'), 5);

@@ -4,18 +4,31 @@ import { sessionToICS } from '../vo2max/js/ics.js';
 
 const baseSession = {
   id: 'abc123',
+  type: 'interval',
   date: '2026-08-18',
   intervalsCompleted: 4,
   intervals: [
-    { avgHR: 182, peakHR: 190 },
-    { avgHR: 183, peakHR: 191 },
-    { avgHR: 184, peakHR: 192 },
-    { avgHR: 185, peakHR: 193 },
+    { avgHR: 182, peakHR: 190, durationMin: 4 },
+    { avgHR: 183, peakHR: 191, durationMin: 4.1 },
+    { avgHR: 184, peakHR: 192, durationMin: 4 },
+    { avgHR: 185, peakHR: 193, durationMin: 3.9 },
   ],
   recovery: 'moderate',
   rpe: 6,
   vo2max: 47.2,
   notes: 'Felt strong, cool weather',
+};
+
+const easyRunSession = {
+  id: 'run456',
+  type: 'easy-run',
+  date: '2026-08-17',
+  durationMin: 45,
+  distanceKm: 8.2,
+  avgHR: 148,
+  rpe: 4,
+  vo2max: null,
+  notes: 'Easy shakeout',
 };
 
 test('sessionToICS produces a well-formed VEVENT with correct dates', () => {
@@ -52,4 +65,20 @@ test('sessionToICS omits the VO2max line when no reading was logged', () => {
   const session = { ...baseSession, vo2max: null };
   const ics = sessionToICS(session);
   assert.doesNotMatch(ics, /VO2max reading/);
+});
+
+test('sessionToICS includes each interval\'s logged duration', () => {
+  const unfolded = sessionToICS(baseSession).replaceAll('\r\n ', '');
+  assert.match(unfolded, /R1 182\/190 \(4min\)/);
+  assert.match(unfolded, /R2 183\/191 \(4\.1min\)/);
+});
+
+test('sessionToICS builds an easy-run summary and description', () => {
+  const unfolded = sessionToICS(easyRunSession).replaceAll('\r\n ', '');
+  assert.match(unfolded, /SUMMARY:Easy run: 45min\\, 8\.2km/);
+  assert.match(unfolded, /Duration: 45 min/);
+  assert.match(unfolded, /Distance: 8\.2 km/);
+  assert.match(unfolded, /Average HR: 148 bpm/);
+  assert.doesNotMatch(unfolded, /Intervals completed/);
+  assert.doesNotMatch(unfolded, /VO2max reading/);
 });

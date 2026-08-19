@@ -41,11 +41,14 @@ export function totalPlannedSessions(settings) {
 
 /**
  * Checklist of the whole block, one entry per planned session slot, filled
- * in order as sessions are logged (oldest first).
+ * in order as sessions are logged (oldest first). Easy runs are logged
+ * separately and don't count toward the interval block.
  */
 export function sessionChecklist(settings, sessions) {
   const total = totalPlannedSessions(settings);
-  const sorted = [...sessions].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = sessions
+    .filter((s) => (s.type ?? 'interval') === 'interval')
+    .sort((a, b) => a.date.localeCompare(b.date));
   return Array.from({ length: total }, (_, i) => {
     const done = sorted[i];
     const week = Math.floor(i / settings.protocol.freqPerWeek) + 1;

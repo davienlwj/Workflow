@@ -10,6 +10,8 @@ import {
 } from './block.js';
 import { vo2maxTrendSVG } from './chart.js';
 import { sessionToICS } from './ics.js';
+import { recognizeImageText } from './ocr.js';
+import { parseWorkoutText, summarizeForNotes } from './photoParse.js';
 
 let settings = loadSettings();
 let sessions = loadSessions();
@@ -64,16 +66,20 @@ function fmtDateLong(iso) {
 function buildIntervalRows(container, count, existing = []) {
   const prevAvg = [...container.querySelectorAll('.iv-avg')].map((i) => i.value);
   const prevPeak = [...container.querySelectorAll('.iv-peak')].map((i) => i.value);
+  const prevDuration = [...container.querySelectorAll('.iv-duration')].map((i) => i.value);
+  const defaultDuration = settings.protocol.workMin;
   container.innerHTML = '';
   for (let i = 0; i < count; i++) {
     const row = document.createElement('div');
     row.className = 'interval-row';
     const avgVal = existing[i]?.avgHR ?? prevAvg[i] ?? '';
     const peakVal = existing[i]?.peakHR ?? prevPeak[i] ?? '';
+    const durationVal = existing[i]?.durationMin ?? prevDuration[i] ?? defaultDuration;
     row.innerHTML = `
       <span class="iv-label">R${i + 1}</span>
-      <input class="iv-avg" type="number" inputmode="numeric" min="60" max="230" placeholder="avg bpm" value="${avgVal}">
-      <input class="iv-peak" type="number" inputmode="numeric" min="60" max="230" placeholder="peak bpm" value="${peakVal}">
+      <input class="iv-avg" type="number" inputmode="numeric" min="60" max="230" placeholder="avg" value="${avgVal}">
+      <input class="iv-peak" type="number" inputmode="numeric" min="60" max="230" placeholder="peak" value="${peakVal}">
+      <input class="iv-duration" type="number" inputmode="decimal" step="0.1" min="0" max="60" placeholder="min" value="${durationVal}">
     `;
     container.appendChild(row);
   }
@@ -83,6 +89,7 @@ function readIntervalRows(container) {
   return [...container.querySelectorAll('.interval-row')].map((row) => ({
     avgHR: numOrNull(row.querySelector('.iv-avg').value),
     peakHR: numOrNull(row.querySelector('.iv-peak').value),
+    durationMin: numOrNull(row.querySelector('.iv-duration').value),
   }));
 }
 
@@ -94,16 +101,33 @@ function numOrNull(v) {
 
 /* --------------------------------------------------------------- LOG tab */
 
+function toggleTypeFields(prefix, type) {
+  $(`${prefix}IntervalFields`).hidden = type !== 'interval';
+  $(`${prefix}EasyRunFields`).hidden = type !== 'easy-run';
+}
+
+function sessionTypeOf(session) {
+  return session.type ?? 'interval';
+}
+
 function resetLogForm() {
   $('logDate').value = todayIso();
+  $('logType').value = 'interval';
+  toggleTypeFields('log', 'interval');
   $('logIntervals').value = settings.protocol.reps;
   buildIntervalRows($('logIntervalRows'), settings.protocol.reps);
   $('logRecovery').value = 'moderate';
+  $('logDurationMin').value = '';
+  $('logDistanceKm').value = '';
+  $('logRunAvgHR').value = '';
+  $('logRunMaxHR').value = '';
   $('logRPE').value = 6;
   $('logRPEOut').textContent = '6';
   $('logVO2max').value = '';
   $('logNotes').value = '';
 }
+
+$('logType').addEventListener('change', () => toggleTypeFields('log', $('logType').value));
 
 $('logIntervals').addEventListener('input', () => {
   const n = Math.max(0, Math.min(20, Number($('logIntervals').value) || 0));
@@ -112,18 +136,91 @@ $('logIntervals').addEventListener('input', () => {
 
 $('logRPE').addEventListener('input', () => { $('logRPEOut').textContent = $('logRPE').value; });
 
+function readSessionForm(prefix) {
+  const type = $(`${prefix}Type`).value;
+  const base = {
+    type,
+    date: $(`${prefix}Date`).value,
+    rpe: Number($(`${prefix}RPE`).value),
+    vo2max: numOrNull($(`${prefix}VO2max`).value),
+    notes: $(`${prefix}Notes`).value.trim(),
+    intervalsCompleted: 0,
+    intervals: [],
+    recovery: null,
+    durationMin: null,
+    distanceKm: null,
+    avgHR: null,
+    maxHR: null,
+  };
+  if (type === 'interval') {
+    base.intervalsCompleted = Number($(`${prefix}Intervals`).value) || 0;
+    base.intervals = readIntervalRows($(`${prefix}IntervalRows`));
+    base.recovery = $(`${prefix}Recovery`).value;
+  } else {
+    base.durationMin = numOrNull($(`${prefix}DurationMin`).value);
+    base.distanceKm = numOrNull($(`${prefix}DistanceKm`).value);
+    base.avgHR = numOrNull($(`${prefix}RunAvgHR`).value);
+    base.maxHR = numOrNull($(`${prefix}RunMaxHR`).value);
+  }
+  return base;
+}
+
+/* --------------------------------------------------------- photo import */
+
+$('logImportPhoto').addEventListener('click', () => $('logPhotoFile').click());
+
+$('logPhotoFile').addEventListener('change', () => {
+  const file = $('logPhotoFile').files[0];
+  if (file) importWorkoutPhoto(file);
+  $('logPhotoFile').value = '';
+});
+
+// Cmd+V / iOS paste of a copied screenshot, while the Log tab is open.
+document.addEventListener('paste', (e) => {
+  if ($('view-log').hidden) return;
+  const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith('image/'));
+  if (!item) return;
+  e.preventDefault();
+  importWorkoutPhoto(item.getAsFile());
+});
+
+async function importWorkoutPhoto(file) {
+  const status = $('logImportStatus');
+  status.hidden = false;
+  status.classList.remove('error');
+  status.textContent = 'Reading photo…';
+  try {
+    const text = await recognizeImageText(file, (label, pct) => {
+      status.textContent = pct != null ? `${label}… ${pct}%` : `${label}…`;
+    });
+    applyParsedWorkout(parseWorkoutText(text));
+    status.classList.remove('error');
+    status.textContent = 'Photo parsed — check the fields below before saving';
+    setTimeout(() => { status.hidden = true; }, 6000);
+  } catch {
+    status.classList.add('error');
+    status.textContent = "Couldn't read that photo — needs a connection the first time you use this, otherwise enter details manually";
+  }
+}
+
+function applyParsedWorkout(parsed) {
+  $('logType').value = 'easy-run';
+  toggleTypeFields('log', 'easy-run');
+  if (parsed.date) $('logDate').value = parsed.date;
+  if (parsed.durationMin != null) $('logDurationMin').value = parsed.durationMin;
+  if (parsed.distanceKm != null) $('logDistanceKm').value = parsed.distanceKm;
+  if (parsed.avgHR != null) $('logRunAvgHR').value = parsed.avgHR;
+  if (parsed.maxHR != null) $('logRunMaxHR').value = parsed.maxHR;
+  const summary = summarizeForNotes(parsed);
+  if (summary) {
+    const existing = $('logNotes').value.trim();
+    $('logNotes').value = existing ? `${existing}\n${summary}` : summary;
+  }
+}
+
 $('logForm').addEventListener('submit', (e) => {
   e.preventDefault();
-  const n = Number($('logIntervals').value) || 0;
-  addSession({
-    date: $('logDate').value,
-    intervalsCompleted: n,
-    intervals: readIntervalRows($('logIntervalRows')),
-    recovery: $('logRecovery').value,
-    rpe: Number($('logRPE').value),
-    vo2max: numOrNull($('logVO2max').value),
-    notes: $('logNotes').value.trim(),
-  });
+  addSession(readSessionForm('log'));
   sessions = loadSessions();
   resetLogForm();
   renderAll();
@@ -141,10 +238,34 @@ function renderHistory() {
   $('historyEmpty').hidden = sorted.length > 0;
 
   for (const s of sorted) {
-    const avgs = (s.intervals || []).map((iv) => iv.avgHR).filter((v) => v != null);
-    const peaks = (s.intervals || []).map((iv) => iv.peakHR).filter((v) => v != null);
-    const avgHR = avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
-    const peakHR = peaks.length ? Math.max(...peaks) : null;
+    const isInterval = sessionTypeOf(s) === 'interval';
+    let metaHTML;
+    let badgeHTML;
+
+    if (isInterval) {
+      const avgs = (s.intervals || []).map((iv) => iv.avgHR).filter((v) => v != null);
+      const peaks = (s.intervals || []).map((iv) => iv.peakHR).filter((v) => v != null);
+      const avgHR = avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
+      const peakHR = peaks.length ? Math.max(...peaks) : null;
+      badgeHTML = `<span class="pill pill-${s.recovery}">${recoveryLabel[s.recovery] ?? s.recovery}</span>`;
+      metaHTML = `
+        <span>${s.intervalsCompleted} interval${s.intervalsCompleted === 1 ? '' : 's'}</span>
+        ${avgHR != null ? `<span class="mono">avg ${avgHR}</span>` : ''}
+        ${peakHR != null ? `<span class="mono">peak ${peakHR}</span>` : ''}
+        <span class="mono">RPE ${s.rpe}</span>
+        ${s.vo2max != null ? `<span class="mono">VO2 ${s.vo2max}</span>` : ''}
+      `;
+    } else {
+      badgeHTML = '<span class="pill pill-run">Easy run</span>';
+      metaHTML = `
+        ${s.durationMin != null ? `<span class="mono">${s.durationMin}min</span>` : ''}
+        ${s.distanceKm != null ? `<span class="mono">${s.distanceKm}km</span>` : ''}
+        ${s.avgHR != null ? `<span class="mono">avg ${s.avgHR}</span>` : ''}
+        ${s.maxHR != null ? `<span class="mono">max ${s.maxHR}</span>` : ''}
+        <span class="mono">RPE ${s.rpe}</span>
+        ${s.vo2max != null ? `<span class="mono">VO2 ${s.vo2max}</span>` : ''}
+      `;
+    }
 
     const li = document.createElement('li');
     const btn = document.createElement('button');
@@ -153,15 +274,9 @@ function renderHistory() {
     btn.innerHTML = `
       <div class="history-top">
         <span class="history-date">${fmtDateLong(s.date)}</span>
-        <span class="pill pill-${s.recovery}">${recoveryLabel[s.recovery] ?? s.recovery}</span>
+        ${badgeHTML}
       </div>
-      <div class="history-meta">
-        <span>${s.intervalsCompleted} interval${s.intervalsCompleted === 1 ? '' : 's'}</span>
-        ${avgHR != null ? `<span class="mono">avg ${avgHR}</span>` : ''}
-        ${peakHR != null ? `<span class="mono">peak ${peakHR}</span>` : ''}
-        <span class="mono">RPE ${s.rpe}</span>
-        ${s.vo2max != null ? `<span class="mono">VO2 ${s.vo2max}</span>` : ''}
-      </div>
+      <div class="history-meta">${metaHTML}</div>
       ${s.notes ? `<div class="history-notes">${escapeHTML(s.notes)}</div>` : ''}
     `;
     btn.addEventListener('click', () => openEditSheet(s));
@@ -180,10 +295,17 @@ function escapeHTML(str) {
 
 function openEditSheet(session) {
   editingId = session.id;
+  const type = sessionTypeOf(session);
   $('editDate').value = session.date;
-  $('editIntervals').value = session.intervalsCompleted;
-  buildIntervalRows($('editIntervalRows'), session.intervalsCompleted, session.intervals || []);
-  $('editRecovery').value = session.recovery;
+  $('editType').value = type;
+  toggleTypeFields('edit', type);
+  $('editIntervals').value = session.intervalsCompleted || 0;
+  buildIntervalRows($('editIntervalRows'), session.intervalsCompleted || 0, session.intervals || []);
+  $('editRecovery').value = session.recovery ?? 'moderate';
+  $('editDurationMin').value = session.durationMin ?? '';
+  $('editDistanceKm').value = session.distanceKm ?? '';
+  $('editRunAvgHR').value = session.avgHR ?? '';
+  $('editRunMaxHR').value = session.maxHR ?? '';
   $('editRPE').value = session.rpe;
   $('editRPEOut').textContent = String(session.rpe);
   $('editVO2max').value = session.vo2max ?? '';
@@ -200,6 +322,8 @@ function closeEditSheet() {
 
 $('scrim').addEventListener('click', closeEditSheet);
 $('editCancel').addEventListener('click', closeEditSheet);
+
+$('editType').addEventListener('change', () => toggleTypeFields('edit', $('editType').value));
 
 $('editIntervals').addEventListener('input', () => {
   const n = Math.max(0, Math.min(20, Number($('editIntervals').value) || 0));
@@ -218,16 +342,7 @@ $('editAddToCalendar').addEventListener('click', () => {
 $('editForm').addEventListener('submit', (e) => {
   e.preventDefault();
   if (!editingId) return;
-  const n = Number($('editIntervals').value) || 0;
-  updateSession(editingId, {
-    date: $('editDate').value,
-    intervalsCompleted: n,
-    intervals: readIntervalRows($('editIntervalRows')),
-    recovery: $('editRecovery').value,
-    rpe: Number($('editRPE').value),
-    vo2max: numOrNull($('editVO2max').value),
-    notes: $('editNotes').value.trim(),
-  });
+  updateSession(editingId, readSessionForm('edit'));
   sessions = loadSessions();
   closeEditSheet();
   renderAll();

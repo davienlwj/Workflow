@@ -31,6 +31,10 @@
   <!-- LOG -->
   <section id="view-log" class="view">
     <h1 class="view-title">Log session</h1>
+    <button type="button" id="logImportPhoto" class="ghost-btn block">📷 Import from photo</button>
+    <p id="logImportStatus" class="import-status" hidden></p>
+    <input id="logPhotoFile" type="file" accept="image/*" hidden>
+
     <form id="logForm" class="form" autocomplete="off">
       <label class="field">
         <span>Date</span>
@@ -38,13 +42,24 @@
       </label>
 
       <label class="field">
-        <span>Intervals completed</span>
-        <input id="logIntervals" type="number" min="0" max="20" required>
+        <span>Session type</span>
+        <select id="logType">
+          <option value="interval">Interval (Norwegian 4x4)</option>
+          <option value="easy-run">Easy run</option>
+        </select>
       </label>
 
-      <div id="logIntervalRows" class="interval-rows"></div>
+      <div id="logIntervalFields" class="form">
+        <label class="field">
+          <span>Intervals completed</span>
+          <input id="logIntervals" type="number" min="0" max="20" required>
+        </label>
 
-      <div class="row">
+        <div class="interval-row interval-row-heading" aria-hidden="true">
+          <span></span><span>avg</span><span>peak</span><span>min</span>
+        </div>
+        <div id="logIntervalRows" class="interval-rows"></div>
+
         <label class="field">
           <span>Recovery quality</span>
           <select id="logRecovery">
@@ -53,11 +68,35 @@
             <option value="hard">Hard</option>
           </select>
         </label>
-        <label class="field">
-          <span>Session RPE <output id="logRPEOut" class="mono"></output>/10</span>
-          <input id="logRPE" type="range" min="1" max="10" step="1" value="6">
-        </label>
       </div>
+
+      <div id="logEasyRunFields" class="form" hidden>
+        <div class="row">
+          <label class="field">
+            <span>Duration (min)</span>
+            <input id="logDurationMin" type="number" min="0" max="600" placeholder="e.g. 45">
+          </label>
+          <label class="field">
+            <span>Distance (km) <em>(optional)</em></span>
+            <input id="logDistanceKm" type="number" step="0.1" min="0" placeholder="e.g. 8.2">
+          </label>
+        </div>
+        <div class="row">
+          <label class="field">
+            <span>Average HR <em>(optional)</em></span>
+            <input id="logRunAvgHR" type="number" min="60" max="230" placeholder="bpm">
+          </label>
+          <label class="field">
+            <span>Max HR <em>(optional)</em></span>
+            <input id="logRunMaxHR" type="number" min="60" max="230" placeholder="bpm">
+          </label>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Session RPE <output id="logRPEOut" class="mono"></output>/10</span>
+        <input id="logRPE" type="range" min="1" max="10" step="1" value="6">
+      </label>
 
       <label class="field">
         <span>VO2max reading <em>(optional)</em></span>
@@ -223,13 +262,24 @@
     </label>
 
     <label class="field">
-      <span>Intervals completed</span>
-      <input id="editIntervals" type="number" min="0" max="20" required>
+      <span>Session type</span>
+      <select id="editType">
+        <option value="interval">Interval (Norwegian 4x4)</option>
+        <option value="easy-run">Easy run</option>
+      </select>
     </label>
 
-    <div id="editIntervalRows" class="interval-rows"></div>
+    <div id="editIntervalFields" class="form">
+      <label class="field">
+        <span>Intervals completed</span>
+        <input id="editIntervals" type="number" min="0" max="20" required>
+      </label>
 
-    <div class="row">
+      <div class="interval-row interval-row-heading" aria-hidden="true">
+        <span></span><span>avg</span><span>peak</span><span>min</span>
+      </div>
+      <div id="editIntervalRows" class="interval-rows"></div>
+
       <label class="field">
         <span>Recovery quality</span>
         <select id="editRecovery">
@@ -238,11 +288,35 @@
           <option value="hard">Hard</option>
         </select>
       </label>
-      <label class="field">
-        <span>Session RPE <output id="editRPEOut" class="mono"></output>/10</span>
-        <input id="editRPE" type="range" min="1" max="10" step="1">
-      </label>
     </div>
+
+    <div id="editEasyRunFields" class="form" hidden>
+      <div class="row">
+        <label class="field">
+          <span>Duration (min)</span>
+          <input id="editDurationMin" type="number" min="0" max="600">
+        </label>
+        <label class="field">
+          <span>Distance (km) <em>(optional)</em></span>
+          <input id="editDistanceKm" type="number" step="0.1" min="0">
+        </label>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>Average HR <em>(optional)</em></span>
+          <input id="editRunAvgHR" type="number" min="60" max="230">
+        </label>
+        <label class="field">
+          <span>Max HR <em>(optional)</em></span>
+          <input id="editRunMaxHR" type="number" min="60" max="230">
+        </label>
+      </div>
+    </div>
+
+    <label class="field">
+      <span>Session RPE <output id="editRPEOut" class="mono"></output>/10</span>
+      <input id="editRPE" type="range" min="1" max="10" step="1">
+    </label>
 
     <label class="field">
       <span>VO2max reading <em>(optional)</em></span>
