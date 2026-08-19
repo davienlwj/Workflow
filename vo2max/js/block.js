@@ -42,20 +42,25 @@ export function totalPlannedSessions(settings) {
 /**
  * Checklist of the whole block, one entry per planned session slot, filled
  * in order as sessions are logged (oldest first). Easy runs are logged
- * separately and don't count toward the interval block.
+ * separately and don't count toward the interval block. A slot is
+ * "overdue" if its week has fully elapsed and it's still unfilled — this
+ * only flags whole missed weeks, since we track slots by week, not by an
+ * exact planned day within the week.
  */
-export function sessionChecklist(settings, sessions) {
+export function sessionChecklist(settings, sessions, now = todayIso()) {
   const total = totalPlannedSessions(settings);
+  const week = currentWeek(settings, now);
   const sorted = sessions
     .filter((s) => (s.type ?? 'interval') === 'interval')
     .sort((a, b) => a.date.localeCompare(b.date));
   return Array.from({ length: total }, (_, i) => {
     const done = sorted[i];
-    const week = Math.floor(i / settings.protocol.freqPerWeek) + 1;
+    const slotWeek = Math.floor(i / settings.protocol.freqPerWeek) + 1;
     return {
       index: i + 1,
-      week,
+      week: slotWeek,
       done: Boolean(done),
+      overdue: !done && slotWeek < week,
       date: done ? done.date : null,
       sessionId: done ? done.id : null,
     };

@@ -107,7 +107,7 @@ function updateComputedAvgHR(prefix) {
     .map((i) => numOrNull(i.value))
     .filter((v) => v != null);
   el.innerHTML = vals.length
-    ? `Average HR: <span class="mono">${Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)}</span> bpm`
+    ? `Session avg HR: <span class="mono">${Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)}</span> bpm`
     : '';
 }
 
@@ -213,6 +213,9 @@ $('logForm').addEventListener('submit', (e) => {
 /* ------------------------------------------------------------- HISTORY */
 
 const recoveryLabel = { easy: 'Easy', moderate: 'Moderate', hard: 'Hard' };
+// A filled-vs-outline glyph so recovery intensity reads at a glance without
+// relying on color (monotone theme) or having to read the word.
+const recoverySymbol = { easy: '○', moderate: '◐', hard: '●' };
 const runTypeLabel = { 'easy-run': 'Easy run', 'long-run': 'Long run' };
 
 function renderHistory() {
@@ -232,7 +235,7 @@ function renderHistory() {
       const peaks = (s.intervals || []).map((iv) => iv.peakHR).filter((v) => v != null);
       const avgHR = avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
       const peakHR = peaks.length ? Math.max(...peaks) : null;
-      badgeHTML = `<span class="pill pill-${s.recovery}">${recoveryLabel[s.recovery] ?? s.recovery}</span>`;
+      badgeHTML = `<span class="pill pill-${s.recovery}">${recoverySymbol[s.recovery] ?? ''} ${recoveryLabel[s.recovery] ?? s.recovery}</span>`;
       metaHTML = `
         <span>${s.intervalsCompleted} interval${s.intervalsCompleted === 1 ? '' : 's'}</span>
         ${avgHR != null ? `<span class="mono">avg ${avgHR}</span>` : ''}
@@ -300,6 +303,7 @@ function openEditSheet(session) {
   $('editNotes').value = session.notes ?? '';
   $('scrim').hidden = false;
   $('editSheet').hidden = false;
+  $('editSheet').scrollTop = 0;
 }
 
 function closeEditSheet() {
@@ -381,11 +385,11 @@ function renderProgress() {
   $('mileageChartWrap').innerHTML = mileageBarChartSVG(mileageBuckets(sessions, mileageScope));
 
   const checklist = sessionChecklist(settings, sessions);
-  $('checklist').innerHTML = checklist.map((c) => `
-    <div class="checklist-cell ${c.done ? 'done' : ''}" title="Week ${c.week}${c.date ? ` · ${c.date}` : ''}">
-      ${c.index}
-    </div>
-  `).join('');
+  $('checklist').innerHTML = checklist.map((c) => {
+    const cls = c.done ? 'done' : c.overdue ? 'overdue' : '';
+    const title = c.done ? `Week ${c.week} · ${c.date}` : c.overdue ? `Week ${c.week} · missed` : `Week ${c.week} · upcoming`;
+    return `<div class="checklist-cell ${cls}" title="${title}">${c.index}</div>`;
+  }).join('');
 }
 
 $('mileageScope').addEventListener('click', (e) => {

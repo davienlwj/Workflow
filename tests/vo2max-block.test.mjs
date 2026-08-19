@@ -60,6 +60,20 @@ test('sessionChecklist skips easy runs — only the interval block counts', () =
   assert.equal(list[2].sessionId, 'legacy');
 });
 
+test('sessionChecklist flags unfilled slots from a fully-elapsed week as overdue', () => {
+  // freq=2, so week 1 = slots 1-2, week 2 = slots 3-4. Now is in week 3
+  // (2026-08-17), so week 1 and 2 have both fully elapsed.
+  const sessions = [{ id: 'a', type: 'interval', date: '2026-08-04' }]; // fills slot 1 only
+  const list = sessionChecklist(settings, sessions, '2026-08-17');
+  assert.equal(list[0].done, true);
+  assert.equal(list[0].overdue, false); // done slots are never overdue
+  assert.equal(list[1].done, false);
+  assert.equal(list[1].overdue, true); // week 1, missed
+  assert.equal(list[2].overdue, true); // week 2, missed
+  assert.equal(list[3].overdue, true); // week 2, missed
+  assert.equal(list[4].overdue, false); // week 3 — current week, not overdue yet
+});
+
 test('daysSinceLastSession looks at the most recent date', () => {
   const sessions = [{ date: '2026-08-01' }, { date: '2026-08-10' }];
   assert.equal(daysSinceLastSession(sessions, '2026-08-15'), 5);
