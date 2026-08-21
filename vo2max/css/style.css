@@ -257,6 +257,11 @@ button { font-family: var(--font-mono); }
 
 .primary.block, .ghost-btn.block, .danger-btn.block { width: 100%; }
 
+/* The Run/Workout tabs' "+ Log ..." button sits directly under a stat-grid;
+   give it the same 24px clearance the next section-title has below it, so
+   the gap above and below the button matches. */
+.stat-grid + .primary.block { margin-top: 24px; }
+
 .ghost-btn {
   background: transparent;
   border: 1px solid var(--line);
