@@ -8,25 +8,44 @@
 
 const BASE = './icons/muscles';
 
-// Which view(s) each muscle group has an overlay image for.
-const VIEWS_FOR = {
-  chest: ['front'],
-  shoulders: ['front', 'back'],
-  biceps: ['front'],
-  forearms: ['front'],
-  abs: ['front'],
-  quads: ['front'],
-  back: ['back'],
-  triceps: ['back'],
-  glutes: ['back'],
-  hamstrings: ['back'],
-  calves: ['back'],
+// The exercise library's muscle groups are finer-grained than the diagram
+// artwork (e.g. three chest sub-regions, three delt heads) - several ids
+// share one region's overlay image. Maps each muscle id to the asset name
+// its overlay is drawn from and which view(s) it appears on.
+export const MUSCLE_META = {
+  'upper-chest': { asset: 'chest', views: ['front'] },
+  'mid-chest': { asset: 'chest', views: ['front'] },
+  'lower-chest': { asset: 'chest', views: ['front'] },
+  'front-delts': { asset: 'shoulders', views: ['front'] },
+  'lateral-delts': { asset: 'shoulders', views: ['front'] },
+  'rear-delts': { asset: 'shoulders', views: ['back'] },
+  traps: { asset: 'back', views: ['back'] },
+  lats: { asset: 'back', views: ['back'] },
+  'mid-back': { asset: 'back', views: ['back'] },
+  'lower-back': { asset: 'back', views: ['back'] },
+  biceps: { asset: 'biceps', views: ['front'] },
+  triceps: { asset: 'triceps', views: ['back'] },
+  forearms: { asset: 'forearms', views: ['front'] },
+  abs: { asset: 'abs', views: ['front'] },
+  core: { asset: 'abs', views: ['front'] },
+  'side-abs': { asset: 'abs', views: ['front'] },
+  quads: { asset: 'quads', views: ['front'] },
+  hamstrings: { asset: 'hamstrings', views: ['back'] },
+  glutes: { asset: 'glutes', views: ['back'] },
+  calves: { asset: 'calves', views: ['back'] },
 };
 
 function bodyHTML(view, activeMuscles) {
-  const overlays = activeMuscles
-    .filter((m) => VIEWS_FOR[m]?.includes(view))
-    .map((m) => `<img class="muscle-overlay" src="${BASE}/${m}-${view}.png" alt="">`)
+  // Dedupe by asset: several active muscle ids (e.g. upper/mid/lower chest)
+  // can share one overlay image, which would otherwise be stacked more than
+  // once for nothing.
+  const assets = new Set(
+    activeMuscles
+      .filter((m) => MUSCLE_META[m]?.views.includes(view))
+      .map((m) => MUSCLE_META[m].asset),
+  );
+  const overlays = [...assets]
+    .map((asset) => `<img class="muscle-overlay" src="${BASE}/${asset}-${view}.png" alt="">`)
     .join('');
   return `<div class="muscle-body">
     <img class="muscle-base" src="${BASE}/body-${view}.png" alt="">
@@ -40,8 +59,8 @@ function bodyHTML(view, activeMuscles) {
  *   (front, back, or both), wrapped in a `.muscle-diagram` container
  */
 export function muscleDiagramHTML(activeMuscles) {
-  const needsFront = activeMuscles.some((m) => VIEWS_FOR[m]?.includes('front'));
-  const needsBack = activeMuscles.some((m) => VIEWS_FOR[m]?.includes('back'));
+  const needsFront = activeMuscles.some((m) => MUSCLE_META[m]?.views.includes('front'));
+  const needsBack = activeMuscles.some((m) => MUSCLE_META[m]?.views.includes('back'));
   const views = [];
   if (needsFront || !needsBack) views.push(bodyHTML('front', activeMuscles));
   if (needsBack) views.push(bodyHTML('back', activeMuscles));

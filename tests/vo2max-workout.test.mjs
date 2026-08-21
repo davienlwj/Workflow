@@ -115,33 +115,33 @@ test('muscleSetBreakdown "week" only includes workouts from the Monday-start cur
   const counts = breakdownFor('week');
   assert.equal(counts.quads, 1);
   assert.equal(counts.glutes, 1);
-  assert.equal(counts.chest, 0);
+  assert.equal(counts['mid-chest'], 0);
   assert.equal(counts.biceps, 0);
-  assert.equal(counts.back, 0);
+  assert.equal(counts['lower-back'], 0);
 });
 
 test('muscleSetBreakdown "month" includes the whole current calendar month', () => {
   const counts = breakdownFor('month');
   assert.equal(counts.quads, 1);
-  assert.equal(counts.chest, 1);
+  assert.equal(counts['mid-chest'], 1);
   assert.equal(counts.triceps, 1);
-  assert.equal(counts.shoulders, 1);
+  assert.equal(counts['front-delts'], 1);
   assert.equal(counts.biceps, 0);
 });
 
 test('muscleSetBreakdown "year" includes the whole current calendar year', () => {
   const counts = breakdownFor('year');
   assert.equal(counts.quads, 1);
-  assert.equal(counts.chest, 1);
+  assert.equal(counts['mid-chest'], 1);
   assert.equal(counts.biceps, 1);
-  assert.equal(counts.back, 0);
+  assert.equal(counts['lower-back'], 0);
 });
 
 test('muscleSetBreakdown "all" includes every workout regardless of date', () => {
   const counts = breakdownFor('all');
   assert.equal(counts.quads, 1);
   assert.equal(counts.biceps, 1);
-  assert.equal(counts.back, 1);
+  assert.equal(counts['lower-back'], 1);
   assert.equal(counts.hamstrings, 1);
   assert.equal(counts.glutes, 2); // squat + deadlift both work glutes
 });
@@ -153,9 +153,9 @@ test('muscleSetBreakdown credits every muscle an exercise targets, not just the 
   const counts = Object.fromEntries(
     muscleSetBreakdown(workouts, 'all', '2026-08-18').map((r) => [r.muscle, r.sets]),
   );
-  assert.equal(counts.chest, 1);
+  assert.equal(counts['mid-chest'], 1);
   assert.equal(counts.triceps, 1);
-  assert.equal(counts.shoulders, 1);
+  assert.equal(counts['front-delts'], 1);
 });
 
 test('muscleSetBreakdown ignores sets missing both weight and reps', () => {
