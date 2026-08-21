@@ -50,12 +50,17 @@ def trace_to_path_d(image_path):
             ys.append(seg.end_point.y)
     x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
     scale = VIEWBOX / max(x1 - x0, y1 - y0)
+    # Center the shorter axis within the square viewBox instead of pinning it
+    # to 0, so icons that aren't square (a wide dumbbell, a tall runner)
+    # don't end up hugging one edge.
+    pad_x = (VIEWBOX - (x1 - x0) * scale) / 2
+    pad_y = (VIEWBOX - (y1 - y0) * scale) / 2
 
     def fmt(pt):
         # potrace's y axis already increases downward, matching the source
         # image's row order and SVG's coordinate system, so no flip needed.
-        x = (pt.x - x0) * scale
-        y = (pt.y - y0) * scale
+        x = pad_x + (pt.x - x0) * scale
+        y = pad_y + (pt.y - y0) * scale
         return f"{x:.2f},{y:.2f}"
 
     parts = []

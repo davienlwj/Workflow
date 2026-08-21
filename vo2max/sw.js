@@ -1,6 +1,6 @@
 /* HYBIRD - offline shell. Bump CACHE when the app files change. */
 
-const CACHE = 'vo2max-v31';
+const CACHE = 'vo2max-v32';
 
 const SHELL = [
   './',
@@ -58,7 +58,11 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
 
   // Network first, so a deployed update is picked up as soon as it is online,
-  // with the cache as the offline fallback.
+  // with the cache as the offline fallback. The index.html fallback only
+  // applies to page navigations - falling back to it for a failed asset
+  // fetch (e.g. one of the muscle-diagram PNGs dropped mid-load) would hand
+  // the browser an HTML document where it expected a script or image, which
+  // renders as a broken-image icon instead of failing cleanly.
   event.respondWith(
     fetch(request)
       .then((response) => {
@@ -66,6 +70,10 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE).then((cache) => cache.put(request, copy));
         return response;
       })
-      .catch(() => caches.match(request).then((hit) => hit || caches.match('./index.html'))),
+      .catch(() => caches.match(request).then((hit) => {
+        if (hit) return hit;
+        if (request.mode === 'navigate') return caches.match('./index.html');
+        return Response.error();
+      })),
   );
 });
