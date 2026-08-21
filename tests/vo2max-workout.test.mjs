@@ -45,6 +45,24 @@ test('workoutVolume treats a set with no type as a normal working set (old data)
   assert.equal(workoutVolume(w), 60 * 8);
 });
 
+test('workoutVolume adds the user\'s bodyweight for Bodyweight-equipment exercises', () => {
+  const w = makeWorkout('2026-08-10', [
+    { exerciseId: 'dip', sets: [{ reps: 10 }, { weight: 10, reps: 8 }] }, // bodyweight-only, then +10kg weighted
+  ]);
+  // 80kg bodyweight: set 1 = 80*10, set 2 = (80+10)*8
+  assert.equal(workoutVolume(w, undefined, 80), 80 * 10 + 90 * 8);
+});
+
+test('workoutVolume ignores bodyweight when the user has not set one yet', () => {
+  const w = makeWorkout('2026-08-10', [{ exerciseId: 'dip', sets: [{ reps: 10 }] }]);
+  assert.equal(workoutVolume(w, undefined, null), 0);
+});
+
+test('workoutVolume leaves non-bodyweight exercises unaffected by a set bodyweight', () => {
+  const w = makeWorkout('2026-08-10', [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8 }] }]);
+  assert.equal(workoutVolume(w, undefined, 80), 60 * 8);
+});
+
 test('lastPerformance returns the most recent workout containing the exercise', () => {
   const workouts = [
     makeWorkout('2026-08-01', [{ exerciseId: 'bench-press', sets: [{ weight: 55, reps: 8 }] }]),
@@ -71,6 +89,22 @@ test('personalRecords finds the max weight, best est. 1RM, best set volume, and 
   assert.equal(pr.timesLogged, 2);
   // Epley 1RM: 60*(1+8/30)=76, 65*(1+3/30)=71.5, 55*(1+8/30)=69.67 -> best is 76
   assert.equal(pr.best1RM, 76);
+});
+
+test('personalRecords includes reps-only bodyweight sets and adds the user\'s bodyweight', () => {
+  const workouts = [
+    makeWorkout('2026-08-01', [{ exerciseId: 'dip', sets: [{ reps: 12 }] }]), // bodyweight only, no weight typed
+    makeWorkout('2026-08-10', [{ exerciseId: 'dip', sets: [{ weight: 15, reps: 6 }] }]), // +15kg weighted
+  ];
+  const pr = personalRecords(workouts, 'dip', undefined, 80);
+  assert.equal(pr.maxWeight, 95); // 80 + 15
+  assert.equal(pr.timesLogged, 2);
+});
+
+test('personalRecords for a bodyweight exercise with no bodyweight set falls back to just the entered weight', () => {
+  const workouts = [makeWorkout('2026-08-01', [{ exerciseId: 'dip', sets: [{ weight: 10, reps: 6 }] }])];
+  const pr = personalRecords(workouts, 'dip');
+  assert.equal(pr.maxWeight, 10);
 });
 
 test('personalRecords returns null for an exercise never logged', () => {
@@ -104,6 +138,16 @@ test('workoutSummaryByExercise reports sets/reps/volume per exercise, warm-ups e
   ]);
 });
 
+test('workoutSummaryByExercise adds the user\'s bodyweight for a Bodyweight-equipment exercise', () => {
+  const w = makeWorkout('2026-08-18', [
+    { exerciseId: 'dip', sets: [{ reps: 10, type: 'normal' }, { weight: 20, reps: 6, type: 'normal' }] },
+  ]);
+  const summary = workoutSummaryByExercise(w, undefined, 80);
+  assert.deepEqual(summary[0], {
+    exerciseId: 'dip', name: 'Dip', setCount: 2, totalReps: 16, volume: 80 * 10 + 100 * 6,
+  });
+});
+
 test('workoutSummaryByExercise falls back to the raw id for an unknown exercise', () => {
   const w = makeWorkout('2026-08-18', [
     { exerciseId: 'not-a-real-exercise', sets: [{ weight: 10, reps: 10, type: 'normal' }] },
@@ -121,6 +165,17 @@ test('exerciseProgress picks the heaviest set per workout date, sorted oldest to
     { date: '2026-08-01', value: 55, reps: 8 },
     { date: '2026-08-10', value: 65, reps: 3 },
   ]);
+});
+
+test('volumeSince adds the user\'s bodyweight for bodyweight exercises within the window', () => {
+  const workouts = [makeWorkout('2026-08-18', [{ exerciseId: 'dip', sets: [{ reps: 10 }] }])];
+  assert.equal(volumeSince(workouts, 7, '2026-08-18', undefined, 80), 80 * 10);
+});
+
+test('exerciseProgress adds the user\'s bodyweight for bodyweight exercises', () => {
+  const workouts = [makeWorkout('2026-08-10', [{ exerciseId: 'dip', sets: [{ reps: 10 }] }])];
+  const series = exerciseProgress(workouts, 'dip', undefined, 80);
+  assert.deepEqual(series, [{ date: '2026-08-10', value: 80, reps: 10 }]);
 });
 
 test('loggedExerciseIds lists exercises most-recently-performed first', () => {

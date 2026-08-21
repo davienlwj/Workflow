@@ -11,30 +11,52 @@ import {
 const DAY_MS = 86400000;
 const toDate = (iso) => new Date(`${iso}T00:00:00`);
 
+/** Whichever weight a set's load should be figured from: for a Bodyweight-
+ *  equipment exercise (dips, pull-ups, ...) that's the user's own bodyweight
+ *  plus whatever extra weight they entered (belt/vest, defaulting to 0 for
+ *  a bodyweight-only set); for every other equipment it's just the entered
+ *  weight, unchanged. `bodyweightKg` not being set yet falls back to the
+ *  entered weight alone (0 for an unweighted set), same as before this
+ *  existed. */
+function loadWeight(set, isBodyweight, bodyweightKg) {
+  if (isBodyweight && bodyweightKg) return (set.weight || 0) + bodyweightKg;
+  return set.weight || 0;
+}
+
 /** Total weight x reps across every completed, non-warm-up set in one
  *  workout - a warm-up doesn't reflect the working weight this is meant to
- *  track. */
-export function workoutVolume(workout) {
-  return (workout.exercises || []).reduce(
-    (sum, ex) => sum + (ex.sets || [])
+ *  track.
+ * @param {typeof EXERCISES} [exercises] defaults to the built-in library;
+ *   pass a list that also includes the user's custom exercises to resolve
+ *   which are Bodyweight equipment.
+ * @param {number|null} [bodyweightKg] the user's bodyweight, added into the
+ *   load for Bodyweight-equipment exercises (see loadWeight above).
+ */
+export function workoutVolume(workout, exercises = EXERCISES, bodyweightKg = null) {
+  return (workout.exercises || []).reduce((sum, ex) => {
+    const isBodyweight = exerciseById(ex.exerciseId, exercises)?.equipment === 'Bodyweight';
+    return sum + (ex.sets || [])
       .filter((set) => set.type !== 'warmup')
-      .reduce((s, set) => s + (set.weight || 0) * (set.reps || 0), 0),
-    0,
-  );
+      .reduce((s, set) => s + loadWeight(set, isBodyweight, bodyweightKg) * (set.reps || 0), 0);
+  }, 0);
 }
 
 /** Every logged non-warm-up set for one exercise across all workouts,
  *  oldest first - feeds PRs and the progress chart, which a light warm-up
- *  set would otherwise understate or distort. */
-function setsForExercise(workouts, exerciseId) {
+ *  set would otherwise understate or distort. A Bodyweight-equipment set
+ *  only needs reps logged (weight is optional extra load); every other
+ *  equipment still requires an explicit weight, as before. */
+function setsForExercise(workouts, exerciseId, exercises = EXERCISES, bodyweightKg = null) {
+  const isBodyweight = exerciseById(exerciseId, exercises)?.equipment === 'Bodyweight';
   const out = [];
   for (const w of [...workouts].sort((a, b) => a.date.localeCompare(b.date))) {
     const ex = (w.exercises || []).find((e) => e.exerciseId === exerciseId);
     if (!ex) continue;
     for (const set of ex.sets || []) {
-      if (set.weight == null || set.reps == null) continue;
+      if (set.reps == null) continue;
+      if (!isBodyweight && set.weight == null) continue;
       if (set.type === 'warmup') continue;
-      out.push({ date: w.date, weight: set.weight, reps: set.reps });
+      out.push({ date: w.date, weight: loadWeight(set, isBodyweight, bodyweightKg), reps: set.reps });
     }
   }
   return out;
@@ -58,9 +80,11 @@ function estOneRM(weight, reps) {
   return reps <= 1 ? weight : weight * (1 + reps / 30);
 }
 
-/** Best weight, best estimated 1RM, best single-set volume, and how many sessions this exercise has appeared in. */
-export function personalRecords(workouts, exerciseId) {
-  const sets = setsForExercise(workouts, exerciseId);
+/** Best weight, best estimated 1RM, best single-set volume, and how many
+ *  sessions this exercise has appeared in. See workoutVolume for the
+ *  `exercises`/`bodyweightKg` params. */
+export function personalRecords(workouts, exerciseId, exercises = EXERCISES, bodyweightKg = null) {
+  const sets = setsForExercise(workouts, exerciseId, exercises, bodyweightKg);
   if (!sets.length) return null;
   return {
     maxWeight: Math.max(...sets.map((s) => s.weight)),
@@ -70,9 +94,11 @@ export function personalRecords(workouts, exerciseId) {
   };
 }
 
-/** One point per workout date this exercise appears in (that day's heaviest set), for a progress chart. */
-export function exerciseProgress(workouts, exerciseId) {
-  const sets = setsForExercise(workouts, exerciseId);
+/** One point per workout date this exercise appears in (that day's heaviest
+ *  set), for a progress chart. See workoutVolume for the `exercises`/
+ *  `bodyweightKg` params. */
+export function exerciseProgress(workouts, exerciseId, exercises = EXERCISES, bodyweightKg = null) {
+  const sets = setsForExercise(workouts, exerciseId, exercises, bodyweightKg);
   const byDate = new Map();
   for (const s of sets) {
     const prev = byDate.get(s.date);
@@ -91,17 +117,20 @@ export function exerciseProgress(workouts, exerciseId) {
  * @param {typeof EXERCISES} [exercises] defaults to the built-in library;
  *   pass a list that also includes the user's custom exercises to resolve
  *   names for those too.
+ * @param {number|null} [bodyweightKg] the user's bodyweight, added into the
+ *   load for Bodyweight-equipment exercises (see loadWeight above).
  */
-export function workoutSummaryByExercise(workout, exercises = EXERCISES) {
+export function workoutSummaryByExercise(workout, exercises = EXERCISES, bodyweightKg = null) {
   return (workout.exercises || []).map((ex) => {
     const def = exerciseById(ex.exerciseId, exercises);
-    const workingSets = (ex.sets || []).filter((s) => s.weight != null && s.reps != null && s.type !== 'warmup');
+    const isBodyweight = def?.equipment === 'Bodyweight';
+    const workingSets = (ex.sets || []).filter((s) => s.reps != null && (isBodyweight || s.weight != null) && s.type !== 'warmup');
     return {
       exerciseId: ex.exerciseId,
       name: def ? def.name : ex.exerciseId,
       setCount: workingSets.length,
       totalReps: workingSets.reduce((sum, s) => sum + s.reps, 0),
-      volume: workingSets.reduce((sum, s) => sum + s.weight * s.reps, 0),
+      volume: workingSets.reduce((sum, s) => sum + loadWeight(s, isBodyweight, bodyweightKg) * s.reps, 0),
     };
   });
 }
@@ -125,13 +154,15 @@ export function daysSinceLastWorkout(workouts, now = todayIso()) {
   return Math.round((toDate(now) - toDate(last.date)) / DAY_MS);
 }
 
-/** Total volume (weight x reps) logged within the last `days` days, inclusive of today. */
-export function volumeSince(workouts, days, now = todayIso()) {
+/** Total volume (weight x reps) logged within the last `days` days,
+ *  inclusive of today. See workoutVolume for the `exercises`/`bodyweightKg`
+ *  params. */
+export function volumeSince(workouts, days, now = todayIso(), exercises = EXERCISES, bodyweightKg = null) {
   const cutoff = toDate(now).getTime() - (days - 1) * DAY_MS;
   return Math.round(
     workouts
       .filter((w) => toDate(w.date).getTime() >= cutoff)
-      .reduce((sum, w) => sum + workoutVolume(w), 0),
+      .reduce((sum, w) => sum + workoutVolume(w, exercises, bodyweightKg), 0),
   );
 }
 

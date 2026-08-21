@@ -123,6 +123,27 @@
     <h1 class="view-title">Settings</h1>
 
     <form id="settingsForm" class="form">
+      <h2 class="section-title">Profile</h2>
+      <label class="field">
+        <span>Name</span>
+        <input id="sName" type="text" placeholder="Your name">
+      </label>
+      <label class="field">
+        <span>Date of birth <em>(optional)</em></span>
+        <input id="sDob" type="date">
+      </label>
+      <div class="row">
+        <label class="field">
+          <span>Height (cm)</span>
+          <input id="sHeightCm" type="number" step="0.1" min="0" max="300">
+        </label>
+        <label class="field">
+          <span>Weight (kg)</span>
+          <input id="sWeightKg" type="number" step="0.1" min="0" max="400">
+        </label>
+      </div>
+      <p class="field-hint">Your weight is added to the load for bodyweight exercises (e.g. dips, pull-ups) — bodyweight-only sets use it as-is, and weighted sets add it to whatever extra weight you enter.</p>
+
       <h2 class="section-title">Baseline</h2>
       <div class="row">
         <label class="field">

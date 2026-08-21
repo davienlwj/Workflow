@@ -54,6 +54,13 @@ function findExercise(id) {
   return exerciseById(id, allExercises());
 }
 
+/** The user's bodyweight from Settings > Profile, or null if not set yet -
+ *  added into the load for Bodyweight-equipment exercises (dips, pull-ups)
+ *  when computing volume/PRs/progress. */
+function bodyweightKg() {
+  return settings.profile?.weightKg ?? null;
+}
+
 /* ------------------------------------------------------------- tab views */
 
 const VIEW_LABEL = { dashboard: 'Dashboard', run: 'Run', workout: 'Workout', settings: 'Settings' };
@@ -454,7 +461,7 @@ function sessionCompactSummary(s) {
 function workoutCompactSummary(w) {
   const exCount = (w.exercises || []).length;
   const badgeHTML = `<span class="pill pill-type">${w.name ? escapeHTML(w.name) : 'Workout'}</span>`;
-  const metaHTML = `<span class="mono">${exCount} exercise${exCount === 1 ? '' : 's'} · ${workoutVolume(w)}kg</span>`;
+  const metaHTML = `<span class="mono">${exCount} exercise${exCount === 1 ? '' : 's'} · ${workoutVolume(w, allExercises(), bodyweightKg())}kg</span>`;
   return { badgeHTML, metaHTML };
 }
 
@@ -508,7 +515,7 @@ function renderDashboard() {
     [String(sessions.length), 'Runs logged'],
     [String(workouts.length), 'Workouts logged'],
     [`${mileageThisWeek}km`, 'Mileage this week'],
-    [`${volumeSince(workouts, 7)}kg`, 'Volume this week'],
+    [`${volumeSince(workouts, 7, todayIso(), allExercises(), bodyweightKg())}kg`, 'Volume this week'],
     [daysSinceRun != null ? String(daysSinceRun) : '—', 'Days since last run'],
     [daysSinceWorkout != null ? String(daysSinceWorkout) : '—', 'Days since last workout'],
   ].map(([value, label]) => `
@@ -716,6 +723,10 @@ function exerciseBlockHTML(exerciseId, sets, supersetId) {
     ? `Last (${fmtDateShort(last.date)}): ${last.sets.map((s) => `${s.weight}kg×${s.reps}`).join(', ') || '—'}`
     : 'No previous data for this exercise';
   const supersetBtnHTML = supersetId ? '' : '<button type="button" class="wo-superset-btn" title="Superset with another exercise">⚭</button>';
+  const bw = bodyweightKg();
+  const bwHintHTML = ex.equipment !== 'Bodyweight' ? '' : bw
+    ? `<p class="wo-bodyweight-hint">Your bodyweight (${bw}kg) is added automatically — the kg field below is just extra weight (e.g. a belt or vest), leave it blank for bodyweight only.</p>`
+    : `<p class="wo-bodyweight-hint">Set your weight in Settings → Profile to include your bodyweight in this exercise's volume. The kg field below is extra weight only.</p>`;
   return `
     <div class="wo-exercise-block" data-exercise-id="${exerciseId}"${supersetId ? ` data-superset-id="${supersetId}"` : ''}>
       <div class="wo-exercise-header">
@@ -730,6 +741,7 @@ function exerciseBlockHTML(exerciseId, sets, supersetId) {
       </div>
       ${muscleDiagramHTML(ex.muscles)}
       <p class="wo-last-performance">${lastText}</p>
+      ${bwHintHTML}
       <div class="wo-set-row-heading"><span></span><span>Set</span><span>kg</span><span>Reps</span>${workoutSheetMode === 'live' ? '<span></span>' : ''}<span></span></div>
       <div class="wo-set-rows">${sets.map((s, i) => setRowHTML(i, s, last?.sets[i])).join('')}</div>
       <button type="button" class="wo-add-set ghost-btn">+ Add set</button>
@@ -1196,7 +1208,7 @@ function startOrOpenWorkoutFor(iso) {
 
 function openWorkoutSummarySheet(workout, durationMs) {
   $('summaryDuration').textContent = fmtElapsed(durationMs);
-  const rows = workoutSummaryByExercise(workout, allExercises());
+  const rows = workoutSummaryByExercise(workout, allExercises(), bodyweightKg());
   $('summaryExercises').innerHTML = rows.length
     ? rows.map((r) => `
       <div class="summary-exercise-row">
@@ -1320,7 +1332,7 @@ function openExerciseSheet(exerciseId) {
   // Not in the built-in static library (checked with no custom exercises
   // mixed in) means the user created it themselves, and can delete it.
   $('exDetailDeleteCustom').hidden = Boolean(exerciseById(exerciseId));
-  const pr = personalRecords(workouts, exerciseId);
+  const pr = personalRecords(workouts, exerciseId, allExercises(), bodyweightKg());
   $('exDetailName').textContent = ex.name;
   $('exDetailMeta').textContent = exerciseMetaText(ex);
   $('exDetailDiagram').innerHTML = muscleDiagramHTML(ex.muscles);
@@ -1334,7 +1346,7 @@ function openExerciseSheet(exerciseId) {
       <div class="stat-label">${label}</div>
     </div>
   `).join('');
-  $('exDetailChart').innerHTML = exerciseProgressSVG(exerciseProgress(workouts, exerciseId));
+  $('exDetailChart').innerHTML = exerciseProgressSVG(exerciseProgress(workouts, exerciseId, allExercises(), bodyweightKg()));
   $('scrim').hidden = false;
   $('exerciseSheet').hidden = false;
   $('exerciseSheet').scrollTop = 0;
@@ -1364,7 +1376,7 @@ function renderExerciseSummaries() {
   $('exerciseSummaryList').innerHTML = ids.map((id) => {
     const ex = findExercise(id);
     if (!ex) return '';
-    const pr = personalRecords(workouts, id);
+    const pr = personalRecords(workouts, id, allExercises(), bodyweightKg());
     return `
       <button type="button" class="exercise-summary-card" data-id="${id}">
         ${muscleDiagramHTML(ex.muscles)}
@@ -1397,7 +1409,7 @@ function renderWorkoutHistory() {
           </div>
           <div class="history-meta">
             <span>${exCount} exercise${exCount === 1 ? '' : 's'}</span>
-            <span class="mono">${workoutVolume(w)}kg volume</span>
+            <span class="mono">${workoutVolume(w, allExercises(), bodyweightKg())}kg volume</span>
           </div>
           ${w.notes ? `<div class="history-notes">${escapeHTML(w.notes)}</div>` : ''}
         </button>
@@ -1417,7 +1429,7 @@ function renderWorkoutTab() {
   const daysSince = daysSinceLastWorkout(workouts);
   $('workoutStatGrid').innerHTML = [
     [String(workouts.length), 'Workouts logged'],
-    [`${volumeSince(workouts, 7)}kg`, 'Volume this week'],
+    [`${volumeSince(workouts, 7, todayIso(), allExercises(), bodyweightKg())}kg`, 'Volume this week'],
     [daysSince != null ? String(daysSince) : '—', 'Days since last workout'],
   ].map(([value, label]) => `
     <div class="stat-tile">
@@ -1525,6 +1537,10 @@ function renderZones() {
 /* ------------------------------------------------------------- SETTINGS */
 
 function renderSettingsForm() {
+  $('sName').value = settings.profile.name;
+  $('sDob').value = settings.profile.dob;
+  $('sHeightCm').value = settings.profile.heightCm ?? '';
+  $('sWeightKg').value = settings.profile.weightKg ?? '';
   $('sBaselineVO2max').value = settings.baselineVO2max;
   $('sBaselineDate').value = settings.baselineDate;
   $('sDevice').value = settings.device;
@@ -1543,6 +1559,12 @@ function renderSettingsForm() {
 $('settingsForm').addEventListener('submit', (e) => {
   e.preventDefault();
   settings = {
+    profile: {
+      name: $('sName').value.trim(),
+      dob: $('sDob').value,
+      heightCm: numOrNull($('sHeightCm').value),
+      weightKg: numOrNull($('sWeightKg').value),
+    },
     baselineVO2max: Number($('sBaselineVO2max').value),
     baselineDate: $('sBaselineDate').value,
     device: $('sDevice').value.trim(),

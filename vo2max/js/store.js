@@ -12,6 +12,12 @@ const CUSTOM_EXERCISES_KEY = 'vo2max.customExercises.v1';
 const LIVE_WORKOUT_KEY = 'vo2max.liveWorkout.v1';
 
 export const DEFAULT_SETTINGS = {
+  profile: {
+    name: '',
+    dob: '',
+    heightCm: null,
+    weightKg: null,
+  },
   baselineVO2max: 46,
   baselineDate: '2026-08-16',
   device: 'Amazfit T-Rex 3 Pro (Zepp app)',
@@ -42,6 +48,7 @@ export function loadSettings() {
     return {
       ...clone(DEFAULT_SETTINGS),
       ...parsed,
+      profile: { ...DEFAULT_SETTINGS.profile, ...(parsed.profile || {}) },
       protocol: { ...DEFAULT_SETTINGS.protocol, ...(parsed.protocol || {}) },
     };
   } catch {
