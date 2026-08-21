@@ -69,6 +69,59 @@ export function vo2maxTrendSVG(points) {
   </svg>`;
 }
 
+/** @param {{date: string, value: number, reps: number}[]} points oldest to newest: an exercise's heaviest set per session */
+export function exerciseProgressSVG(points) {
+  if (points.length === 0) {
+    return '<p class="chart-empty">No sets logged for this exercise yet.</p>';
+  }
+
+  const values = points.map((p) => p.value);
+  const minV = Math.min(...values);
+  const maxV = Math.max(...values);
+  const span = Math.max(maxV - minV, 2);
+  const yLow = Math.floor(minV - span * 0.15);
+  const yHigh = Math.ceil(maxV + span * 0.15);
+
+  const innerW = W - PAD_L - PAD_R;
+  const innerH = H - PAD_T - PAD_B;
+
+  const x = (i) => PAD_L + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
+  const y = (v) => PAD_T + innerH - ((v - yLow) / (yHigh - yLow)) * innerH;
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(p.value).toFixed(1)}`).join(' ');
+
+  const decimals = (yHigh - yLow) < 6 ? 1 : 0;
+  const gridLines = Array.from({ length: 4 }, (_, i) => {
+    const v = yLow + ((yHigh - yLow) * i) / 3;
+    const gy = y(v).toFixed(1);
+    return `<line x1="${PAD_L}" y1="${gy}" x2="${W - PAD_R}" y2="${gy}" class="chart-grid" />
+      <text x="${PAD_L - 6}" y="${gy}" class="chart-axis" text-anchor="end" dominant-baseline="middle">${v.toFixed(decimals)}</text>`;
+  }).join('');
+
+  const dots = points.map((p, i) => {
+    const cx = x(i).toFixed(1);
+    const cy = y(p.value).toFixed(1);
+    const labelY = Math.max(9, Number(cy) - 8).toFixed(1);
+    return `<circle cx="${cx}" cy="${cy}" r="3" class="chart-dot">
+      <title>${fmtDate(p.date)}: ${p.value}kg × ${p.reps}</title>
+    </circle>
+    <text x="${cx}" y="${labelY}" class="chart-value-label" text-anchor="middle">${p.value}</text>`;
+  }).join('');
+
+  const firstLabel = `<text x="${x(0).toFixed(1)}" y="${H - 6}" class="chart-axis" text-anchor="start">${fmtDate(points[0].date)}</text>`;
+  const lastLabel = points.length > 1
+    ? `<text x="${x(points.length - 1).toFixed(1)}" y="${H - 6}" class="chart-axis" text-anchor="end">${fmtDate(points[points.length - 1].date)}</text>`
+    : '';
+
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}" class="chart-svg" role="img" aria-label="Exercise progress">
+    ${gridLines}
+    <path d="${linePath}" class="chart-line" fill="none" />
+    ${dots}
+    ${firstLabel}
+    ${lastLabel}
+  </svg>`;
+}
+
 /** @param {{label: string, km: number}[]} buckets oldest to newest */
 export function mileageBarChartSVG(buckets) {
   if (buckets.every((b) => b.km === 0)) {

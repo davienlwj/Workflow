@@ -1,11 +1,13 @@
 /*
  * localStorage persistence for the VO2max tracker.
- * Two keys: settings (a single object) and sessions (an array), each versioned
- * so a future shape change can migrate instead of silently losing data.
+ * Three keys: settings (a single object), sessions (an array) and workouts
+ * (an array), each versioned so a future shape change can migrate instead
+ * of silently losing data.
  */
 
 const SETTINGS_KEY = 'vo2max.settings.v1';
 const SESSIONS_KEY = 'vo2max.sessions.v1';
+const WORKOUTS_KEY = 'vo2max.workouts.v1';
 
 export const DEFAULT_SETTINGS = {
   baselineVO2max: 46,
@@ -98,10 +100,50 @@ export function deleteSession(id) {
   saveSessions(sessions);
 }
 
+export function loadWorkouts() {
+  try {
+    const raw = localStorage.getItem(WORKOUTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveWorkouts(workouts) {
+  localStorage.setItem(WORKOUTS_KEY, JSON.stringify(workouts));
+}
+
+export function addWorkout(workout) {
+  const workouts = loadWorkouts();
+  const record = { id: makeId(), ...workout };
+  workouts.push(record);
+  workouts.sort((a, b) => a.date.localeCompare(b.date));
+  saveWorkouts(workouts);
+  return record;
+}
+
+export function updateWorkout(id, patch) {
+  const workouts = loadWorkouts();
+  const idx = workouts.findIndex((w) => w.id === id);
+  if (idx === -1) return null;
+  workouts[idx] = { ...workouts[idx], ...patch, id };
+  workouts.sort((a, b) => a.date.localeCompare(b.date));
+  saveWorkouts(workouts);
+  return workouts[idx];
+}
+
+export function deleteWorkout(id) {
+  const workouts = loadWorkouts().filter((w) => w.id !== id);
+  saveWorkouts(workouts);
+}
+
 export function exportAll() {
   return JSON.stringify({
     settings: loadSettings(),
     sessions: loadSessions(),
+    workouts: loadWorkouts(),
     exportedAt: new Date().toISOString(),
   }, null, 2);
 }
@@ -110,4 +152,5 @@ export function importAll(json) {
   const data = JSON.parse(json);
   if (data.settings) saveSettings({ ...clone(DEFAULT_SETTINGS), ...data.settings });
   if (Array.isArray(data.sessions)) saveSessions(data.sessions);
+  if (Array.isArray(data.workouts)) saveWorkouts(data.workouts);
 }

@@ -64,17 +64,21 @@
     <p id="historyEmpty" class="empty" hidden>No sessions logged yet.</p>
   </section>
 
-  <!-- ZONES -->
-  <section id="view-zones" class="view" hidden>
-    <h1 class="view-title">Zones &amp; protocol</h1>
+  <!-- WORKOUT -->
+  <section id="view-workout" class="view" hidden>
+    <h1 class="view-title">Workout</h1>
 
-    <div id="protocolCard" class="card protocol-card"></div>
+    <div id="workoutStatGrid" class="stat-grid"></div>
 
-    <h2 class="section-title">LTHR-based zones <span id="lthrPrimaryBadge" class="badge" hidden>primary</span></h2>
-    <div id="lthrZoneTable" class="zone-table"></div>
+    <button type="button" id="startWorkoutBtn" class="primary block">+ Log workout</button>
 
-    <h2 class="section-title">RHR-based zones (Karvonen) <span id="rhrPrimaryBadge" class="badge" hidden>primary</span></h2>
-    <div id="rhrZoneTable" class="zone-table"></div>
+    <h2 class="section-title">Exercises</h2>
+    <div id="exerciseSummaryList" class="exercise-summary-list"></div>
+    <p id="exerciseSummaryEmpty" class="empty" hidden>No workouts logged yet — the exercises you log will show up here with their progress.</p>
+
+    <h2 class="section-title">History</h2>
+    <ul id="workoutHistoryList" class="history-list"></ul>
+    <p id="workoutHistoryEmpty" class="empty" hidden>No workouts logged yet.</p>
   </section>
 
   <!-- SETTINGS -->
@@ -155,6 +159,19 @@
       <button type="submit" id="settingsSaveBtn" class="primary block">Save settings</button>
     </form>
 
+    <details class="zones-details">
+      <summary class="section-title">Zones &amp; protocol reference</summary>
+      <div class="zones-details-body">
+        <div id="protocolCard" class="card protocol-card"></div>
+
+        <h2 class="section-title">LTHR-based zones <span id="lthrPrimaryBadge" class="badge" hidden>primary</span></h2>
+        <div id="lthrZoneTable" class="zone-table"></div>
+
+        <h2 class="section-title">RHR-based zones (Karvonen) <span id="rhrPrimaryBadge" class="badge" hidden>primary</span></h2>
+        <div id="rhrZoneTable" class="zone-table"></div>
+      </div>
+    </details>
+
     <div class="actions-row">
       <button type="button" id="sExport" class="ghost-btn">Export data</button>
       <button type="button" id="sImport" class="ghost-btn">Import data</button>
@@ -167,7 +184,7 @@
 
 <nav id="tabs" class="tabs" role="tablist" aria-label="Sections">
   <button type="button" class="tab" data-view="dashboard" role="tab" aria-selected="true">Dashboard</button>
-  <button type="button" class="tab" data-view="zones" role="tab" aria-selected="false">Zones</button>
+  <button type="button" class="tab" data-view="workout" role="tab" aria-selected="false">Workout</button>
   <button type="button" class="tab" data-view="settings" role="tab" aria-selected="false">Settings</button>
 </nav>
 
@@ -350,6 +367,55 @@
       <button type="submit" id="logSaveBtn" class="primary">Save session</button>
     </div>
   </form>
+</section>
+
+<!-- Log/edit workout sheet (popup, shared by "+ Log workout" and tapping a past workout) -->
+<section id="workoutSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Log workout">
+  <div class="grabber"></div>
+  <form id="workoutForm" class="form" autocomplete="off">
+    <label class="field">
+      <span>Date</span>
+      <input id="woDate" type="date" required>
+    </label>
+    <label class="field">
+      <span>Workout name <em>(optional)</em></span>
+      <input id="woName" type="text" placeholder="e.g. Push Day">
+    </label>
+
+    <div id="woExerciseList" class="wo-exercise-list"></div>
+
+    <div id="woPicker" class="wo-picker" hidden>
+      <input id="woPickerSearch" type="text" class="wo-picker-search" placeholder="Search exercises…">
+      <div id="woPickerChips" class="wo-picker-chips"></div>
+      <div id="woPickerResults" class="wo-picker-results"></div>
+    </div>
+    <button type="button" id="woAddExercise" class="ghost-btn block">+ Add exercise</button>
+
+    <label class="field">
+      <span>Notes</span>
+      <textarea id="woNotes" rows="3"></textarea>
+    </label>
+
+    <div class="actions">
+      <button type="button" id="woDelete" class="danger-btn" hidden>Delete</button>
+      <button type="button" id="woCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" id="woSave" class="primary">Save workout</button>
+    </div>
+  </form>
+</section>
+
+<!-- Exercise progress sheet (popup, opened from an exercise card) -->
+<section id="exerciseSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Exercise progress">
+  <div class="grabber"></div>
+  <h2 id="exDetailName" class="view-title"></h2>
+  <p id="exDetailMeta" class="exercise-summary-meta"></p>
+  <div id="exDetailDiagram" class="exercise-detail-diagram"></div>
+  <div id="exDetailStatGrid" class="stat-grid"></div>
+  <h3 class="section-title">Progress</h3>
+  <div id="exDetailChart" class="chart-wrap"></div>
+  <div class="actions">
+    <button type="button" id="exDetailClose" class="ghost-btn block">Close</button>
+  </div>
 </section>
 
 <div id="toast" class="toast" hidden></div>

@@ -1,6 +1,7 @@
 import {
   loadSettings, saveSettings, resetSettings,
   loadSessions, addSession, updateSession, deleteSession,
+  loadWorkouts, addWorkout, updateWorkout, deleteWorkout,
   exportAll, importAll,
 } from './store.js';
 import { lthrZoneTable, rhrZoneTable, targetZone } from './zones.js';
@@ -9,12 +10,20 @@ import {
   daysSinceLastSession, averageIntervalHR, vo2maxSeries,
   mileageBuckets, totalMileage,
 } from './block.js';
-import { vo2maxTrendSVG, mileageBarChartSVG } from './chart.js';
+import { vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG } from './chart.js';
 import { sessionToICS } from './ics.js';
+import { MUSCLES, MUSCLE_LABEL, exerciseById, searchExercises } from './exercises.js';
+import { muscleDiagramSVG } from './muscleDiagram.js';
+import {
+  workoutVolume, lastPerformance, personalRecords, exerciseProgress,
+  loggedExerciseIds, daysSinceLastWorkout, volumeSince,
+} from './workout.js';
 
 let settings = loadSettings();
 let sessions = loadSessions();
+let workouts = loadWorkouts();
 let editingId = null;
+let workoutEditingId = null;
 let mileageScope = 'week';
 
 const $ = (id) => document.getElementById(id);
@@ -77,6 +86,10 @@ function fmtDateLong(iso) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', {
     weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
   });
+}
+
+function fmtDateShort(iso) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
 /* --------------------------------------------------------- interval rows */
@@ -469,6 +482,8 @@ function closeEditSheet() {
 $('scrim').addEventListener('click', () => {
   closeEditSheet();
   closeLogSheet();
+  closeWorkoutSheet();
+  closeExerciseSheet();
 });
 $('editCancel').addEventListener('click', closeEditSheet);
 
@@ -548,6 +563,314 @@ $('mileageScope').addEventListener('click', (e) => {
   });
   $('mileageChartWrap').innerHTML = mileageBarChartSVG(mileageBuckets(sessions, mileageScope));
 });
+
+/* -------------------------------------------------------------- WORKOUT */
+
+function exerciseMetaText(ex) {
+  return `${ex.equipment} · ${ex.muscles.map((m) => MUSCLE_LABEL[m]).join(', ')}`;
+}
+
+function setRowHTML(index, set = {}) {
+  return `
+    <div class="wo-set-row">
+      <span class="wo-set-index">${index + 1}</span>
+      <input type="number" class="wo-set-weight" step="0.5" min="0" inputmode="decimal" placeholder="kg" value="${set.weight ?? ''}">
+      <input type="number" class="wo-set-reps" min="0" inputmode="numeric" placeholder="reps" value="${set.reps ?? ''}">
+      <button type="button" class="wo-set-remove" aria-label="Remove set">✕</button>
+    </div>
+  `;
+}
+
+function exerciseBlockHTML(exerciseId, sets) {
+  const ex = exerciseById(exerciseId);
+  if (!ex) return '';
+  const last = lastPerformance(workouts, exerciseId);
+  const lastText = last
+    ? `Last (${fmtDateShort(last.date)}): ${last.sets.map((s) => `${s.weight}kg×${s.reps}`).join(', ') || '—'}`
+    : 'No previous data for this exercise';
+  return `
+    <div class="wo-exercise-block" data-exercise-id="${exerciseId}">
+      <div class="wo-exercise-header">
+        <div>
+          <div class="wo-exercise-name">${escapeHTML(ex.name)}</div>
+          <div class="wo-exercise-meta">${escapeHTML(exerciseMetaText(ex))}</div>
+        </div>
+        <button type="button" class="wo-exercise-remove" aria-label="Remove exercise">✕</button>
+      </div>
+      ${muscleDiagramSVG(ex.muscles)}
+      <p class="wo-last-performance">${lastText}</p>
+      <div class="wo-set-row-heading"><span>Set</span><span>kg</span><span>Reps</span><span></span></div>
+      <div class="wo-set-rows">${sets.map((s, i) => setRowHTML(i, s)).join('')}</div>
+      <button type="button" class="wo-add-set ghost-btn">+ Add set</button>
+    </div>
+  `;
+}
+
+function renumberSets(block) {
+  block.querySelectorAll('.wo-set-row').forEach((row, i) => {
+    row.querySelector('.wo-set-index').textContent = String(i + 1);
+  });
+}
+
+function renderWoPickerChips() {
+  $('woPickerChips').innerHTML = MUSCLES.map((m) => `<button type="button" class="chip" data-muscle="${m}">${MUSCLE_LABEL[m]}</button>`).join('');
+}
+
+function renderWoPickerResults() {
+  const q = $('woPickerSearch').value;
+  const muscle = $('woPickerChips').querySelector('.chip.active')?.dataset.muscle || '';
+  const results = searchExercises(q, muscle);
+  $('woPickerResults').innerHTML = results.length
+    ? results.map((e) => `
+      <button type="button" class="wo-picker-result" data-id="${e.id}">
+        <span>${escapeHTML(e.name)}</span>
+        <span class="wo-picker-result-meta">${escapeHTML(e.equipment)}</span>
+      </button>
+    `).join('')
+    : '<p class="empty">No matching exercises.</p>';
+}
+
+$('woAddExercise').addEventListener('click', () => {
+  const opening = $('woPicker').hidden;
+  $('woPicker').hidden = !opening;
+  if (opening) {
+    $('woPickerSearch').value = '';
+    renderWoPickerChips();
+    renderWoPickerResults();
+    $('woPickerSearch').focus();
+  }
+});
+
+$('woPickerChips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  const wasActive = chip.classList.contains('active');
+  $('woPickerChips').querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+  if (!wasActive) chip.classList.add('active');
+  renderWoPickerResults();
+});
+
+$('woPickerSearch').addEventListener('input', renderWoPickerResults);
+
+$('woPickerResults').addEventListener('click', (e) => {
+  const btn = e.target.closest('.wo-picker-result');
+  if (!btn) return;
+  $('woExerciseList').insertAdjacentHTML('beforeend', exerciseBlockHTML(btn.dataset.id, [{}]));
+  $('woPicker').hidden = true;
+});
+
+$('woExerciseList').addEventListener('click', (e) => {
+  const removeExBtn = e.target.closest('.wo-exercise-remove');
+  if (removeExBtn) {
+    removeExBtn.closest('.wo-exercise-block').remove();
+    return;
+  }
+  const addSetBtn = e.target.closest('.wo-add-set');
+  if (addSetBtn) {
+    const rows = addSetBtn.closest('.wo-exercise-block').querySelector('.wo-set-rows');
+    rows.insertAdjacentHTML('beforeend', setRowHTML(rows.children.length));
+    return;
+  }
+  const removeSetBtn = e.target.closest('.wo-set-remove');
+  if (removeSetBtn) {
+    const block = removeSetBtn.closest('.wo-exercise-block');
+    const rows = block.querySelector('.wo-set-rows');
+    if (rows.children.length > 1) {
+      removeSetBtn.closest('.wo-set-row').remove();
+      renumberSets(block);
+    }
+  }
+});
+
+function readWorkoutForm() {
+  const exercises = [...$('woExerciseList').querySelectorAll('.wo-exercise-block')].map((block) => ({
+    exerciseId: block.dataset.exerciseId,
+    sets: [...block.querySelectorAll('.wo-set-row')]
+      .map((row) => ({
+        weight: numOrNull(row.querySelector('.wo-set-weight').value),
+        reps: numOrNull(row.querySelector('.wo-set-reps').value),
+      }))
+      .filter((s) => s.weight != null || s.reps != null),
+  }));
+  return {
+    date: $('woDate').value,
+    name: $('woName').value.trim(),
+    notes: $('woNotes').value.trim(),
+    exercises,
+  };
+}
+
+/** Opens the workout sheet blank, for logging a new workout (defaults to today). */
+function openWorkoutSheet(dateIso) {
+  workoutEditingId = null;
+  $('woDate').value = dateIso || todayIso();
+  $('woName').value = '';
+  $('woNotes').value = '';
+  $('woExerciseList').innerHTML = '';
+  $('woPicker').hidden = true;
+  $('woDelete').hidden = true;
+  $('woSave').textContent = 'Save workout';
+  $('scrim').hidden = false;
+  $('workoutSheet').hidden = false;
+  $('workoutSheet').scrollTop = 0;
+}
+
+/** Opens the workout sheet pre-filled, for editing a past workout from History. */
+function openWorkoutEditSheet(workout) {
+  workoutEditingId = workout.id;
+  $('woDate').value = workout.date;
+  $('woName').value = workout.name || '';
+  $('woNotes').value = workout.notes || '';
+  $('woExerciseList').innerHTML = (workout.exercises || [])
+    .map((ex) => exerciseBlockHTML(ex.exerciseId, ex.sets && ex.sets.length ? ex.sets : [{}]))
+    .join('');
+  $('woPicker').hidden = true;
+  $('woDelete').hidden = false;
+  $('woSave').textContent = 'Update workout';
+  $('scrim').hidden = false;
+  $('workoutSheet').hidden = false;
+  $('workoutSheet').scrollTop = 0;
+}
+
+function closeWorkoutSheet() {
+  workoutEditingId = null;
+  $('scrim').hidden = true;
+  $('workoutSheet').hidden = true;
+}
+
+$('startWorkoutBtn').addEventListener('click', () => openWorkoutSheet(todayIso()));
+$('woCancel').addEventListener('click', closeWorkoutSheet);
+
+$('workoutForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const data = readWorkoutForm();
+  if (data.exercises.length === 0) {
+    toast('Add at least one exercise');
+    return;
+  }
+  if (workoutEditingId) {
+    updateWorkout(workoutEditingId, data);
+    toast('Workout updated');
+  } else {
+    addWorkout(data);
+    toast('Workout saved');
+  }
+  workouts = loadWorkouts();
+  closeWorkoutSheet();
+  renderAll();
+});
+
+$('woDelete').addEventListener('click', () => {
+  if (!workoutEditingId) return;
+  if (!confirm('Delete this workout? This cannot be undone.')) return;
+  deleteWorkout(workoutEditingId);
+  workouts = loadWorkouts();
+  closeWorkoutSheet();
+  renderAll();
+  toast('Workout deleted');
+});
+
+function openExerciseSheet(exerciseId) {
+  const ex = exerciseById(exerciseId);
+  if (!ex) return;
+  const pr = personalRecords(workouts, exerciseId);
+  $('exDetailName').textContent = ex.name;
+  $('exDetailMeta').textContent = exerciseMetaText(ex);
+  $('exDetailDiagram').innerHTML = muscleDiagramSVG(ex.muscles);
+  $('exDetailStatGrid').innerHTML = [
+    [pr ? `${pr.maxWeight}kg` : '—', 'Best weight'],
+    [pr ? `${pr.best1RM}kg` : '—', 'Est. 1RM'],
+    [pr ? String(pr.timesLogged) : '0', 'Times logged'],
+  ].map(([value, label]) => `
+    <div class="stat-tile">
+      <div class="stat-value mono">${value}</div>
+      <div class="stat-label">${label}</div>
+    </div>
+  `).join('');
+  $('exDetailChart').innerHTML = exerciseProgressSVG(exerciseProgress(workouts, exerciseId));
+  $('scrim').hidden = false;
+  $('exerciseSheet').hidden = false;
+  $('exerciseSheet').scrollTop = 0;
+}
+
+function closeExerciseSheet() {
+  $('scrim').hidden = true;
+  $('exerciseSheet').hidden = true;
+}
+
+$('exDetailClose').addEventListener('click', closeExerciseSheet);
+
+function renderExerciseSummaries() {
+  const ids = loggedExerciseIds(workouts);
+  $('exerciseSummaryEmpty').hidden = ids.length > 0;
+  $('exerciseSummaryList').innerHTML = ids.map((id) => {
+    const ex = exerciseById(id);
+    if (!ex) return '';
+    const pr = personalRecords(workouts, id);
+    return `
+      <button type="button" class="exercise-summary-card" data-id="${id}">
+        ${muscleDiagramSVG(ex.muscles)}
+        <div class="exercise-summary-info">
+          <div class="exercise-summary-name">${escapeHTML(ex.name)}</div>
+          <div class="exercise-summary-meta">${escapeHTML(exerciseMetaText(ex))}</div>
+          <div class="exercise-summary-pr mono">PR ${pr.maxWeight}kg</div>
+        </div>
+      </button>
+    `;
+  }).join('');
+}
+
+$('exerciseSummaryList').addEventListener('click', (e) => {
+  const card = e.target.closest('.exercise-summary-card');
+  if (card) openExerciseSheet(card.dataset.id);
+});
+
+function renderWorkoutHistory() {
+  const sorted = [...workouts].sort((a, b) => b.date.localeCompare(a.date));
+  $('workoutHistoryEmpty').hidden = sorted.length > 0;
+  $('workoutHistoryList').innerHTML = sorted.map((w) => {
+    const exCount = (w.exercises || []).length;
+    return `
+      <li>
+        <button type="button" class="history-item" data-id="${w.id}">
+          <div class="history-top">
+            <span class="history-date">${fmtDateLong(w.date)}</span>
+            ${w.name ? `<span class="pill pill-type">${escapeHTML(w.name)}</span>` : ''}
+          </div>
+          <div class="history-meta">
+            <span>${exCount} exercise${exCount === 1 ? '' : 's'}</span>
+            <span class="mono">${workoutVolume(w)}kg volume</span>
+          </div>
+          ${w.notes ? `<div class="history-notes">${escapeHTML(w.notes)}</div>` : ''}
+        </button>
+      </li>
+    `;
+  }).join('');
+}
+
+$('workoutHistoryList').addEventListener('click', (e) => {
+  const btn = e.target.closest('.history-item');
+  if (!btn) return;
+  const w = workouts.find((x) => x.id === btn.dataset.id);
+  if (w) openWorkoutEditSheet(w);
+});
+
+function renderWorkoutTab() {
+  const daysSince = daysSinceLastWorkout(workouts);
+  $('workoutStatGrid').innerHTML = [
+    [String(workouts.length), 'Workouts logged'],
+    [`${volumeSince(workouts, 7)}kg`, 'Volume this week'],
+    [daysSince != null ? String(daysSince) : '—', 'Days since last workout'],
+  ].map(([value, label]) => `
+    <div class="stat-tile">
+      <div class="stat-value mono">${value}</div>
+      <div class="stat-label">${label}</div>
+    </div>
+  `).join('');
+
+  renderExerciseSummaries();
+  renderWorkoutHistory();
+}
 
 /* --------------------------------------------------------------- ZONES */
 
@@ -667,6 +990,7 @@ function renderAll() {
   renderHistory();
   renderCalendar();
   renderProgress();
+  renderWorkoutTab();
   renderZones();
   renderSettingsForm();
 }

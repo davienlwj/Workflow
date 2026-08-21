@@ -50,12 +50,26 @@ npm run icons:vo2max                # regenerate the app icons
   and distance fills in automatically (still editable by hand if you'd
   rather enter it directly). A VO2max reading isn't captured here — add one
   after the fact from the Dashboard if your watch reports it.
-- **Zones** — both the LTHR-based and RHR-based (Karvonen) zone tables, the
-  interval target zone highlighted, and a protocol quick-reference card.
+- **Workout** — strength training, tracked separately from the cardio
+  sessions above. *+ Log workout* opens a popup: add exercises from a
+  built-in ~50-exercise library (searchable, filterable by muscle group),
+  each showing a minimalist front/back body diagram with its worked muscles
+  filled in, plus a "last time" hint recalled from your most recent session
+  with that exercise. Log any number of weight × reps sets per exercise.
+  Below that: workouts logged, this week's total volume, days since your
+  last workout, a card per exercise you've ever logged (its muscle diagram
+  and current PR — tap through to a detail sheet with best weight,
+  estimated 1RM, times logged, and a weight-over-time progress chart), and
+  the full workout history (tap one to edit or delete it).
 - **Settings** — every number above (baseline VO2max, resting/max/threshold
   HR, which zone model is primary, and all of the protocol's
   reps/timing/frequency) is editable here — nothing is hardcoded once you've
-  changed it. Export/import a JSON backup, or reset to defaults.
+  changed it. Export/import a JSON backup (workouts included), or reset to
+  defaults. Below that, an expandable **Zones & protocol reference**
+  section: both the LTHR-based and RHR-based (Karvonen) zone tables, the
+  interval target zone highlighted, and a protocol quick-reference card —
+  collapsed by default so it doesn't compete with the settings form for
+  attention.
 
 ## Zone math
 
@@ -75,16 +89,19 @@ the defaults in this app.
 ## Layout
 
 ```
-index.html                  markup and the two popup sheets (log session, edit session)
-css/style.css               the whole dark theme
-js/store.js                 localStorage CRUD for settings and sessions
+index.html                  markup and the four popup sheets (log/edit session, log/edit workout, exercise progress)
+css/style.css               the whole light theme
+js/store.js                 localStorage CRUD for settings, sessions and workouts
 js/zones.js                 zone tables, computed from settings
-js/block.js                  progress stats — pure functions
-js/chart.js                 dependency-free SVG charts: VO2max trend line, mileage bars
+js/block.js                 cardio progress stats — pure functions
+js/workout.js                strength progress stats — PRs, last-performance, volume; pure functions
+js/exercises.js              the built-in exercise library (name, equipment, muscles)
+js/muscleDiagram.js          minimalist front/back body silhouette SVG, muscles highlighted per exercise
+js/chart.js                 dependency-free SVG charts: VO2max trend, mileage bars, exercise progress
 js/ics.js                   builds a per-session .ics file for calendar export
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/icon-source.jpg        the hand-drawn mark the icons are built from
 tools/gen-icons.py           crops/centers it into the icon set (needs Pillow, numpy)
-../tests/vo2max-*.test.mjs   zone, progress-stats, chart and ics-export test suites
+../tests/vo2max-*.test.mjs   zone, progress-stats, workout, exercise, muscle-diagram, chart and ics-export test suites
 ```
