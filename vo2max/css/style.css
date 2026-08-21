@@ -161,7 +161,7 @@ main {
 /* Only grows while the live-session mini-bar is actually on screen, so it
    doesn't steal vertical space the rest of the time. */
 main.has-live-bar {
-  padding-bottom: calc(88px + var(--safe-b));
+  padding-bottom: calc(100px + var(--safe-b));
 }
 
 .view-title {
@@ -782,22 +782,22 @@ button { font-family: var(--font-mono); }
   z-index: 19;
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 10px 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  gap: 14px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 16px;
+  padding: 14px 18px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   text-align: left;
-  color: var(--ink);
+  color: var(--bg);
 }
 
 .live-mini-bar[hidden] { display: none; }
 
 .live-mini-timer {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--bg);
   flex-shrink: 0;
 }
 
@@ -809,21 +809,22 @@ button { font-family: var(--font-mono); }
 }
 
 .live-mini-exercise {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
+  color: var(--bg);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .live-mini-set {
-  font-size: 12px;
-  color: var(--dim);
+  font-size: 13px;
+  color: var(--accent-dim);
 }
 
 .live-mini-resume {
-  font-size: 12px;
-  color: var(--dim);
+  font-size: 13px;
+  color: var(--accent-dim);
   flex-shrink: 0;
 }
 
