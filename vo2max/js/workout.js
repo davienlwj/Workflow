@@ -11,15 +11,21 @@ import {
 const DAY_MS = 86400000;
 const toDate = (iso) => new Date(`${iso}T00:00:00`);
 
-/** Total weight x reps across every completed set in one workout. */
+/** Total weight x reps across every completed, non-warm-up set in one
+ *  workout - a warm-up doesn't reflect the working weight this is meant to
+ *  track. */
 export function workoutVolume(workout) {
   return (workout.exercises || []).reduce(
-    (sum, ex) => sum + (ex.sets || []).reduce((s, set) => s + (set.weight || 0) * (set.reps || 0), 0),
+    (sum, ex) => sum + (ex.sets || [])
+      .filter((set) => set.type !== 'warmup')
+      .reduce((s, set) => s + (set.weight || 0) * (set.reps || 0), 0),
     0,
   );
 }
 
-/** Every logged set for one exercise across all workouts, oldest first. */
+/** Every logged non-warm-up set for one exercise across all workouts,
+ *  oldest first - feeds PRs and the progress chart, which a light warm-up
+ *  set would otherwise understate or distort. */
 function setsForExercise(workouts, exerciseId) {
   const out = [];
   for (const w of [...workouts].sort((a, b) => a.date.localeCompare(b.date))) {
@@ -27,6 +33,7 @@ function setsForExercise(workouts, exerciseId) {
     if (!ex) continue;
     for (const set of ex.sets || []) {
       if (set.weight == null || set.reps == null) continue;
+      if (set.type === 'warmup') continue;
       out.push({ date: w.date, weight: set.weight, reps: set.reps });
     }
   }
@@ -74,6 +81,29 @@ export function exerciseProgress(workouts, exerciseId) {
   return [...byDate.values()]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((s) => ({ date: s.date, value: s.weight, reps: s.reps }));
+}
+
+/**
+ * Per-exercise recap for the finish-workout summary screen: sets logged,
+ * total reps, and volume (weight x reps, warm-ups excluded per
+ * workoutVolume's convention), in the order the exercises appear in the
+ * workout.
+ * @param {typeof EXERCISES} [exercises] defaults to the built-in library;
+ *   pass a list that also includes the user's custom exercises to resolve
+ *   names for those too.
+ */
+export function workoutSummaryByExercise(workout, exercises = EXERCISES) {
+  return (workout.exercises || []).map((ex) => {
+    const def = exerciseById(ex.exerciseId, exercises);
+    const workingSets = (ex.sets || []).filter((s) => s.weight != null && s.reps != null && s.type !== 'warmup');
+    return {
+      exerciseId: ex.exerciseId,
+      name: def ? def.name : ex.exerciseId,
+      setCount: workingSets.length,
+      totalReps: workingSets.reduce((sum, s) => sum + s.reps, 0),
+      volume: workingSets.reduce((sum, s) => sum + s.weight * s.reps, 0),
+    };
+  });
 }
 
 /** Every exercise id logged at least once, most-recently-performed first. */

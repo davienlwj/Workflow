@@ -5,7 +5,7 @@ import {
   loadCustomExercises, addCustomExercise, deleteCustomExercise,
   exportAll, importAll,
 } from './store.js';
-import { lthrZoneTable, rhrZoneTable, targetZone } from './zones.js';
+import { lthrZoneTable, rhrZoneTable } from './zones.js';
 import {
   todayIso,
   daysSinceLastSession, averageSessionHR, vo2maxSeries,
@@ -52,8 +52,10 @@ function findExercise(id) {
 
 /* ------------------------------------------------------------- tab views */
 
-const tabs = document.querySelectorAll('.tab');
-tabs.forEach((btn) => {
+const VIEW_LABEL = { dashboard: 'Dashboard', run: 'Run', workout: 'Workout', settings: 'Settings' };
+
+const menuItems = document.querySelectorAll('.menu-item');
+menuItems.forEach((btn) => {
   btn.addEventListener('click', () => switchView(btn.dataset.view));
 });
 
@@ -61,9 +63,34 @@ function switchView(name) {
   document.querySelectorAll('.view').forEach((v) => {
     v.hidden = v.id !== `view-${name}`;
   });
-  tabs.forEach((btn) => btn.setAttribute('aria-selected', String(btn.dataset.view === name)));
+  menuItems.forEach((btn) => btn.setAttribute('aria-selected', String(btn.dataset.view === name)));
+  $('headerTitle').textContent = VIEW_LABEL[name] ?? '';
+  closeMenu();
   window.scrollTo({ top: 0 });
 }
+
+function openMenu() {
+  $('menuDropdown').hidden = false;
+  $('menuToggle').setAttribute('aria-expanded', 'true');
+}
+
+function closeMenu() {
+  $('menuDropdown').hidden = true;
+  $('menuToggle').setAttribute('aria-expanded', 'false');
+}
+
+$('menuToggle').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if ($('menuDropdown').hidden) openMenu(); else closeMenu();
+});
+
+// Close the dropdown on any click outside it (and outside the toggle itself,
+// which has its own handler above).
+document.addEventListener('click', (e) => {
+  if ($('menuDropdown').hidden) return;
+  if (e.target.closest('#menuDropdown') || e.target.closest('#menuToggle')) return;
+  closeMenu();
+});
 
 /* ------------------------------------------------------------ toast, fmt */
 
@@ -639,41 +666,125 @@ function exerciseMetaText(ex) {
   return `${ex.equipment} · ${ex.muscles.map((m) => MUSCLE_LABEL[m]).join(', ')}`;
 }
 
-function setRowHTML(index, set = {}) {
+const SET_TYPES = ['normal', 'warmup', 'drop', 'failure'];
+const SET_TYPE_GLYPH = { normal: 'N', warmup: 'W', drop: 'D', failure: 'F' };
+const SET_TYPE_LABEL = { normal: 'Normal set', warmup: 'Warm-up set', drop: 'Drop set', failure: 'Failure set' };
+
+/** @param {{weight:number, reps:number}} [prevSet] the matching set index from
+ *  lastPerformance(), shown as this row's placeholder so today's target is
+ *  visible while filling it in, not just in the summary line above. */
+function setRowHTML(index, set = {}, prevSet) {
+  const type = set.type || 'normal';
   return `
-    <div class="wo-set-row">
+    <div class="wo-set-row" data-type="${type}">
+      <button type="button" class="wo-set-type" data-type="${type}" title="${SET_TYPE_LABEL[type]} — tap to change">${SET_TYPE_GLYPH[type]}</button>
       <span class="wo-set-index">${index + 1}</span>
-      <input type="number" class="wo-set-weight" step="0.5" min="0" inputmode="decimal" placeholder="kg" value="${set.weight ?? ''}">
-      <input type="number" class="wo-set-reps" min="0" inputmode="numeric" placeholder="reps" value="${set.reps ?? ''}">
+      <input type="number" class="wo-set-weight" step="0.5" min="0" inputmode="decimal" placeholder="${prevSet?.weight ?? 'kg'}" value="${set.weight ?? ''}">
+      <input type="number" class="wo-set-reps" min="0" inputmode="numeric" placeholder="${prevSet?.reps ?? 'reps'}" value="${set.reps ?? ''}">
       <button type="button" class="wo-set-remove" aria-label="Remove set">✕</button>
     </div>
   `;
 }
 
-function exerciseBlockHTML(exerciseId, sets) {
+function cycleSetType(btn) {
+  const next = SET_TYPES[(SET_TYPES.indexOf(btn.dataset.type) + 1) % SET_TYPES.length];
+  btn.dataset.type = next;
+  btn.textContent = SET_TYPE_GLYPH[next];
+  btn.title = `${SET_TYPE_LABEL[next]} — tap to change`;
+  btn.closest('.wo-set-row').dataset.type = next;
+}
+
+/** @param {string} [supersetId] if this exercise is already paired into a
+ *  superset, its group id — suppresses the "⚭ Superset" button (v1 only
+ *  supports pairs, formed/broken via that button and the group's unpair ✕). */
+function exerciseBlockHTML(exerciseId, sets, supersetId) {
   const ex = findExercise(exerciseId);
   if (!ex) return '';
   const last = lastPerformance(workouts, exerciseId);
   const lastText = last
     ? `Last (${fmtDateShort(last.date)}): ${last.sets.map((s) => `${s.weight}kg×${s.reps}`).join(', ') || '—'}`
     : 'No previous data for this exercise';
+  const supersetBtnHTML = supersetId ? '' : '<button type="button" class="wo-superset-btn" title="Superset with another exercise">⚭</button>';
   return `
-    <div class="wo-exercise-block" data-exercise-id="${exerciseId}">
+    <div class="wo-exercise-block" data-exercise-id="${exerciseId}"${supersetId ? ` data-superset-id="${supersetId}"` : ''}>
       <div class="wo-exercise-header">
         <div>
           <div class="wo-exercise-name">${escapeHTML(ex.name)}</div>
           <div class="wo-exercise-meta">${escapeHTML(exerciseMetaText(ex))}</div>
         </div>
-        <button type="button" class="wo-exercise-remove" aria-label="Remove exercise">✕</button>
+        <div class="wo-exercise-header-actions">
+          ${supersetBtnHTML}
+          <button type="button" class="wo-exercise-remove" aria-label="Remove exercise">✕</button>
+        </div>
       </div>
       ${muscleDiagramHTML(ex.muscles)}
       <p class="wo-last-performance">${lastText}</p>
-      <div class="wo-set-row-heading"><span>Set</span><span>kg</span><span>Reps</span><span></span></div>
-      <div class="wo-set-rows">${sets.map((s, i) => setRowHTML(i, s)).join('')}</div>
+      <div class="wo-set-row-heading"><span></span><span>Set</span><span>kg</span><span>Reps</span><span></span></div>
+      <div class="wo-set-rows">${sets.map((s, i) => setRowHTML(i, s, last?.sets[i])).join('')}</div>
       <button type="button" class="wo-add-set ghost-btn">+ Add set</button>
     </div>
   `;
 }
+
+/* ------------------------------------------------------------- supersets */
+
+function makeShortId() {
+  return Math.random().toString(36).slice(2, 8);
+}
+
+function supersetLabelHTML() {
+  return `
+    <div class="wo-superset-label">
+      <span>⚭ Superset</span>
+      <button type="button" class="wo-superset-unpair" aria-label="Remove superset pairing">✕</button>
+    </div>
+  `;
+}
+
+/** Wraps `blocks` (already-in-DOM .wo-exercise-block elements) in a shared
+ *  .wo-superset-group container, tagging each with `supersetId`. */
+function wrapAsSupersetGroup(blocks, supersetId) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'wo-superset-group';
+  wrapper.dataset.supersetId = supersetId;
+  wrapper.innerHTML = supersetLabelHTML();
+  blocks[0].parentNode.insertBefore(wrapper, blocks[0]);
+  blocks.forEach((b) => {
+    b.dataset.supersetId = supersetId;
+    b.querySelector('.wo-superset-btn')?.remove();
+    wrapper.appendChild(b);
+  });
+}
+
+/** Un-pairs every block in a .wo-superset-group, restoring the "⚭ Superset"
+ *  button on any that lost it when it was originally rendered pre-paired. */
+function unwrapSuperset(wrapper) {
+  const blocks = [...wrapper.querySelectorAll('.wo-exercise-block')];
+  blocks.forEach((b) => {
+    delete b.dataset.supersetId;
+    const actions = b.querySelector('.wo-exercise-header-actions');
+    if (actions && !actions.querySelector('.wo-superset-btn')) {
+      actions.insertAdjacentHTML('afterbegin', '<button type="button" class="wo-superset-btn" title="Superset with another exercise">⚭</button>');
+    }
+    wrapper.parentNode.insertBefore(b, wrapper);
+  });
+  wrapper.remove();
+}
+
+/** Re-groups exercise blocks that already share a supersetId - used after
+ *  bulk-rendering a saved workout's exercises (openWorkoutEditSheet), since
+ *  exerciseBlockHTML renders each block flat and grouping happens after. */
+function regroupSupersets() {
+  const groups = new Map();
+  $('woExerciseList').querySelectorAll(':scope > .wo-exercise-block[data-superset-id]').forEach((b) => {
+    const id = b.dataset.supersetId;
+    if (!groups.has(id)) groups.set(id, []);
+    groups.get(id).push(b);
+  });
+  groups.forEach((blocks, id) => { if (blocks.length > 1) wrapAsSupersetGroup(blocks, id); });
+}
+
+let pairingSourceBlock = null;
 
 function renumberSets(block) {
   block.querySelectorAll('.wo-set-row').forEach((row, i) => {
@@ -748,15 +859,32 @@ $('newExSave').addEventListener('click', () => {
   toast('Exercise added');
 });
 
+/** Opens the exercise picker - either to add a normal exercise, or (when
+ *  pairingSourceBlock is set) to pick this exercise's superset partner. */
+function openWoPicker() {
+  $('woPicker').hidden = false;
+  $('woPickerSearch').value = '';
+  renderWoPickerChips();
+  renderWoPickerResults();
+  closeNewExerciseForm();
+  const hint = $('woPickerHint');
+  if (pairingSourceBlock) {
+    const name = pairingSourceBlock.querySelector('.wo-exercise-name')?.textContent || 'this exercise';
+    hint.textContent = `Pick an exercise to superset with ${name}`;
+    hint.hidden = false;
+  } else {
+    hint.hidden = true;
+  }
+  $('woPickerSearch').focus();
+}
+
 $('woAddExercise').addEventListener('click', () => {
   const opening = $('woPicker').hidden;
-  $('woPicker').hidden = !opening;
+  pairingSourceBlock = null;
   if (opening) {
-    $('woPickerSearch').value = '';
-    renderWoPickerChips();
-    renderWoPickerResults();
-    closeNewExerciseForm();
-    $('woPickerSearch').focus();
+    openWoPicker();
+  } else {
+    $('woPicker').hidden = true;
   }
 });
 
@@ -775,19 +903,45 @@ $('woPickerResults').addEventListener('click', (e) => {
   const btn = e.target.closest('.wo-picker-result');
   if (!btn) return;
   $('woExerciseList').insertAdjacentHTML('beforeend', exerciseBlockHTML(btn.dataset.id, [{}]));
+  if (pairingSourceBlock) {
+    wrapAsSupersetGroup([pairingSourceBlock, $('woExerciseList').lastElementChild], `superset-${makeShortId()}`);
+    pairingSourceBlock = null;
+  }
   $('woPicker').hidden = true;
+  $('woPickerHint').hidden = true;
 });
 
 $('woExerciseList').addEventListener('click', (e) => {
+  const typeBtn = e.target.closest('.wo-set-type');
+  if (typeBtn) {
+    cycleSetType(typeBtn);
+    return;
+  }
+  const supersetBtn = e.target.closest('.wo-superset-btn');
+  if (supersetBtn) {
+    pairingSourceBlock = supersetBtn.closest('.wo-exercise-block');
+    openWoPicker();
+    return;
+  }
+  const unpairBtn = e.target.closest('.wo-superset-unpair');
+  if (unpairBtn) {
+    unwrapSuperset(unpairBtn.closest('.wo-superset-group'));
+    return;
+  }
   const removeExBtn = e.target.closest('.wo-exercise-remove');
   if (removeExBtn) {
-    removeExBtn.closest('.wo-exercise-block').remove();
+    const block = removeExBtn.closest('.wo-exercise-block');
+    const group = block.closest('.wo-superset-group');
+    block.remove();
+    if (group && group.querySelectorAll('.wo-exercise-block').length < 2) unwrapSuperset(group);
     return;
   }
   const addSetBtn = e.target.closest('.wo-add-set');
   if (addSetBtn) {
-    const rows = addSetBtn.closest('.wo-exercise-block').querySelector('.wo-set-rows');
-    rows.insertAdjacentHTML('beforeend', setRowHTML(rows.children.length));
+    const block = addSetBtn.closest('.wo-exercise-block');
+    const rows = block.querySelector('.wo-set-rows');
+    const last = lastPerformance(workouts, block.dataset.exerciseId);
+    rows.insertAdjacentHTML('beforeend', setRowHTML(rows.children.length, {}, last?.sets[rows.children.length]));
     return;
   }
   const removeSetBtn = e.target.closest('.wo-set-remove');
@@ -804,10 +958,12 @@ $('woExerciseList').addEventListener('click', (e) => {
 function readWorkoutForm() {
   const exercises = [...$('woExerciseList').querySelectorAll('.wo-exercise-block')].map((block) => ({
     exerciseId: block.dataset.exerciseId,
+    supersetId: block.dataset.supersetId || null,
     sets: [...block.querySelectorAll('.wo-set-row')]
       .map((row) => ({
         weight: numOrNull(row.querySelector('.wo-set-weight').value),
         reps: numOrNull(row.querySelector('.wo-set-reps').value),
+        type: row.querySelector('.wo-set-type').dataset.type,
       }))
       .filter((s) => s.weight != null || s.reps != null),
   }));
@@ -822,6 +978,7 @@ function readWorkoutForm() {
 /** Opens the workout sheet blank, for logging a new workout (defaults to today). */
 function openWorkoutSheet(dateIso) {
   workoutEditingId = null;
+  pairingSourceBlock = null;
   $('woDate').value = dateIso || todayIso();
   $('woName').value = '';
   $('woNotes').value = '';
@@ -837,12 +994,14 @@ function openWorkoutSheet(dateIso) {
 /** Opens the workout sheet pre-filled, for editing a past workout from History. */
 function openWorkoutEditSheet(workout) {
   workoutEditingId = workout.id;
+  pairingSourceBlock = null;
   $('woDate').value = workout.date;
   $('woName').value = workout.name || '';
   $('woNotes').value = workout.notes || '';
   $('woExerciseList').innerHTML = (workout.exercises || [])
-    .map((ex) => exerciseBlockHTML(ex.exerciseId, ex.sets && ex.sets.length ? ex.sets : [{}]))
+    .map((ex) => exerciseBlockHTML(ex.exerciseId, ex.sets && ex.sets.length ? ex.sets : [{}], ex.supersetId))
     .join('');
+  regroupSupersets();
   $('woPicker').hidden = true;
   $('woDelete').hidden = false;
   $('woSave').textContent = 'Update workout';
@@ -1098,12 +1257,6 @@ function renderZones() {
   `;
 }
 
-function renderHeaderZone() {
-  const z = targetZone(settings);
-  const modelLabel = settings.primaryZoneModel === 'rhr' ? 'RHR' : 'LTHR';
-  $('headerZone').textContent = `${modelLabel} target ${z.bpmLow}–${z.bpmHigh}`;
-}
-
 /* ------------------------------------------------------------- SETTINGS */
 
 function renderSettingsForm() {
@@ -1183,7 +1336,6 @@ $('sReset').addEventListener('click', () => {
 /* ------------------------------------------------------------------ boot */
 
 function renderAll() {
-  renderHeaderZone();
   renderDashboard();
   renderHistory();
   renderCalendar();

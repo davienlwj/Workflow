@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   workoutVolume, lastPerformance, personalRecords, exerciseProgress,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince, muscleSetBreakdown,
-  muscleSetBreakdownDetailed,
+  muscleSetBreakdownDetailed, workoutSummaryByExercise,
 } from '../vo2max/js/workout.js';
 import { RADAR_GROUPS, MUSCLES, RADAR_GROUP_FOR } from '../vo2max/js/exercises.js';
 
@@ -24,6 +24,25 @@ test('workoutVolume ignores sets missing weight or reps', () => {
     { exerciseId: 'bench-press', sets: [{ weight: null, reps: 8 }, { weight: 60, reps: null }] },
   ]);
   assert.equal(workoutVolume(w), 0);
+});
+
+test('workoutVolume excludes warm-up sets but counts drop/failure sets', () => {
+  const w = makeWorkout('2026-08-10', [
+    { exerciseId: 'bench-press', sets: [
+      { weight: 20, reps: 10, type: 'warmup' },
+      { weight: 60, reps: 8, type: 'normal' },
+      { weight: 40, reps: 12, type: 'drop' },
+      { weight: 60, reps: 6, type: 'failure' },
+    ] },
+  ]);
+  assert.equal(workoutVolume(w), 60 * 8 + 40 * 12 + 60 * 6);
+});
+
+test('workoutVolume treats a set with no type as a normal working set (old data)', () => {
+  const w = makeWorkout('2026-08-10', [
+    { exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8 }] },
+  ]);
+  assert.equal(workoutVolume(w), 60 * 8);
 });
 
 test('lastPerformance returns the most recent workout containing the exercise', () => {
@@ -56,6 +75,40 @@ test('personalRecords finds the max weight, best est. 1RM, best set volume, and 
 
 test('personalRecords returns null for an exercise never logged', () => {
   assert.equal(personalRecords([], 'bench-press'), null);
+});
+
+test('personalRecords ignores warm-up sets when finding the best weight', () => {
+  const workouts = [
+    makeWorkout('2026-08-10', [{ exerciseId: 'bench-press', sets: [
+      { weight: 100, reps: 5, type: 'warmup' }, // heavier than the working set, but shouldn't win
+      { weight: 60, reps: 8, type: 'normal' },
+    ] }]),
+  ];
+  const pr = personalRecords(workouts, 'bench-press');
+  assert.equal(pr.maxWeight, 60);
+});
+
+test('workoutSummaryByExercise reports sets/reps/volume per exercise, warm-ups excluded', () => {
+  const w = makeWorkout('2026-08-18', [
+    { exerciseId: 'bench-press', sets: [
+      { weight: 20, reps: 10, type: 'warmup' },
+      { weight: 60, reps: 8, type: 'normal' },
+      { weight: 60, reps: 6, type: 'normal' },
+    ] },
+    { exerciseId: 'squat', sets: [{ weight: 80, reps: 5, type: 'normal' }] },
+  ]);
+  const summary = workoutSummaryByExercise(w);
+  assert.deepEqual(summary, [
+    { exerciseId: 'bench-press', name: 'Bench Press', setCount: 2, totalReps: 14, volume: 60 * 8 + 60 * 6 },
+    { exerciseId: 'squat', name: 'Back Squat', setCount: 1, totalReps: 5, volume: 80 * 5 },
+  ]);
+});
+
+test('workoutSummaryByExercise falls back to the raw id for an unknown exercise', () => {
+  const w = makeWorkout('2026-08-18', [
+    { exerciseId: 'not-a-real-exercise', sets: [{ weight: 10, reps: 10, type: 'normal' }] },
+  ]);
+  assert.equal(workoutSummaryByExercise(w)[0].name, 'not-a-real-exercise');
 });
 
 test('exerciseProgress picks the heaviest set per workout date, sorted oldest to newest', () => {

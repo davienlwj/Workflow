@@ -77,6 +77,8 @@ body {
   border-bottom: 1px solid var(--line);
 }
 
+.bar-left { display: flex; align-items: center; gap: 10px; }
+
 .brand {
   font-weight: 700;
   font-size: 17px;
@@ -84,15 +86,69 @@ body {
   color: var(--accent);
 }
 
-.header-zone {
+.header-title {
   font-size: 13px;
   color: var(--dim);
+}
+
+.menu-toggle {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.menu-toggle-bar {
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--ink);
+}
+
+.menu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 16px;
+  margin-top: 6px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  min-width: 168px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.menu-dropdown[hidden] { display: none; }
+
+.menu-item {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 11px 12px;
+  font-size: 14px;
+  text-align: left;
+  color: var(--dim);
+}
+
+.menu-item[aria-selected="true"] {
+  background: var(--panel-2);
+  color: var(--accent);
+  font-weight: 700;
 }
 
 /* ------------------------------------------------------------------ main */
 
 main {
-  padding: 16px 16px calc(96px + var(--safe-b));
+  padding: 16px 16px calc(24px + var(--safe-b));
   max-width: 560px;
   margin: 0 auto;
   /* Backstop alongside html's overflow-x: hidden — Safari doesn't always
@@ -645,39 +701,6 @@ button { font-family: var(--font-mono); }
 .protocol-card .k { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; }
 .protocol-card .v { font-family: var(--font-mono); font-size: 16px; font-weight: 700; }
 
-/* ------------------------------------------------------------------ tabs */
-
-.tabs {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 10;
-  display: flex;
-  background: rgba(245, 245, 245, 0.92);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid var(--line);
-  padding-bottom: var(--safe-b);
-}
-
-.tab {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  color: var(--dimmer);
-  font-size: 12px;
-  letter-spacing: -0.01em;
-  padding: 9px 2px 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  white-space: nowrap;
-}
-
-.tab[aria-selected="true"] { color: var(--accent); }
-
 /* ----------------------------------------------------------------- sheet */
 
 .scrim {
@@ -823,6 +846,41 @@ button { font-family: var(--font-mono); }
   padding: 12px 14px;
 }
 
+.wo-superset-group {
+  border: 1px dashed var(--accent);
+  border-radius: 14px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wo-superset-group .wo-exercise-block {
+  border-color: transparent;
+  padding: 8px 6px;
+}
+
+.wo-superset-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.wo-superset-unpair {
+  background: transparent;
+  border: none;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px;
+}
+
 .wo-exercise-header {
   display: flex;
   align-items: flex-start;
@@ -833,7 +891,14 @@ button { font-family: var(--font-mono); }
 .wo-exercise-name { font-weight: 700; font-size: 15px; }
 .wo-exercise-meta { font-size: 12px; color: var(--dim); margin-top: 2px; }
 
-.wo-exercise-remove, .wo-set-remove {
+.wo-exercise-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.wo-exercise-remove, .wo-set-remove, .wo-superset-btn {
   background: transparent;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -853,7 +918,7 @@ button { font-family: var(--font-mono); }
 
 .wo-set-row-heading {
   display: grid;
-  grid-template-columns: 22px 1fr 1fr 26px;
+  grid-template-columns: 26px 22px 1fr 1fr 26px;
   gap: 6px;
   font-size: 11px;
   text-transform: uppercase;
@@ -862,7 +927,6 @@ button { font-family: var(--font-mono); }
   text-align: center;
   margin-bottom: 4px;
 }
-.wo-set-row-heading span:first-child { text-align: left; }
 
 .wo-set-rows {
   display: flex;
@@ -872,15 +936,39 @@ button { font-family: var(--font-mono); }
 
 .wo-set-row {
   display: grid;
-  grid-template-columns: 22px 1fr 1fr 26px;
+  grid-template-columns: 26px 22px 1fr 1fr 26px;
   gap: 6px;
   align-items: center;
+}
+
+.wo-set-type {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Any non-normal set type fills in solid so it's spottable at a glance
+   down a list of sets, rather than just readable one row at a time. */
+.wo-set-row[data-type="warmup"] .wo-set-type,
+.wo-set-row[data-type="drop"] .wo-set-type,
+.wo-set-row[data-type="failure"] .wo-set-type {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
 }
 
 .wo-set-index {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--dim);
+  text-align: center;
 }
 
 .wo-set-row input { padding: 8px 6px; font-size: 14px; text-align: center; }
@@ -896,6 +984,16 @@ button { font-family: var(--font-mono); }
   flex-direction: column;
   gap: 10px;
 }
+
+.wo-picker[hidden] { display: none; }
+
+.wo-picker-hint {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.wo-picker-hint[hidden] { display: none; }
 
 .wo-picker-search {
   background: var(--bg);

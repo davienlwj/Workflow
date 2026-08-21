@@ -27,8 +27,22 @@
 <body>
 
 <header class="bar">
-  <span class="brand">HYBIRD</span>
-  <span id="headerZone" class="header-zone mono"></span>
+  <div class="bar-left">
+    <button type="button" id="menuToggle" class="menu-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="menuDropdown">
+      <span class="menu-toggle-bar"></span>
+      <span class="menu-toggle-bar"></span>
+      <span class="menu-toggle-bar"></span>
+    </button>
+    <span class="brand">HYBIRD</span>
+  </div>
+  <span id="headerTitle" class="header-title mono">Dashboard</span>
+
+  <nav id="menuDropdown" class="menu-dropdown" hidden role="menu" aria-label="Sections">
+    <button type="button" class="menu-item" data-view="dashboard" role="menuitem" aria-selected="true">Dashboard</button>
+    <button type="button" class="menu-item" data-view="run" role="menuitem" aria-selected="false">Run</button>
+    <button type="button" class="menu-item" data-view="workout" role="menuitem" aria-selected="false">Workout</button>
+    <button type="button" class="menu-item" data-view="settings" role="menuitem" aria-selected="false">Settings</button>
+  </nav>
 </header>
 
 <main id="main">
@@ -205,13 +219,6 @@
 
 </main>
 
-<nav id="tabs" class="tabs" role="tablist" aria-label="Sections">
-  <button type="button" class="tab" data-view="dashboard" role="tab" aria-selected="true">Dashboard</button>
-  <button type="button" class="tab" data-view="run" role="tab" aria-selected="false">Run</button>
-  <button type="button" class="tab" data-view="workout" role="tab" aria-selected="false">Workout</button>
-  <button type="button" class="tab" data-view="settings" role="tab" aria-selected="false">Settings</button>
-</nav>
-
 <!-- Edit session sheet -->
 <div id="scrim" class="scrim" hidden></div>
 <section id="editSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Edit session">
@@ -372,6 +379,7 @@
     <div id="woExerciseList" class="wo-exercise-list"></div>
 
     <div id="woPicker" class="wo-picker" hidden>
+      <p id="woPickerHint" class="wo-picker-hint" hidden></p>
       <input id="woPickerSearch" type="text" class="wo-picker-search" placeholder="Search exercises…">
       <div id="woPickerChips" class="wo-picker-chips"></div>
       <button type="button" id="woNewExerciseBtn" class="ghost-btn block">+ Create new exercise</button>
