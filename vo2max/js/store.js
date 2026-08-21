@@ -9,6 +9,7 @@ const SETTINGS_KEY = 'vo2max.settings.v1';
 const SESSIONS_KEY = 'vo2max.sessions.v1';
 const WORKOUTS_KEY = 'vo2max.workouts.v1';
 const CUSTOM_EXERCISES_KEY = 'vo2max.customExercises.v1';
+const LIVE_WORKOUT_KEY = 'vo2max.liveWorkout.v1';
 
 export const DEFAULT_SETTINGS = {
   baselineVO2max: 46,
@@ -167,6 +168,27 @@ export function addCustomExercise(exercise) {
 export function deleteCustomExercise(id) {
   const exercises = loadCustomExercises().filter((e) => e.id !== id);
   saveCustomExercises(exercises);
+}
+
+/** In-progress "today's workout" live session, so backgrounding/killing the
+ *  PWA mid-workout at the gym doesn't lose it. Shape: { startedAt, date,
+ *  name, notes, exercises } - same as readWorkoutForm()'s output plus
+ *  startedAt, with each set also carrying a `done` flag. */
+export function loadLiveWorkout() {
+  try {
+    const raw = localStorage.getItem(LIVE_WORKOUT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLiveWorkout(session) {
+  localStorage.setItem(LIVE_WORKOUT_KEY, JSON.stringify(session));
+}
+
+export function clearLiveWorkout() {
+  localStorage.removeItem(LIVE_WORKOUT_KEY);
 }
 
 export function exportAll() {

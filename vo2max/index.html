@@ -97,7 +97,7 @@
 
     <div id="workoutStatGrid" class="stat-grid"></div>
 
-    <button type="button" id="startWorkoutBtn" class="primary block">+ Log workout</button>
+    <button type="button" id="startWorkoutBtn" class="primary block">Start Workout</button>
 
     <h2 class="section-title">Muscle balance</h2>
     <div id="muscleScope" class="scopes" role="tablist" aria-label="Muscle balance range">
@@ -221,6 +221,17 @@
 
 <!-- Edit session sheet -->
 <div id="scrim" class="scrim" hidden></div>
+
+<!-- Persistent bar shown while a live workout is running and its sheet is minimized -->
+<button type="button" id="liveMiniBar" class="live-mini-bar" hidden>
+  <span id="liveMiniTimer" class="live-mini-timer mono">00:00</span>
+  <span class="live-mini-info">
+    <span id="liveMiniExercise" class="live-mini-exercise">—</span>
+    <span id="liveMiniSet" class="live-mini-set">—</span>
+  </span>
+  <span class="live-mini-resume">Resume ▲</span>
+</button>
+
 <section id="editSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Edit session">
   <div class="grabber"></div>
   <form id="editForm" class="form">
@@ -366,6 +377,10 @@
 <!-- Log/edit workout sheet (popup, shared by "+ Log workout" and tapping a past workout) -->
 <section id="workoutSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Log workout">
   <div class="grabber"></div>
+  <div id="woLiveTimer" class="wo-live-timer" hidden>
+    <span class="wo-live-dot"></span>
+    <span id="woLiveTimerText" class="mono">00:00</span>
+  </div>
   <form id="workoutForm" class="form" autocomplete="off">
     <label class="field">
       <span>Date</span>
@@ -418,6 +433,17 @@
       <button type="submit" id="woSave" class="primary">Save workout</button>
     </div>
   </form>
+</section>
+
+<!-- Workout summary sheet (popup, shown right after finishing a live workout) -->
+<section id="workoutSummarySheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Workout summary">
+  <div class="grabber"></div>
+  <h2 class="view-title">Workout complete</h2>
+  <div id="summaryDuration" class="summary-duration mono"></div>
+  <div id="summaryExercises" class="summary-exercises"></div>
+  <div class="actions">
+    <button type="button" id="summaryDone" class="primary block">Done</button>
+  </div>
 </section>
 
 <!-- Exercise progress sheet (popup, opened from an exercise card) -->

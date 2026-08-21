@@ -158,6 +158,12 @@ main {
   overflow-x: hidden;
 }
 
+/* Only grows while the live-session mini-bar is actually on screen, so it
+   doesn't steal vertical space the rest of the time. */
+main.has-live-bar {
+  padding-bottom: calc(88px + var(--safe-b));
+}
+
 .view-title {
   font-size: 14px;
   text-transform: uppercase;
@@ -732,6 +738,115 @@ button { font-family: var(--font-mono); }
   margin: 4px auto 14px;
 }
 
+/* ------------------------------------------------------------ live workout */
+
+.wo-live-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.wo-live-timer[hidden] { display: none; }
+
+.wo-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: wo-live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes wo-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+#woLiveTimerText {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.live-mini-bar {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + var(--safe-b));
+  z-index: 19;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  text-align: left;
+  color: var(--ink);
+}
+
+.live-mini-bar[hidden] { display: none; }
+
+.live-mini-timer {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.live-mini-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.live-mini-exercise {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.live-mini-set {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.live-mini-resume {
+  font-size: 12px;
+  color: var(--dim);
+  flex-shrink: 0;
+}
+
+/* --------------------------------------------------------- workout summary */
+
+.summary-duration {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 700;
+  margin: 4px 0 18px;
+}
+
+.summary-exercises {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.summary-exercise-row {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.summary-exercise-name { font-weight: 700; font-size: 14px; }
+.summary-exercise-stats { font-size: 12px; color: var(--dim); margin-top: 2px; }
+
 /* ----------------------------------------------------------------- toast */
 
 .toast {
@@ -939,6 +1054,30 @@ button { font-family: var(--font-mono); }
   grid-template-columns: 26px 22px 1fr 1fr 26px;
   gap: 6px;
   align-items: center;
+}
+
+/* Live sessions add a tick-mark column between reps and remove. */
+#workoutSheet.live-mode .wo-set-row-heading,
+#workoutSheet.live-mode .wo-set-row {
+  grid-template-columns: 26px 22px 1fr 1fr 26px 26px;
+}
+
+.wo-set-done {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.wo-set-done[data-done="true"] {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
 }
 
 .wo-set-type {

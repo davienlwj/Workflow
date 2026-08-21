@@ -3,6 +3,7 @@ import {
   loadSessions, addSession, updateSession, deleteSession,
   loadWorkouts, addWorkout, updateWorkout, deleteWorkout,
   loadCustomExercises, addCustomExercise, deleteCustomExercise,
+  loadLiveWorkout, saveLiveWorkout, clearLiveWorkout,
   exportAll, importAll,
 } from './store.js';
 import { lthrZoneTable, rhrZoneTable } from './zones.js';
@@ -23,7 +24,7 @@ import { muscleDiagramHTML } from './muscleDiagram.js';
 import {
   workoutVolume, lastPerformance, personalRecords, exerciseProgress,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince,
-  muscleSetBreakdown, muscleSetBreakdownDetailed,
+  muscleSetBreakdown, muscleSetBreakdownDetailed, workoutSummaryByExercise,
 } from './workout.js';
 import { runIconSVG, dumbbellIconSVG } from './icons.js';
 
@@ -37,6 +38,9 @@ let exerciseSheetId = null;
 let mileageScope = 'week';
 let muscleRange = 'week';
 let expandedRadarGroup = null;
+let liveSession = null; // { startedAt } while a live "today's workout" session is running
+let workoutSheetMode = 'instant'; // 'instant' | 'live' - which mode #workoutSheet is currently rendering
+let liveTimerInterval = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -402,7 +406,7 @@ function renderCalDayPanel() {
   $('calLogWorkoutBtn').addEventListener('click', () => {
     const iso = calSelectedDate;
     closeCalDaySheet();
-    openWorkoutSheet(iso);
+    startOrOpenWorkoutFor(iso);
   });
 }
 
@@ -590,6 +594,7 @@ $('scrim').addEventListener('click', () => {
   closeWorkoutSheet();
   closeExerciseSheet();
   closeCalDaySheet();
+  $('workoutSummarySheet').hidden = true;
 });
 $('editCancel').addEventListener('click', closeEditSheet);
 
@@ -672,15 +677,21 @@ const SET_TYPE_LABEL = { normal: 'Normal set', warmup: 'Warm-up set', drop: 'Dro
 
 /** @param {{weight:number, reps:number}} [prevSet] the matching set index from
  *  lastPerformance(), shown as this row's placeholder so today's target is
- *  visible while filling it in, not just in the summary line above. */
+ *  visible while filling it in, not just in the summary line above.
+ *  The done tick is live-session only - meaningless when retrospectively
+ *  filling in a past date, so it's gated on workoutSheetMode. */
 function setRowHTML(index, set = {}, prevSet) {
   const type = set.type || 'normal';
+  const doneHTML = workoutSheetMode === 'live'
+    ? `<button type="button" class="wo-set-done" data-done="${set.done ? 'true' : 'false'}" aria-label="Mark set done">${set.done ? '✓' : ''}</button>`
+    : '';
   return `
     <div class="wo-set-row" data-type="${type}">
       <button type="button" class="wo-set-type" data-type="${type}" title="${SET_TYPE_LABEL[type]} — tap to change">${SET_TYPE_GLYPH[type]}</button>
       <span class="wo-set-index">${index + 1}</span>
       <input type="number" class="wo-set-weight" step="0.5" min="0" inputmode="decimal" placeholder="${prevSet?.weight ?? 'kg'}" value="${set.weight ?? ''}">
       <input type="number" class="wo-set-reps" min="0" inputmode="numeric" placeholder="${prevSet?.reps ?? 'reps'}" value="${set.reps ?? ''}">
+      ${doneHTML}
       <button type="button" class="wo-set-remove" aria-label="Remove set">✕</button>
     </div>
   `;
@@ -719,7 +730,7 @@ function exerciseBlockHTML(exerciseId, sets, supersetId) {
       </div>
       ${muscleDiagramHTML(ex.muscles)}
       <p class="wo-last-performance">${lastText}</p>
-      <div class="wo-set-row-heading"><span></span><span>Set</span><span>kg</span><span>Reps</span><span></span></div>
+      <div class="wo-set-row-heading"><span></span><span>Set</span><span>kg</span><span>Reps</span>${workoutSheetMode === 'live' ? '<span></span>' : ''}<span></span></div>
       <div class="wo-set-rows">${sets.map((s, i) => setRowHTML(i, s, last?.sets[i])).join('')}</div>
       <button type="button" class="wo-add-set ghost-btn">+ Add set</button>
     </div>
@@ -909,12 +920,22 @@ $('woPickerResults').addEventListener('click', (e) => {
   }
   $('woPicker').hidden = true;
   $('woPickerHint').hidden = true;
+  syncLiveWorkout();
 });
 
 $('woExerciseList').addEventListener('click', (e) => {
+  const doneBtn = e.target.closest('.wo-set-done');
+  if (doneBtn) {
+    const isDone = doneBtn.dataset.done === 'true';
+    doneBtn.dataset.done = String(!isDone);
+    doneBtn.textContent = isDone ? '' : '✓';
+    syncLiveWorkout();
+    return;
+  }
   const typeBtn = e.target.closest('.wo-set-type');
   if (typeBtn) {
     cycleSetType(typeBtn);
+    syncLiveWorkout();
     return;
   }
   const supersetBtn = e.target.closest('.wo-superset-btn');
@@ -926,6 +947,7 @@ $('woExerciseList').addEventListener('click', (e) => {
   const unpairBtn = e.target.closest('.wo-superset-unpair');
   if (unpairBtn) {
     unwrapSuperset(unpairBtn.closest('.wo-superset-group'));
+    syncLiveWorkout();
     return;
   }
   const removeExBtn = e.target.closest('.wo-exercise-remove');
@@ -934,6 +956,7 @@ $('woExerciseList').addEventListener('click', (e) => {
     const group = block.closest('.wo-superset-group');
     block.remove();
     if (group && group.querySelectorAll('.wo-exercise-block').length < 2) unwrapSuperset(group);
+    syncLiveWorkout();
     return;
   }
   const addSetBtn = e.target.closest('.wo-add-set');
@@ -942,6 +965,7 @@ $('woExerciseList').addEventListener('click', (e) => {
     const rows = block.querySelector('.wo-set-rows');
     const last = lastPerformance(workouts, block.dataset.exerciseId);
     rows.insertAdjacentHTML('beforeend', setRowHTML(rows.children.length, {}, last?.sets[rows.children.length]));
+    syncLiveWorkout();
     return;
   }
   const removeSetBtn = e.target.closest('.wo-set-remove');
@@ -951,6 +975,7 @@ $('woExerciseList').addEventListener('click', (e) => {
     if (rows.children.length > 1) {
       removeSetBtn.closest('.wo-set-row').remove();
       renumberSets(block);
+      syncLiveWorkout();
     }
   }
 });
@@ -960,11 +985,16 @@ function readWorkoutForm() {
     exerciseId: block.dataset.exerciseId,
     supersetId: block.dataset.supersetId || null,
     sets: [...block.querySelectorAll('.wo-set-row')]
-      .map((row) => ({
-        weight: numOrNull(row.querySelector('.wo-set-weight').value),
-        reps: numOrNull(row.querySelector('.wo-set-reps').value),
-        type: row.querySelector('.wo-set-type').dataset.type,
-      }))
+      .map((row) => {
+        const doneEl = row.querySelector('.wo-set-done');
+        const set = {
+          weight: numOrNull(row.querySelector('.wo-set-weight').value),
+          reps: numOrNull(row.querySelector('.wo-set-reps').value),
+          type: row.querySelector('.wo-set-type').dataset.type,
+        };
+        if (doneEl) set.done = doneEl.dataset.done === 'true';
+        return set;
+      })
       .filter((s) => s.weight != null || s.reps != null),
   }));
   return {
@@ -977,8 +1007,10 @@ function readWorkoutForm() {
 
 /** Opens the workout sheet blank, for logging a new workout (defaults to today). */
 function openWorkoutSheet(dateIso) {
+  if (liveSession) { toast('Finish or cancel your live workout first'); return; }
   workoutEditingId = null;
   pairingSourceBlock = null;
+  setWorkoutSheetLiveMode(false);
   $('woDate').value = dateIso || todayIso();
   $('woName').value = '';
   $('woNotes').value = '';
@@ -993,8 +1025,10 @@ function openWorkoutSheet(dateIso) {
 
 /** Opens the workout sheet pre-filled, for editing a past workout from History. */
 function openWorkoutEditSheet(workout) {
+  if (liveSession) { toast('Finish or cancel your live workout first'); return; }
   workoutEditingId = workout.id;
   pairingSourceBlock = null;
+  setWorkoutSheetLiveMode(false);
   $('woDate').value = workout.date;
   $('woName').value = workout.name || '';
   $('woNotes').value = workout.notes || '';
@@ -1014,16 +1048,233 @@ function closeWorkoutSheet() {
   workoutEditingId = null;
   $('scrim').hidden = true;
   $('workoutSheet').hidden = true;
+  // A live session's DOM/state is never cleared just by hiding the sheet -
+  // closing it while one is still running is a minimize, not a discard.
+  if (liveSession) showLiveMiniBar();
 }
 
-$('startWorkoutBtn').addEventListener('click', () => openWorkoutSheet(todayIso()));
-$('woCancel').addEventListener('click', closeWorkoutSheet);
+/* --------------------------------------------------------- live session */
+
+function showLiveMiniBar() {
+  $('liveMiniBar').hidden = false;
+  $('main').classList.add('has-live-bar');
+  updateLiveMiniBar();
+}
+
+function hideLiveMiniBar() {
+  $('liveMiniBar').hidden = true;
+  $('main').classList.remove('has-live-bar');
+}
+
+function fmtElapsed(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const mm = String(m).padStart(2, '0');
+  const ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+/** Scans the live sheet's current DOM for the first exercise with an
+ *  un-ticked set, for the mini-bar's "current exercise / current set" copy. */
+function computeLiveProgress() {
+  const blocks = [...$('woExerciseList').querySelectorAll('.wo-exercise-block')];
+  for (const block of blocks) {
+    const rows = [...block.querySelectorAll('.wo-set-row')];
+    const undoneIndex = rows.findIndex((r) => r.querySelector('.wo-set-done')?.dataset.done !== 'true');
+    if (undoneIndex !== -1) {
+      return {
+        exercise: block.querySelector('.wo-exercise-name')?.textContent || '',
+        setLabel: `Set ${undoneIndex + 1} of ${rows.length}`,
+      };
+    }
+  }
+  return { exercise: blocks.length ? 'All sets done' : 'No exercises yet', setLabel: '' };
+}
+
+function updateLiveMiniBar() {
+  if (!liveSession) return;
+  const progress = computeLiveProgress();
+  $('liveMiniExercise').textContent = progress.exercise;
+  $('liveMiniSet').textContent = progress.setLabel;
+}
+
+function tickLiveTimer() {
+  if (!liveSession) return;
+  const text = fmtElapsed(Date.now() - new Date(liveSession.startedAt).getTime());
+  $('woLiveTimerText').textContent = text;
+  $('liveMiniTimer').textContent = text;
+}
+
+function startLiveTimer() {
+  stopLiveTimer();
+  tickLiveTimer();
+  liveTimerInterval = setInterval(tickLiveTimer, 1000);
+}
+
+function stopLiveTimer() {
+  clearInterval(liveTimerInterval);
+  liveTimerInterval = null;
+}
+
+function saveLiveWorkoutState() {
+  if (!liveSession) return;
+  saveLiveWorkout({ ...readWorkoutForm(), startedAt: liveSession.startedAt });
+}
+
+/** Called after any change to the live sheet's exercises/sets - keeps the
+ *  persisted session and the mini-bar's progress copy both up to date. */
+function syncLiveWorkout() {
+  saveLiveWorkoutState();
+  updateLiveMiniBar();
+}
+
+function setWorkoutSheetLiveMode(isLive) {
+  workoutSheetMode = isLive ? 'live' : 'instant';
+  $('workoutSheet').classList.toggle('live-mode', isLive);
+  $('woLiveTimer').hidden = !isLive;
+  $('woSave').textContent = isLive ? 'Finish Workout' : 'Save workout';
+  $('woCancel').textContent = isLive ? 'Cancel workout' : 'Cancel';
+}
+
+/** Fully discards the running live session (used by "Cancel workout" and
+ *  once a finished workout has been saved) - unlike closeWorkoutSheet(),
+ *  this clears the persisted session and hides the mini-bar for good. */
+function discardLiveWorkout() {
+  stopLiveTimer();
+  liveSession = null;
+  clearLiveWorkout();
+  hideLiveMiniBar();
+  workoutEditingId = null;
+  $('scrim').hidden = true;
+  $('workoutSheet').hidden = true;
+  $('workoutSheet').classList.remove('live-mode');
+  workoutSheetMode = 'instant';
+}
+
+/** Opens #workoutSheet in a fresh live session: running timer, tick marks,
+ *  persisted so backgrounding the PWA mid-workout doesn't lose it. */
+function openLiveWorkoutSheet() {
+  workoutEditingId = null;
+  pairingSourceBlock = null;
+  liveSession = { startedAt: new Date().toISOString() };
+  setWorkoutSheetLiveMode(true);
+  $('woDate').value = todayIso();
+  $('woName').value = '';
+  $('woNotes').value = '';
+  $('woExerciseList').innerHTML = '';
+  $('woPicker').hidden = true;
+  $('woDelete').hidden = true;
+  saveLiveWorkoutState();
+  startLiveTimer();
+  hideLiveMiniBar();
+  $('scrim').hidden = false;
+  $('workoutSheet').hidden = false;
+  $('workoutSheet').scrollTop = 0;
+}
+
+/** Re-opens the full sheet on an already-running live session (resuming
+ *  from the mini-bar, or from "Start Workout" while one is in progress) -
+ *  the DOM/state was never touched while minimized, so nothing to rebuild. */
+function reopenLiveWorkoutSheet() {
+  setWorkoutSheetLiveMode(true);
+  hideLiveMiniBar();
+  $('scrim').hidden = false;
+  $('workoutSheet').hidden = false;
+  $('workoutSheet').scrollTop = 0;
+}
+
+/** Routes "Start Workout" / a calendar day's "+ Log workout": today's date
+ *  always means the live session (new or resumed); any other date keeps
+ *  using the plain instant form, since a timer/tick-off flow only makes
+ *  sense for something not yet done. */
+function startOrOpenWorkoutFor(iso) {
+  if (iso !== todayIso()) { openWorkoutSheet(iso); return; }
+  if (liveSession) reopenLiveWorkoutSheet(); else openLiveWorkoutSheet();
+}
+
+function openWorkoutSummarySheet(workout, durationMs) {
+  $('summaryDuration').textContent = fmtElapsed(durationMs);
+  const rows = workoutSummaryByExercise(workout, allExercises());
+  $('summaryExercises').innerHTML = rows.length
+    ? rows.map((r) => `
+      <div class="summary-exercise-row">
+        <div class="summary-exercise-name">${escapeHTML(r.name)}</div>
+        <div class="summary-exercise-stats mono">${r.setCount} sets · ${r.totalReps} reps · ${r.volume}kg volume</div>
+      </div>
+    `).join('')
+    : '<p class="empty">No working sets logged.</p>';
+  $('scrim').hidden = false;
+  $('workoutSummarySheet').hidden = false;
+  $('workoutSummarySheet').scrollTop = 0;
+}
+
+function finishLiveWorkout(data) {
+  const durationMs = Date.now() - new Date(liveSession.startedAt).getTime();
+  const cleaned = {
+    ...data,
+    exercises: data.exercises.map((ex) => ({
+      ...ex,
+      sets: ex.sets.map(({ done, ...rest }) => rest),
+    })),
+  };
+  const saved = addWorkout(cleaned);
+  workouts = loadWorkouts();
+  discardLiveWorkout();
+  renderAll();
+  openWorkoutSummarySheet(saved, durationMs);
+}
+
+/** Silently resumes a live session left running in localStorage (e.g. the
+ *  PWA was backgrounded/killed mid-workout) - repopulates the sheet's DOM
+ *  and timer but only shows the mini-bar, not the full sheet. */
+function resumeLiveWorkoutIfAny() {
+  const saved = loadLiveWorkout();
+  if (!saved) return;
+  workoutEditingId = null;
+  pairingSourceBlock = null;
+  liveSession = { startedAt: saved.startedAt };
+  setWorkoutSheetLiveMode(true);
+  $('woDate').value = saved.date || todayIso();
+  $('woName').value = saved.name || '';
+  $('woNotes').value = saved.notes || '';
+  $('woExerciseList').innerHTML = (saved.exercises || [])
+    .map((ex) => exerciseBlockHTML(ex.exerciseId, ex.sets && ex.sets.length ? ex.sets : [{}], ex.supersetId))
+    .join('');
+  regroupSupersets();
+  $('woPicker').hidden = true;
+  $('woDelete').hidden = true;
+  startLiveTimer();
+  showLiveMiniBar();
+}
+
+$('startWorkoutBtn').addEventListener('click', () => startOrOpenWorkoutFor(todayIso()));
+$('liveMiniBar').addEventListener('click', reopenLiveWorkoutSheet);
+
+$('woCancel').addEventListener('click', () => {
+  if (workoutSheetMode === 'live') {
+    if (!confirm('Cancel this workout? Your progress will be lost.')) return;
+    discardLiveWorkout();
+    toast('Workout cancelled');
+    return;
+  }
+  closeWorkoutSheet();
+});
+
+$('workoutForm').addEventListener('change', (e) => {
+  if (e.target.matches('#woDate, #woName, #woNotes, .wo-set-weight, .wo-set-reps')) syncLiveWorkout();
+});
 
 $('workoutForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const data = readWorkoutForm();
   if (data.exercises.length === 0) {
     toast('Add at least one exercise');
+    return;
+  }
+  if (workoutSheetMode === 'live') {
+    finishLiveWorkout(data);
     return;
   }
   if (workoutEditingId) {
@@ -1037,6 +1288,20 @@ $('workoutForm').addEventListener('submit', (e) => {
   closeWorkoutSheet();
   renderAll();
 });
+
+$('summaryDone').addEventListener('click', () => {
+  $('scrim').hidden = true;
+  $('workoutSummarySheet').hidden = true;
+});
+
+// Backgrounding the PWA (phone call, screen lock, switching apps) or
+// reloading/closing the tab fires one of these before anything is torn
+// down - a more reliable persistence point than each field's 'change'
+// event alone for whatever was just typed but not yet blurred.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveLiveWorkoutState();
+});
+window.addEventListener('pagehide', () => saveLiveWorkoutState());
 
 $('woDelete').addEventListener('click', () => {
   if (!workoutEditingId) return;
@@ -1348,6 +1613,7 @@ function renderAll() {
 resetLogForm();
 renderAll();
 switchView('dashboard');
+resumeLiveWorkoutIfAny();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
