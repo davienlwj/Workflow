@@ -813,7 +813,7 @@ function renderExerciseSummaries() {
         <div class="exercise-summary-info">
           <div class="exercise-summary-name">${escapeHTML(ex.name)}</div>
           <div class="exercise-summary-meta">${escapeHTML(exerciseMetaText(ex))}</div>
-          <div class="exercise-summary-pr mono">PR ${pr.maxWeight}kg</div>
+          <div class="exercise-summary-pr mono">${pr ? `PR ${pr.maxWeight}kg` : 'No sets logged yet'}</div>
         </div>
       </button>
     `;
