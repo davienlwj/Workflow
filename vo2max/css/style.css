@@ -1,17 +1,18 @@
-/* VO2max Tracker — cardiac-monitor dark theme. Monotone: no hue anywhere,
-   only shades of black/white/gray. Emphasis and state read through
-   lightness, weight and fill vs. outline, not color. */
+/* VO2max Tracker — cardiac-monitor light theme (inverted from the original
+   dark palette, value-for-value, so every contrast ratio is preserved).
+   Monotone: no hue anywhere, only shades of black/white/gray. Emphasis and
+   state read through lightness, weight and fill vs. outline, not color. */
 
 :root {
-  --bg: #0a0a0a;
-  --panel: #141414;
-  --panel-2: #1c1c1c;
-  --line: #2b2b2b;
-  --ink: #ececec;
-  --dim: #999999;
-  --dimmer: #5c5c5c;
-  --accent: #f5f5f5;
-  --accent-dim: #4a4a4a;
+  --bg: #f5f5f5;
+  --panel: #ebebeb;
+  --panel-2: #e3e3e3;
+  --line: #d4d4d4;
+  --ink: #131313;
+  --dim: #666666;
+  --dimmer: #a3a3a3;
+  --accent: #0a0a0a;
+  --accent-dim: #b5b5b5;
   --font-mono: 'Space Mono', ui-monospace, 'SF Mono', 'Menlo', 'Consolas', 'Roboto Mono', monospace;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
@@ -231,7 +232,7 @@ input[type="range"] {
   margin-top: -2px;
 }
 
-input[type="date"], input[type="number"] { color-scheme: dark; }
+input[type="date"], input[type="number"] { color-scheme: light; }
 
 button { font-family: var(--font-mono); }
 
@@ -569,7 +570,7 @@ button { font-family: var(--font-mono); }
 
 .zone-row.is-target {
   border-color: var(--accent);
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.06), transparent);
 }
 
 .zone-name { font-size: 13px; }
@@ -601,7 +602,7 @@ button { font-family: var(--font-mono); }
   right: 0;
   z-index: 10;
   display: flex;
-  background: rgba(8, 12, 15, 0.92);
+  background: rgba(245, 245, 245, 0.92);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--line);
   padding-bottom: var(--safe-b);
