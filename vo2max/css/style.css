@@ -706,12 +706,12 @@ button { font-family: var(--font-mono); }
 
 .muscle-diagram { display: flex; gap: 8px; }
 
-.muscle-body { width: 44px; height: auto; flex-shrink: 0; }
+.muscle-body { width: 34px; height: auto; flex-shrink: 0; }
 
 .muscle-outline { fill: var(--panel-2); stroke: var(--line); stroke-width: 1.5; }
 .muscle-active { fill: var(--ink); stroke: none; }
 
-.exercise-detail-diagram .muscle-body { width: 84px; }
+.exercise-detail-diagram .muscle-body { width: 62px; }
 .exercise-detail-diagram { display: flex; justify-content: center; gap: 16px; margin: 12px 0; }
 
 /* --------------------------------------------------------------- workout */

@@ -1,41 +1,97 @@
 /*
- * Minimalist front/back body silhouette, with the worked muscle group(s)
- * for an exercise filled in solid over a plain outline. Dependency-free
- * inline SVG, in the same spirit as chart.js.
+ * Front/back body silhouette, with the worked muscle group(s) for an
+ * exercise filled in solid over a plain anatomical outline. Dependency-free
+ * inline SVG, in the same spirit as chart.js — built from straight-edge
+ * polygons (tapered limbs, a waisted torso) and ellipses (muscle bulges)
+ * rather than plain boxes, for a more detailed silhouette without needing
+ * hand-tuned bezier curves.
  */
 
 const NS = 'http://www.w3.org/2000/svg';
 
-// A static humanoid outline, identical in both views (drawn as outline-only
-// shapes; the muscle regions below are drawn on top of it).
+function poly(points) {
+  return `<polygon points="${points.map(([x, y]) => `${x},${y}`).join(' ')}"/>`;
+}
+
+/** Mirrors a left-side shape onto the right, reflecting x around the body's centerline (x=50). */
+function mirror(points) {
+  return points.map(([x, y]) => [100 - x, y]);
+}
+
+function ellipse(cx, cy, rx, ry) {
+  return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"/>`;
+}
+
+function mirrorEllipse(cx, cy, rx, ry) {
+  return ellipse(100 - cx, cy, rx, ry);
+}
+
+// ---- static body outline (shared by both views) --------------------------
+
+const TORSO = poly([
+  [30, 36], [22, 50], [24, 66], [30, 90], [26, 100], [32, 112],
+  [68, 112], [74, 100], [70, 90], [76, 66], [78, 50], [70, 36],
+]);
+
+const UPPER_ARM_L = [[16, 40], [12, 58], [14, 78], [24, 78], [24, 60], [26, 42]];
+const FOREARM_L = [[14, 78], [12, 96], [15, 112], [23, 112], [22, 96], [24, 78]];
+const THIGH_L = [[30, 112], [26, 132], [28, 156], [46, 156], [44, 132], [46, 112]];
+const SHIN_L = [[28, 156], [30, 178], [32, 196], [44, 196], [42, 178], [46, 156]];
+
 const OUTLINE = `
-  <circle cx="30" cy="8" r="6"/>
-  <rect x="20" y="14" width="20" height="34" rx="6"/>
-  <rect x="10" y="16" width="7" height="20" rx="3"/>
-  <rect x="43" y="16" width="7" height="20" rx="3"/>
-  <rect x="8" y="36" width="6" height="16" rx="3"/>
-  <rect x="46" y="36" width="6" height="16" rx="3"/>
-  <rect x="21" y="48" width="8" height="30" rx="4"/>
-  <rect x="31" y="48" width="8" height="30" rx="4"/>
+  ${ellipse(50, 14, 11, 13)}
+  <rect x="44" y="24" width="12" height="10" rx="2"/>
+  ${TORSO}
+  ${poly(UPPER_ARM_L)} ${poly(mirror(UPPER_ARM_L))}
+  ${poly(FOREARM_L)} ${poly(mirror(FOREARM_L))}
+  ${ellipse(19, 116, 6, 8)} ${mirrorEllipse(19, 116, 6, 8)}
+  ${poly(THIGH_L)} ${poly(mirror(THIGH_L))}
+  ${poly(SHIN_L)} ${poly(mirror(SHIN_L))}
+  ${ellipse(38, 200, 10, 5)} ${mirrorEllipse(38, 200, 10, 5)}
 `;
 
-// Each muscle's highlighted shape(s), keyed by which view(s) it appears in.
+// ---- muscle region overlays, keyed by which view(s) they appear in -------
+
 const REGIONS = {
   shoulders: {
-    front: '<circle cx="16" cy="18" r="4"/><circle cx="44" cy="18" r="4"/>',
-    back: '<circle cx="16" cy="18" r="4"/><circle cx="44" cy="18" r="4"/>',
+    front: `${ellipse(24, 42, 10, 11)}${mirrorEllipse(24, 42, 10, 11)}`,
+    back: `${ellipse(24, 42, 10, 11)}${mirrorEllipse(24, 42, 10, 11)}`,
   },
-  chest: { front: '<rect x="21" y="16" width="18" height="11" rx="4"/>' },
-  biceps: { front: '<rect x="10.5" y="18" width="5" height="16" rx="2.5"/><rect x="44.5" y="18" width="5" height="16" rx="2.5"/>' },
-  forearms: { front: '<rect x="8.5" y="37" width="5" height="14" rx="2.5"/><rect x="46.5" y="37" width="5" height="14" rx="2.5"/>' },
-  abs: { front: '<rect x="23" y="29" width="14" height="16" rx="3"/>' },
-  quads: { front: '<rect x="21.5" y="49" width="7" height="27" rx="3"/><rect x="31.5" y="49" width="7" height="27" rx="3"/>' },
-
-  back: { back: '<rect x="21" y="22" width="18" height="20" rx="4"/>' },
-  triceps: { back: '<rect x="10.5" y="18" width="5" height="16" rx="2.5"/><rect x="44.5" y="18" width="5" height="16" rx="2.5"/>' },
-  glutes: { back: '<rect x="21" y="47" width="18" height="10" rx="4"/>' },
-  hamstrings: { back: '<rect x="21.5" y="49" width="7" height="14" rx="3"/><rect x="31.5" y="49" width="7" height="14" rx="3"/>' },
-  calves: { back: '<rect x="21.5" y="64" width="7" height="13" rx="3"/><rect x="31.5" y="64" width="7" height="13" rx="3"/>' },
+  chest: {
+    front: `${ellipse(40, 52, 13, 10)}${mirrorEllipse(40, 52, 13, 10)}`,
+  },
+  biceps: {
+    front: `${ellipse(17, 58, 7, 14)}${mirrorEllipse(17, 58, 7, 14)}`,
+  },
+  triceps: {
+    back: `${ellipse(17, 58, 7, 14)}${mirrorEllipse(17, 58, 7, 14)}`,
+  },
+  forearms: {
+    front: `${ellipse(17, 96, 6, 13)}${mirrorEllipse(17, 96, 6, 13)}`,
+  },
+  abs: {
+    // A 3x2 six-pack grid instead of one solid block.
+    front: [66, 77, 88].flatMap((y) => [
+      `<rect x="42" y="${y}" width="7" height="9" rx="2"/>`,
+      `<rect x="51" y="${y}" width="7" height="9" rx="2"/>`,
+    ]).join(''),
+  },
+  quads: {
+    front: `${ellipse(36, 132, 11, 22)}${mirrorEllipse(36, 132, 11, 22)}`,
+  },
+  hamstrings: {
+    back: `${ellipse(36, 132, 11, 22)}${mirrorEllipse(36, 132, 11, 22)}`,
+  },
+  calves: {
+    back: `${ellipse(36, 178, 9, 15)}${mirrorEllipse(36, 178, 9, 15)}`,
+  },
+  back: {
+    // A lat "wing" — wider at the shoulders, tapering to the waist.
+    back: poly([[36, 44], [30, 60], [38, 88], [50, 94], [62, 88], [70, 60], [64, 44], [50, 38]]),
+  },
+  glutes: {
+    back: `${ellipse(40, 104, 12, 10)}${mirrorEllipse(40, 104, 12, 10)}`,
+  },
 };
 
 function bodySVG(view, activeMuscles) {
@@ -43,7 +99,7 @@ function bodySVG(view, activeMuscles) {
     .map((m) => REGIONS[m]?.[view])
     .filter(Boolean)
     .join('');
-  return `<svg viewBox="0 0 60 88" class="muscle-body" xmlns="${NS}" aria-hidden="true">
+  return `<svg viewBox="0 0 100 210" class="muscle-body" xmlns="${NS}" aria-hidden="true">
     <g class="muscle-outline">${OUTLINE}</g>
     <g class="muscle-active">${highlights}</g>
   </svg>`;
