@@ -18,6 +18,22 @@
   --safe-t: env(safe-area-inset-top, 0px);
 }
 
+/* Dark mode: every value above, inverted channel-for-channel (255 - x) -
+   this is in fact the palette the light theme itself was inverted from
+   (see the note at the top of this file), so contrast ratios match
+   exactly and nothing needed hand-picking. */
+:root[data-theme="dark"] {
+  --bg: #0a0a0a;
+  --panel: #141414;
+  --panel-2: #1c1c1c;
+  --line: #2b2b2b;
+  --ink: #ececec;
+  --dim: #999999;
+  --dimmer: #5c5c5c;
+  --accent: #f5f5f5;
+  --accent-dim: #4a4a4a;
+}
+
 * { box-sizing: border-box; }
 
 /* Only html scrolls (the standard scrolling element). Giving body its own
@@ -294,6 +310,7 @@ input[type="range"] {
 }
 
 input[type="date"], input[type="number"] { color-scheme: light; }
+:root[data-theme="dark"] input[type="date"], :root[data-theme="dark"] input[type="number"] { color-scheme: dark; }
 
 button { font-family: var(--font-mono); }
 

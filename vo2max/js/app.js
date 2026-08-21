@@ -29,6 +29,18 @@ import {
 import { runIconSVG, dumbbellIconSVG } from './icons.js';
 
 let settings = loadSettings();
+
+/** Applies the light/dark theme by setting the attribute style.css keys its
+ *  dark-palette overrides off of, plus the PWA's browser-chrome color to
+ *  match. Called on boot (as early as possible, to avoid a flash of the
+ *  wrong theme) and again whenever the Settings toggle changes it. */
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = theme === 'dark' ? '#0a0a0a' : '#f5f5f5';
+}
+applyTheme(settings.theme);
+
 let sessions = loadSessions();
 let workouts = loadWorkouts();
 let customExercises = loadCustomExercises();
@@ -1537,6 +1549,9 @@ function renderZones() {
 /* ------------------------------------------------------------- SETTINGS */
 
 function renderSettingsForm() {
+  $('sTheme').querySelectorAll('.scope').forEach((b) => {
+    b.setAttribute('aria-selected', String(b.dataset.theme === settings.theme));
+  });
   $('sName').value = settings.profile.name;
   $('sDob').value = settings.profile.dob;
   $('sHeightCm').value = settings.profile.heightCm ?? '';
@@ -1556,9 +1571,19 @@ function renderSettingsForm() {
   $('sFreq').value = settings.protocol.freqPerWeek;
 }
 
+$('sTheme').addEventListener('click', (e) => {
+  const btn = e.target.closest('.scope');
+  if (!btn) return;
+  settings = { ...settings, theme: btn.dataset.theme };
+  saveSettings(settings);
+  applyTheme(settings.theme);
+  renderSettingsForm();
+});
+
 $('settingsForm').addEventListener('submit', (e) => {
   e.preventDefault();
   settings = {
+    theme: settings.theme,
     profile: {
       name: $('sName').value.trim(),
       dob: $('sDob').value,
@@ -1600,6 +1625,7 @@ $('sFile').addEventListener('change', async () => {
   try {
     importAll(await file.text());
     settings = loadSettings();
+    applyTheme(settings.theme);
     sessions = loadSessions();
     workouts = loadWorkouts();
     customExercises = loadCustomExercises();
@@ -1615,6 +1641,7 @@ $('sFile').addEventListener('change', async () => {
 $('sReset').addEventListener('click', () => {
   if (!confirm('Reset all settings to defaults? Sessions are not affected.')) return;
   settings = resetSettings();
+  applyTheme(settings.theme);
   renderAll();
   clearSaved($('settingsSaveBtn'));
   toast('Settings reset');

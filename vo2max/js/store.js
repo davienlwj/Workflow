@@ -12,6 +12,7 @@ const CUSTOM_EXERCISES_KEY = 'vo2max.customExercises.v1';
 const LIVE_WORKOUT_KEY = 'vo2max.liveWorkout.v1';
 
 export const DEFAULT_SETTINGS = {
+  theme: 'light', // 'light' | 'dark'
   profile: {
     name: '',
     dob: '',
