@@ -375,7 +375,8 @@ button { font-family: var(--font-mono); }
 .chart-bar { fill: var(--accent-dim); stroke: var(--accent); stroke-width: 1; }
 .chart-empty { color: var(--dimmer); font-size: 13px; text-align: center; padding: 40px 0; }
 .chart-radar-fill { fill: var(--accent); fill-opacity: 0.12; stroke: none; }
-.chart-radar-label { font-size: 9px; }
+.chart-radar-label { font-size: 9px; fill: var(--dim); }
+.chart-radar-pct { font-size: 8px; fill: var(--dimmer); font-weight: 700; }
 
 /* -------------------------------------------------------------- scopes */
 

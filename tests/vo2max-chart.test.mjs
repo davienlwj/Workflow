@@ -68,3 +68,11 @@ test('muscleRadarSVG closes the data polygon back to its starting point', () => 
   const svg = muscleRadarSVG(breakdown({ chest: 3, biceps: 1 }));
   assert.match(svg, /d="M[^"]*Z"[^>]*class="chart-radar-fill"/);
 });
+
+test('muscleRadarSVG labels each muscle with its share of total sets logged', () => {
+  const svg = muscleRadarSVG(breakdown({ chest: 3, biceps: 1 })); // 4 total: 75% / 25%
+  assert.match(svg, /class="chart-radar-pct">75%<\/tspan>/);
+  assert.match(svg, /class="chart-radar-pct">25%<\/tspan>/);
+  // Untouched muscles still get a 0% line rather than being left blank.
+  assert.match(svg, /class="chart-radar-pct">0%<\/tspan>/);
+});

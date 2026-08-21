@@ -196,12 +196,18 @@ export function muscleRadarSVG(breakdown) {
     </circle>`;
   }).join('');
 
+  const totalSets = breakdown.reduce((sum, b) => sum + b.sets, 0);
+
   const labels = breakdown.map((b, i) => {
     const a = angleFor(i);
     const [x, y] = pointAt(i, RADAR_LABEL_R);
     const cos = Math.cos(a);
     const anchor = cos > 0.3 ? 'start' : cos < -0.3 ? 'end' : 'middle';
-    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" class="chart-axis chart-radar-label" text-anchor="${anchor}" dominant-baseline="middle">${MUSCLE_LABEL[b.muscle]}</text>`;
+    const pct = totalSets ? Math.round((b.sets / totalSets) * 100) : 0;
+    return `<text text-anchor="${anchor}" class="chart-radar-label">
+      <tspan x="${x.toFixed(1)}" y="${(y - 4).toFixed(1)}">${MUSCLE_LABEL[b.muscle]}</tspan>
+      <tspan x="${x.toFixed(1)}" y="${(y + 7).toFixed(1)}" class="chart-radar-pct">${pct}%</tspan>
+    </text>`;
   }).join('');
 
   return `<svg viewBox="0 0 ${RADAR_SIZE} ${RADAR_SIZE}" xmlns="${NS}" class="chart-svg" role="img" aria-label="Muscle balance">
