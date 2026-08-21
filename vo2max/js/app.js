@@ -13,7 +13,7 @@ import {
 import { vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG } from './chart.js';
 import { sessionToICS } from './ics.js';
 import { MUSCLES, MUSCLE_LABEL, exerciseById, searchExercises } from './exercises.js';
-import { muscleDiagramSVG } from './muscleDiagram.js';
+import { muscleDiagramHTML } from './muscleDiagram.js';
 import {
   workoutVolume, lastPerformance, personalRecords, exerciseProgress,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince,
@@ -597,7 +597,7 @@ function exerciseBlockHTML(exerciseId, sets) {
         </div>
         <button type="button" class="wo-exercise-remove" aria-label="Remove exercise">✕</button>
       </div>
-      ${muscleDiagramSVG(ex.muscles)}
+      ${muscleDiagramHTML(ex.muscles)}
       <p class="wo-last-performance">${lastText}</p>
       <div class="wo-set-row-heading"><span>Set</span><span>kg</span><span>Reps</span><span></span></div>
       <div class="wo-set-rows">${sets.map((s, i) => setRowHTML(i, s)).join('')}</div>
@@ -776,7 +776,7 @@ function openExerciseSheet(exerciseId) {
   const pr = personalRecords(workouts, exerciseId);
   $('exDetailName').textContent = ex.name;
   $('exDetailMeta').textContent = exerciseMetaText(ex);
-  $('exDetailDiagram').innerHTML = muscleDiagramSVG(ex.muscles);
+  $('exDetailDiagram').innerHTML = muscleDiagramHTML(ex.muscles);
   $('exDetailStatGrid').innerHTML = [
     [pr ? `${pr.maxWeight}kg` : '—', 'Best weight'],
     [pr ? `${pr.best1RM}kg` : '—', 'Est. 1RM'],
@@ -809,7 +809,7 @@ function renderExerciseSummaries() {
     const pr = personalRecords(workouts, id);
     return `
       <button type="button" class="exercise-summary-card" data-id="${id}">
-        ${muscleDiagramSVG(ex.muscles)}
+        ${muscleDiagramHTML(ex.muscles)}
         <div class="exercise-summary-info">
           <div class="exercise-summary-name">${escapeHTML(ex.name)}</div>
           <div class="exercise-summary-meta">${escapeHTML(exerciseMetaText(ex))}</div>

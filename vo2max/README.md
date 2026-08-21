@@ -24,6 +24,7 @@ If this repo is deployed via `.github/workflows/pages.yml`, the app lives at
 python3 -m http.server 8000        # then open http://localhost:8000/vo2max/
 npm test                            # runs this app's tests alongside the calendar's
 npm run icons:vo2max                # regenerate the app icons
+npm run muscle-diagram:vo2max       # regenerate the muscle-diagram image assets
 ```
 
 ## What's in it
@@ -53,9 +54,10 @@ npm run icons:vo2max                # regenerate the app icons
 - **Workout** — strength training, tracked separately from the cardio
   sessions above. *+ Log workout* opens a popup: add exercises from a
   built-in ~50-exercise library (searchable, filterable by muscle group),
-  each showing a minimalist front/back body diagram with its worked muscles
-  filled in, plus a "last time" hint recalled from your most recent session
-  with that exercise. Log any number of weight × reps sets per exercise.
+  each showing a front/back muscle diagram with its worked muscles
+  highlighted in red, plus a "last time" hint recalled from your most recent
+  session with that exercise. Log any number of weight × reps sets per
+  exercise.
   Below that: workouts logged, this week's total volume, days since your
   last workout, a card per exercise you've ever logged (its muscle diagram
   and current PR — tap through to a detail sheet with best weight,
@@ -96,12 +98,15 @@ js/zones.js                 zone tables, computed from settings
 js/block.js                 cardio progress stats — pure functions
 js/workout.js                strength progress stats — PRs, last-performance, volume; pure functions
 js/exercises.js              the built-in exercise library (name, equipment, muscles)
-js/muscleDiagram.js          minimalist front/back body silhouette SVG, muscles highlighted per exercise
+js/muscleDiagram.js          stacks the muscle-diagram image assets for an exercise's muscles
 js/chart.js                 dependency-free SVG charts: VO2max trend, mileage bars, exercise progress
 js/ics.js                   builds a per-session .ics file for calendar export
 js/app.js                   rendering and events
 sw.js                        offline cache
-tools/icon-source.jpg        the hand-drawn mark the icons are built from
+tools/icon-source.jpg        the hand-drawn mark the app icons are built from
 tools/gen-icons.py           crops/centers it into the icon set (needs Pillow, numpy)
+tools/muscle-chart-source.jpg the anatomy illustration the muscle diagrams are built from
+tools/gen-muscle-diagram.py  recolors it lighter grey and cuts a red highlight overlay per
+                              muscle group (needs Pillow, numpy, scipy) -> icons/muscles/
 ../tests/vo2max-*.test.mjs   zone, progress-stats, workout, exercise, muscle-diagram, chart and ics-export test suites
 ```

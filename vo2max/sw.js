@@ -1,6 +1,6 @@
 /* HYBIRD - offline shell. Bump CACHE when the app files change. */
 
-const CACHE = 'vo2max-v26';
+const CACHE = 'vo2max-v27';
 
 const SHELL = [
   './',
@@ -20,6 +20,20 @@ const SHELL = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
+  './icons/muscles/body-front.png',
+  './icons/muscles/body-back.png',
+  './icons/muscles/chest-front.png',
+  './icons/muscles/shoulders-front.png',
+  './icons/muscles/shoulders-back.png',
+  './icons/muscles/biceps-front.png',
+  './icons/muscles/forearms-front.png',
+  './icons/muscles/abs-front.png',
+  './icons/muscles/quads-front.png',
+  './icons/muscles/back-back.png',
+  './icons/muscles/triceps-back.png',
+  './icons/muscles/glutes-back.png',
+  './icons/muscles/hamstrings-back.png',
+  './icons/muscles/calves-back.png',
 ];
 
 self.addEventListener('install', (event) => {
