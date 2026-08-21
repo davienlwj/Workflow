@@ -781,6 +781,8 @@ button { font-family: var(--font-mono); }
 .exercise-detail-diagram .muscle-body { width: 62px; }
 .exercise-detail-diagram { display: flex; justify-content: center; gap: 16px; margin: 12px 0; }
 
+.exercise-summary-card .muscle-body { width: 46px; }
+
 /* --------------------------------------------------------------- workout */
 
 .exercise-summary-list {
