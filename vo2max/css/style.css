@@ -487,8 +487,6 @@ button { font-family: var(--font-mono); }
    section labels, and the dashboard's recent-activity feed. currentColor'd,
    so they pick up whatever text color their container is set to. */
 .glyph-icon { width: 14px; height: 14px; flex-shrink: 0; color: var(--ink); }
-.glyph-run circle { fill: currentColor; }
-.glyph-workout rect { fill: currentColor; }
 
 .cal-icons { display: flex; gap: 3px; }
 .cal-icons .glyph-icon { width: 11px; height: 11px; }
