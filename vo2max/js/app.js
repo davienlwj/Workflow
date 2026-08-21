@@ -335,20 +335,11 @@ function renderCalendar() {
     </button>`;
   }
   $('calGrid').innerHTML = html;
-
-  renderCalDayPanel(byDate);
 }
 
-function renderCalDayPanel(byDate) {
+function renderCalDayPanel() {
+  const day = activityByDate().get(calSelectedDate) || { sessions: [], workouts: [] };
   const panel = $('calDayPanel');
-  if (!calSelectedDate) {
-    panel.hidden = true;
-    panel.innerHTML = '';
-    return;
-  }
-  const day = byDate.get(calSelectedDate) || { sessions: [], workouts: [] };
-
-  panel.hidden = false;
   panel.innerHTML = `
     <div class="cal-day-panel-date mono">${fmtDateLong(calSelectedDate)}</div>
     ${day.sessions.length ? `
@@ -367,18 +358,46 @@ function renderCalDayPanel(byDate) {
   panel.querySelectorAll('.cal-day-item[data-id]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const s = sessions.find((x) => x.id === btn.dataset.id);
-      if (s) openEditSheet(s);
+      if (s) { closeCalDaySheet(); openEditSheet(s); }
     });
   });
   panel.querySelectorAll('.cal-day-item[data-workout-id]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const w = workouts.find((x) => x.id === btn.dataset.workoutId);
-      if (w) openWorkoutEditSheet(w);
+      if (w) { closeCalDaySheet(); openWorkoutEditSheet(w); }
     });
   });
-  $('calLogRunBtn').addEventListener('click', () => openLogSheet(calSelectedDate));
-  $('calLogWorkoutBtn').addEventListener('click', () => openWorkoutSheet(calSelectedDate));
+  $('calLogRunBtn').addEventListener('click', () => {
+    const iso = calSelectedDate;
+    closeCalDaySheet();
+    openLogSheet(iso);
+  });
+  $('calLogWorkoutBtn').addEventListener('click', () => {
+    const iso = calSelectedDate;
+    closeCalDaySheet();
+    openWorkoutSheet(iso);
+  });
 }
+
+/** Opens the day-detail popup (tapped from a calendar date): that day's
+ *  logged runs/workouts plus +Log buttons defaulted to it. */
+function openCalDaySheet(iso) {
+  calSelectedDate = iso;
+  renderCalendar();
+  renderCalDayPanel();
+  $('scrim').hidden = false;
+  $('calDaySheet').hidden = false;
+  $('calDaySheet').scrollTop = 0;
+}
+
+function closeCalDaySheet() {
+  calSelectedDate = null;
+  $('scrim').hidden = true;
+  $('calDaySheet').hidden = true;
+  renderCalendar();
+}
+
+$('calDaySheetClose').addEventListener('click', closeCalDaySheet);
 
 /** A compact {badgeHTML, metaHTML} summary of one session — shared by the
  *  calendar day panel and the dashboard's recent-activity feed. */
@@ -443,9 +462,7 @@ $('calNext').addEventListener('click', () => {
 $('calGrid').addEventListener('click', (e) => {
   const cell = e.target.closest('.cal-cell:not(.pad)');
   if (!cell) return;
-  const iso = cell.dataset.date;
-  calSelectedDate = calSelectedDate === iso ? null : iso;
-  renderCalendar();
+  openCalDaySheet(cell.dataset.date);
 });
 
 /* ----------------------------------------------------------- DASHBOARD */
@@ -545,6 +562,7 @@ $('scrim').addEventListener('click', () => {
   closeLogSheet();
   closeWorkoutSheet();
   closeExerciseSheet();
+  closeCalDaySheet();
 });
 $('editCancel').addEventListener('click', closeEditSheet);
 

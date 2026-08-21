@@ -29,32 +29,32 @@ npm run muscle-diagram:vo2max       # regenerate the muscle-diagram image assets
 
 ## What's in it
 
-Nav is Dashboard / Calendar / Run / Workout / Settings — cardio (Run) and
-strength (Workout) are tracked as separate, parallel domains throughout,
-with Dashboard and Calendar as the two places they come together.
+Nav is Dashboard / Run / Workout / Settings — cardio (Run) and strength
+(Workout) are tracked as separate, parallel domains throughout, with
+Dashboard as the place they come together.
 
-- **Dashboard** — a pure summary, no logging here: six stat tiles (runs
-  logged, workouts logged, mileage this week, volume this week, days since
-  your last run, days since your last workout) and a combined
-  **recent activity** feed — the last few runs and workouts, newest first,
-  each tagged with a small running-figure or dumbbell icon and tappable
-  straight into its edit sheet.
-- **Calendar** — a month grid where every day that has something logged
-  shows the same icons (a run gets the running-figure glyph, a workout gets
-  the dumbbell glyph, a day with both gets both). Tapping a day opens a
-  panel listing that day's runs and workouts separately (tap one to edit or
-  delete it), plus **+ Log run** and **+ Log workout** actions that open the
-  respective log popup pre-filled with that date — this is the only place
-  logging happens for a specific day; Run and Workout's own *+ Log* buttons
-  always default to today.
+- **Dashboard** — a month calendar grid at the top (every day that has
+  something logged shows a small icon: a run gets the running-figure glyph,
+  a workout gets the dumbbell glyph, a day with both gets both), six stat
+  tiles below it (runs logged, workouts logged, mileage this week, volume
+  this week, days since your last run, days since your last workout), and a
+  combined **recent activity** feed — the last few runs and workouts,
+  newest first, each tagged with a small running-figure or dumbbell icon
+  and tappable straight into its edit sheet. Tapping a date on the calendar
+  opens a popup listing that day's runs and workouts separately (tap one to
+  edit or delete it), plus **+ Log run** and **+ Log workout** actions that
+  open the respective log popup pre-filled with that date — this is the
+  only place logging happens for a specific day; Run and Workout's own
+  *+ Log* buttons always default to today.
 - **Run** — the cardio detail view: sessions logged, average session HR,
   days since your last session, a VO2max trend chart labeling each point
   with its exact value, a total-mileage bar chart filterable by
   week/month/year, and the full chronological session list (tap one to edit
   or delete it — *Add to Calendar* there downloads a standard `.ics` file
   for that session that Apple Calendar, Google Calendar, or Outlook can all
-  import directly). *+ Log run* opens the same popup as Calendar's, defaulted
-  to today: pick a **session type** — **interval** (Norwegian 4x4),
+  import directly). *+ Log run* opens the same popup as the Dashboard
+  calendar's, defaulted to today: pick a **session type** — **interval**
+  (Norwegian 4x4),
   **easy run**, or **long run** — then the same fields for all three:
   duration, avg pace, distance (fills in automatically once duration and
   pace are both entered), avg/max HR, session RPE and notes. A VO2max

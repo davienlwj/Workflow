@@ -37,17 +37,6 @@
   <section id="view-dashboard" class="view">
     <h1 class="view-title">Dashboard</h1>
 
-    <div id="dashStatGrid" class="stat-grid"></div>
-
-    <h2 class="section-title">Recent activity</h2>
-    <ul id="recentActivityList" class="history-list"></ul>
-    <p id="recentActivityEmpty" class="empty" hidden>Nothing logged yet — head to Calendar to log a run or workout.</p>
-  </section>
-
-  <!-- CALENDAR -->
-  <section id="view-calendar" class="view" hidden>
-    <h1 class="view-title">Calendar</h1>
-
     <div class="cal-header">
       <button type="button" id="calPrev" class="cal-nav" aria-label="Previous month">‹</button>
       <span id="calMonthLabel" class="cal-month mono"></span>
@@ -56,7 +45,12 @@
     <div id="calWeekdays" class="cal-weekdays"></div>
     <div id="calGrid" class="cal-grid"></div>
     <div id="calLegend" class="cal-legend"></div>
-    <div id="calDayPanel" class="cal-day-panel" hidden></div>
+
+    <div id="dashStatGrid" class="stat-grid"></div>
+
+    <h2 class="section-title">Recent activity</h2>
+    <ul id="recentActivityList" class="history-list"></ul>
+    <p id="recentActivityEmpty" class="empty" hidden>Nothing logged yet — tap a date above to log a run or workout.</p>
   </section>
 
   <!-- RUN -->
@@ -213,7 +207,6 @@
 
 <nav id="tabs" class="tabs" role="tablist" aria-label="Sections">
   <button type="button" class="tab" data-view="dashboard" role="tab" aria-selected="true">Dashboard</button>
-  <button type="button" class="tab" data-view="calendar" role="tab" aria-selected="false">Calendar</button>
   <button type="button" class="tab" data-view="run" role="tab" aria-selected="false">Run</button>
   <button type="button" class="tab" data-view="workout" role="tab" aria-selected="false">Workout</button>
   <button type="button" class="tab" data-view="settings" role="tab" aria-selected="false">Settings</button>
@@ -289,6 +282,15 @@
       <button type="submit" id="editSave" class="primary">Save</button>
     </div>
   </form>
+</section>
+
+<!-- Calendar day sheet (popup, opened by tapping a date on the Dashboard calendar) -->
+<section id="calDaySheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Day activity">
+  <div class="grabber"></div>
+  <div id="calDayPanel" class="cal-day-panel"></div>
+  <div class="actions">
+    <button type="button" id="calDaySheetClose" class="ghost-btn block">Close</button>
+  </div>
 </section>
 
 <!-- Log session sheet (popup, opened from a calendar day) -->
