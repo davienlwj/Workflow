@@ -5,7 +5,7 @@
 
 import { todayIso } from './block.js';
 import {
-  EXERCISES, RADAR_GROUPS, RADAR_GROUP_FOR, exerciseById,
+  EXERCISES, MUSCLES, RADAR_GROUPS, RADAR_GROUP_FOR, exerciseById,
 } from './exercises.js';
 
 const DAY_MS = 86400000;
@@ -120,22 +120,19 @@ function rangeStart(range, now) {
 }
 
 /**
- * Sets logged per general body region within `range`
- * ('week'|'month'|'year'|'all'), for the muscle-balance radar chart. Each
- * exercise's fine-grained muscles (see exercises.js's MUSCLES) roll up into
- * one of RADAR_GROUPS via RADAR_GROUP_FOR - a chart with 22 spokes isn't
- * readable, so this deliberately trades granularity for a chart that is. A
- * set is counted once for every group its exercise reaches (an exercise's
- * `muscles` list may span several), so a compound lift like a bench press
- * credits chest, arms and shoulders alike rather than only its primary
- * muscle. Returns one entry per RADAR_GROUPS id, zero included, in order.
+ * Sets logged per fine-grained muscle group (see exercises.js's MUSCLES)
+ * within `range` ('week'|'month'|'year'|'all'). A set is counted once for
+ * every muscle its exercise targets (an exercise's `muscles` list may span
+ * several), so a compound lift like a bench press credits chest, triceps
+ * and shoulders alike rather than only its primary muscle. Returns one
+ * entry per MUSCLES id, zero included, in order.
  * @param {typeof EXERCISES} [exercises] defaults to the built-in library;
  *   pass a list that also includes the user's custom exercises to credit
  *   sets logged against those too.
  */
-export function muscleSetBreakdown(workouts, range, now = todayIso(), exercises = EXERCISES) {
+export function muscleSetBreakdownDetailed(workouts, range, now = todayIso(), exercises = EXERCISES) {
   const start = rangeStart(range, now);
-  const counts = new Map(RADAR_GROUPS.map((g) => [g, 0]));
+  const counts = new Map(MUSCLES.map((m) => [m, 0]));
   for (const w of workouts) {
     if (start && toDate(w.date) < start) continue;
     for (const ex of w.exercises || []) {
@@ -143,11 +140,27 @@ export function muscleSetBreakdown(workouts, range, now = todayIso(), exercises 
       if (!def) continue;
       const setCount = (ex.sets || []).filter((s) => s.weight != null || s.reps != null).length;
       if (!setCount) continue;
-      for (const m of def.muscles) {
-        const group = RADAR_GROUP_FOR[m];
-        if (group) counts.set(group, (counts.get(group) || 0) + setCount);
-      }
+      for (const m of def.muscles) counts.set(m, (counts.get(m) || 0) + setCount);
     }
+  }
+  return MUSCLES.map((muscle) => ({ muscle, sets: counts.get(muscle) }));
+}
+
+/**
+ * The above, rolled up into RADAR_GROUPS's 9 general regions via
+ * RADAR_GROUP_FOR, for the muscle-balance radar chart - a chart with 22
+ * spokes isn't readable, so this deliberately trades granularity for a
+ * chart that is. Returns one entry per RADAR_GROUPS id, zero included, in
+ * order. See muscleSetBreakdownDetailed for the ungrouped version (used to
+ * drill into one region's granular breakdown, e.g. when a chart label is
+ * tapped to expand it).
+ */
+export function muscleSetBreakdown(workouts, range, now = todayIso(), exercises = EXERCISES) {
+  const detailed = muscleSetBreakdownDetailed(workouts, range, now, exercises);
+  const counts = new Map(RADAR_GROUPS.map((g) => [g, 0]));
+  for (const { muscle, sets } of detailed) {
+    const group = RADAR_GROUP_FOR[muscle];
+    if (group) counts.set(group, counts.get(group) + sets);
   }
   return RADAR_GROUPS.map((muscle) => ({ muscle, sets: counts.get(muscle) }));
 }

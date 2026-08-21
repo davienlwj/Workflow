@@ -162,8 +162,18 @@ const RADAR_CENTER = RADAR_SIZE / 2;
 const RADAR_R = 90;
 const RADAR_LABEL_R = RADAR_R + 28;
 
-/** @param {{muscle: string, sets: number}[]} breakdown one entry per muscle group (see muscleSetBreakdown) */
-export function muscleRadarSVG(breakdown) {
+const LABEL_HIT_W = 68;
+const LABEL_HIT_H = 30;
+
+/**
+ * @param {{muscle: string, sets: number}[]} breakdown one entry per muscle
+ *   group (see muscleSetBreakdown)
+ * @param {string|null} [activeGroup] id of the group currently expanded
+ *   (its label is highlighted); each label is also tagged data-group="…"
+ *   and sized with an invisible hit-target rect so the caller can wire up
+ *   click-to-expand via event delegation on the container.
+ */
+export function muscleRadarSVG(breakdown, activeGroup = null) {
   if (breakdown.every((b) => b.sets === 0)) {
     return '<p class="chart-empty">No sets logged for this range yet.</p>';
   }
@@ -204,10 +214,15 @@ export function muscleRadarSVG(breakdown) {
     const cos = Math.cos(a);
     const anchor = cos > 0.3 ? 'start' : cos < -0.3 ? 'end' : 'middle';
     const pct = totalSets ? Math.round((b.sets / totalSets) * 100) : 0;
-    return `<text text-anchor="${anchor}" class="chart-radar-label">
-      <tspan x="${x.toFixed(1)}" y="${(y - 4).toFixed(1)}">${RADAR_GROUP_LABEL[b.muscle]}</tspan>
-      <tspan x="${x.toFixed(1)}" y="${(y + 7).toFixed(1)}" class="chart-radar-pct">${pct}%</tspan>
-    </text>`;
+    const isActive = b.muscle === activeGroup;
+    const hitX = anchor === 'start' ? x - 4 : anchor === 'end' ? x - LABEL_HIT_W + 4 : x - LABEL_HIT_W / 2;
+    return `<g class="chart-radar-label-group${isActive ? ' active' : ''}" data-group="${b.muscle}">
+      <rect x="${hitX.toFixed(1)}" y="${(y - LABEL_HIT_H / 2).toFixed(1)}" width="${LABEL_HIT_W}" height="${LABEL_HIT_H}" fill="transparent" pointer-events="all" />
+      <text text-anchor="${anchor}" class="chart-radar-label">
+        <tspan x="${x.toFixed(1)}" y="${(y - 4).toFixed(1)}">${RADAR_GROUP_LABEL[b.muscle]}</tspan>
+        <tspan x="${x.toFixed(1)}" y="${(y + 7).toFixed(1)}" class="chart-radar-pct">${pct}% ${isActive ? '▾' : '▸'}</tspan>
+      </text>
+    </g>`;
   }).join('');
 
   return `<svg viewBox="0 0 ${RADAR_SIZE} ${RADAR_SIZE}" xmlns="${NS}" class="chart-svg" role="img" aria-label="Muscle balance">

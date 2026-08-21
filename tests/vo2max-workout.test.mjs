@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {
   workoutVolume, lastPerformance, personalRecords, exerciseProgress,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince, muscleSetBreakdown,
+  muscleSetBreakdownDetailed,
 } from '../vo2max/js/workout.js';
-import { RADAR_GROUPS } from '../vo2max/js/exercises.js';
+import { RADAR_GROUPS, MUSCLES, RADAR_GROUP_FOR } from '../vo2max/js/exercises.js';
 
 function makeWorkout(date, exercises) {
   return { id: date, date, exercises };
@@ -175,4 +176,38 @@ test('muscleSetBreakdown skips exercises no longer in the library rather than cr
     { exerciseId: 'not-a-real-exercise', sets: [{ weight: 10, reps: 10 }] },
   ])];
   assert.doesNotThrow(() => muscleSetBreakdown(workouts, 'all', '2026-08-18'));
+});
+
+test('muscleSetBreakdownDetailed returns every fine-grained muscle, MUSCLES order, zero included', () => {
+  const rows = muscleSetBreakdownDetailed([], 'all', '2026-08-18');
+  assert.deepEqual(rows.map((r) => r.muscle), MUSCLES);
+  assert.ok(rows.every((r) => r.sets === 0));
+});
+
+test('muscleSetBreakdownDetailed credits every fine-grained muscle a bench press targets', () => {
+  const workouts = [makeWorkout('2026-08-18', [
+    { exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8 }] },
+  ])];
+  const counts = Object.fromEntries(
+    muscleSetBreakdownDetailed(workouts, 'all', '2026-08-18').map((r) => [r.muscle, r.sets]),
+  );
+  assert.equal(counts['mid-chest'], 1);
+  assert.equal(counts.triceps, 1);
+  assert.equal(counts['front-delts'], 1);
+  assert.equal(counts.biceps, 0);
+});
+
+test('muscleSetBreakdown is exactly muscleSetBreakdownDetailed rolled up by RADAR_GROUP_FOR', () => {
+  const workouts = [
+    makeWorkout('2026-08-17', [{ exerciseId: 'squat', sets: [{ weight: 80, reps: 5 }] }]),
+    makeWorkout('2026-08-16', [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8 }] }]),
+  ];
+  const detailed = muscleSetBreakdownDetailed(workouts, 'all', '2026-08-18');
+  const expected = new Map(RADAR_GROUPS.map((g) => [g, 0]));
+  for (const { muscle, sets } of detailed) {
+    const group = RADAR_GROUP_FOR[muscle];
+    expected.set(group, expected.get(group) + sets);
+  }
+  const actual = muscleSetBreakdown(workouts, 'all', '2026-08-18');
+  assert.deepEqual(actual, RADAR_GROUPS.map((muscle) => ({ muscle, sets: expected.get(muscle) })));
 });

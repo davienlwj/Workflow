@@ -16,12 +16,14 @@ import {
 } from './chart.js';
 import { sessionToICS } from './ics.js';
 import {
-  EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, exerciseById, searchExercises,
+  EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
+  exerciseById, searchExercises,
 } from './exercises.js';
 import { muscleDiagramHTML } from './muscleDiagram.js';
 import {
   workoutVolume, lastPerformance, personalRecords, exerciseProgress,
-  loggedExerciseIds, daysSinceLastWorkout, volumeSince, muscleSetBreakdown,
+  loggedExerciseIds, daysSinceLastWorkout, volumeSince,
+  muscleSetBreakdown, muscleSetBreakdownDetailed,
 } from './workout.js';
 import { runIconSVG, dumbbellIconSVG } from './icons.js';
 
@@ -34,6 +36,7 @@ let workoutEditingId = null;
 let exerciseSheetId = null;
 let mileageScope = 'week';
 let muscleRange = 'week';
+let expandedRadarGroup = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -981,10 +984,48 @@ function renderWorkoutTab() {
     </div>
   `).join('');
 
-  $('muscleChartWrap').innerHTML = muscleRadarSVG(muscleSetBreakdown(workouts, muscleRange, todayIso(), allExercises()));
-
+  renderMuscleRadar();
   renderExerciseSummaries();
   renderWorkoutHistory();
+}
+
+/** Redraws the radar chart and, if a label is expanded, its breakdown panel below it. */
+function renderMuscleRadar() {
+  $('muscleChartWrap').innerHTML = muscleRadarSVG(
+    muscleSetBreakdown(workouts, muscleRange, todayIso(), allExercises()),
+    expandedRadarGroup,
+  );
+  renderMuscleGroupDetail();
+}
+
+/** The granular body parts (e.g. Front/Lateral/Rear Delts) that roll up into
+ *  whichever radar group's label is currently expanded, each shown as a
+ *  share of that group's own total - not the chart's overall total - so a
+ *  tapped group's sub-parts read as one 100% breakdown of it. */
+function renderMuscleGroupDetail() {
+  const panel = $('muscleGroupDetail');
+  if (!expandedRadarGroup) {
+    panel.hidden = true;
+    panel.innerHTML = '';
+    return;
+  }
+  const detailed = muscleSetBreakdownDetailed(workouts, muscleRange, todayIso(), allExercises());
+  const rows = detailed.filter((r) => RADAR_GROUP_FOR[r.muscle] === expandedRadarGroup);
+  const groupTotal = rows.reduce((sum, r) => sum + r.sets, 0);
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="muscle-group-detail-title">${RADAR_GROUP_LABEL[expandedRadarGroup]} breakdown</div>
+    ${rows.map((r) => {
+      const pct = groupTotal ? Math.round((r.sets / groupTotal) * 100) : 0;
+      return `
+        <div class="muscle-group-detail-row">
+          <span class="muscle-group-detail-name">${MUSCLE_LABEL[r.muscle]}</span>
+          <div class="muscle-group-detail-bar"><div class="muscle-group-detail-bar-fill" style="width:${pct}%"></div></div>
+          <span class="muscle-group-detail-pct mono">${pct}%</span>
+        </div>
+      `;
+    }).join('')}
+  `;
 }
 
 $('muscleScope').addEventListener('click', (e) => {
@@ -994,7 +1035,18 @@ $('muscleScope').addEventListener('click', (e) => {
   $('muscleScope').querySelectorAll('.scope').forEach((b) => {
     b.setAttribute('aria-selected', String(b === btn));
   });
-  $('muscleChartWrap').innerHTML = muscleRadarSVG(muscleSetBreakdown(workouts, muscleRange, todayIso(), allExercises()));
+  renderMuscleRadar();
+});
+
+// Tapping a radar label expands (or, tapped again, collapses) that group's
+// breakdown into its own granular body parts, e.g. Shoulders -> Front/
+// Lateral/Rear Delts.
+$('muscleChartWrap').addEventListener('click', (e) => {
+  const target = e.target.closest('[data-group]');
+  if (!target) return;
+  const group = target.dataset.group;
+  expandedRadarGroup = expandedRadarGroup === group ? null : group;
+  renderMuscleRadar();
 });
 
 /* --------------------------------------------------------------- ZONES */

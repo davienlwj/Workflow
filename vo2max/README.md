@@ -69,7 +69,11 @@ with Dashboard and Calendar as the two places they come together.
   (sets logged, filterable to week/month/year/all, rolled up into 9 general
   regions — Chest, Back, Shoulders, Arms, Quads, Hamstrings, Glutes, Abs,
   Core — since the exercise library's 22 body-part groups are too granular
-  to plot as a readable chart), a card per exercise you've ever logged (its
+  to plot as a readable chart; tap a region's label to expand it into the
+  granular body parts behind it — e.g. Shoulders into Front/Lateral/Rear
+  Delts — each shown as its share of that region's own sets, tap again or
+  tap a different label to collapse or switch), a card per exercise you've
+  ever logged (its
   muscle diagram and current PR — tap through to a detail sheet with best
   weight, estimated 1RM, times logged, and a weight-over-time progress
   chart), and the full workout history (tap one to edit or delete it).

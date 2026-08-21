@@ -71,8 +71,33 @@ test('muscleRadarSVG closes the data polygon back to its starting point', () => 
 
 test('muscleRadarSVG labels each muscle with its share of total sets logged', () => {
   const svg = muscleRadarSVG(breakdown({ chest: 3, arms: 1 })); // 4 total: 75% / 25%
-  assert.match(svg, /class="chart-radar-pct">75%<\/tspan>/);
-  assert.match(svg, /class="chart-radar-pct">25%<\/tspan>/);
+  assert.match(svg, /class="chart-radar-pct">75% /);
+  assert.match(svg, /class="chart-radar-pct">25% /);
   // Untouched muscles still get a 0% line rather than being left blank.
-  assert.match(svg, /class="chart-radar-pct">0%<\/tspan>/);
+  assert.match(svg, /class="chart-radar-pct">0% /);
+});
+
+test('muscleRadarSVG tags each label with its group id for click-to-expand', () => {
+  const svg = muscleRadarSVG(breakdown({ chest: 3 }));
+  for (const g of RADAR_GROUPS) {
+    assert.match(svg, new RegExp(`data-group="${g}"`), `no data-group for "${g}"`);
+  }
+});
+
+test('muscleRadarSVG gives each label an invisible hit-target rect for a larger tap area', () => {
+  const svg = muscleRadarSVG(breakdown({ chest: 3 }));
+  assert.equal((svg.match(/<rect[^>]*pointer-events="all"/g) || []).length, RADAR_GROUPS.length);
+});
+
+test('muscleRadarSVG highlights only the active group\'s label', () => {
+  const svg = muscleRadarSVG(breakdown({ chest: 3, arms: 1 }), 'chest'); // 4 total: chest 75%
+  assert.match(svg, /class="chart-radar-label-group active" data-group="chest"/);
+  assert.doesNotMatch(svg, /class="chart-radar-label-group active" data-group="back"/);
+  // Expanded group shows a down-caret, the rest an up/right one.
+  assert.match(svg, /class="chart-radar-pct">75% ▾<\/tspan>/);
+});
+
+test('muscleRadarSVG has no active label when activeGroup is not passed', () => {
+  const svg = muscleRadarSVG(breakdown({ chest: 3 }));
+  assert.doesNotMatch(svg, /chart-radar-label-group active/);
 });
