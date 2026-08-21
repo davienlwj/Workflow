@@ -18,6 +18,7 @@ import {
   workoutVolume, lastPerformance, personalRecords, exerciseProgress,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince,
 } from './workout.js';
+import { runIconSVG, dumbbellIconSVG } from './icons.js';
 
 let settings = loadSettings();
 let sessions = loadSessions();
@@ -340,17 +341,25 @@ const CAL_WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 function pad2(n) { return String(n).padStart(2, '0'); }
 function isoOf(y, m, d) { return `${y}-${pad2(m + 1)}-${pad2(d)}`; }
 
-function sessionsByDate() {
+/** Runs and workouts for every date either was logged on, keyed by date. */
+function activityByDate() {
   const map = new Map();
-  for (const s of sessions) {
-    if (!map.has(s.date)) map.set(s.date, []);
-    map.get(s.date).push(s);
-  }
+  const ensure = (date) => {
+    if (!map.has(date)) map.set(date, { sessions: [], workouts: [] });
+    return map.get(date);
+  };
+  for (const s of sessions) ensure(s.date).sessions.push(s);
+  for (const w of workouts) ensure(w.date).workouts.push(w);
   return map;
 }
 
+$('calLegend').innerHTML = `
+  <span class="cal-legend-item">${runIconSVG()}<span>Run</span></span>
+  <span class="cal-legend-item">${dumbbellIconSVG()}<span>Workout</span></span>
+`;
+
 function renderCalendar() {
-  const byDate = sessionsByDate();
+  const byDate = activityByDate();
 
   $('calMonthLabel').textContent = new Date(calYear, calMonth, 1)
     .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -364,14 +373,19 @@ function renderCalendar() {
   for (let i = 0; i < firstDow; i++) html += '<div class="cal-cell pad"></div>';
   for (let d = 1; d <= daysInMonth; d++) {
     const iso = isoOf(calYear, calMonth, d);
-    const has = byDate.has(iso);
+    const day = byDate.get(iso);
+    const hasRun = Boolean(day && day.sessions.length);
+    const hasWorkout = Boolean(day && day.workouts.length);
     const classes = ['cal-cell'];
-    if (has) classes.push('has-session');
+    if (hasRun || hasWorkout) classes.push('has-activity');
     if (iso === todayIsoStr) classes.push('today');
     if (iso === calSelectedDate) classes.push('selected');
+    const iconsHTML = (hasRun || hasWorkout)
+      ? `<span class="cal-icons">${hasRun ? runIconSVG() : ''}${hasWorkout ? dumbbellIconSVG() : ''}</span>`
+      : '';
     html += `<button type="button" class="${classes.join(' ')}" data-date="${iso}">
       <span>${d}</span>
-      ${has ? '<span class="cal-dot"></span>' : ''}
+      ${iconsHTML}
     </button>`;
   }
   $('calGrid').innerHTML = html;
@@ -386,43 +400,85 @@ function renderCalDayPanel(byDate) {
     panel.innerHTML = '';
     return;
   }
-  const daySessions = byDate.get(calSelectedDate) || [];
-  const logBtnLabel = daySessions.length ? '+ Log another session on this day' : '+ Log session on this day';
+  const day = byDate.get(calSelectedDate) || { sessions: [], workouts: [] };
+
   panel.hidden = false;
   panel.innerHTML = `
     <div class="cal-day-panel-date mono">${fmtDateLong(calSelectedDate)}</div>
-    ${daySessions.map((s) => calDaySummaryHTML(s)).join('')}
-    <button type="button" id="calLogBtn" class="ghost-btn block">${logBtnLabel}</button>
+    ${day.sessions.length ? `
+      <div class="cal-day-section-label">${runIconSVG()}<span>Runs</span></div>
+      ${day.sessions.map((s) => calDaySummaryHTML(s)).join('')}
+    ` : ''}
+    ${day.workouts.length ? `
+      <div class="cal-day-section-label">${dumbbellIconSVG()}<span>Workouts</span></div>
+      ${day.workouts.map((w) => calDayWorkoutSummaryHTML(w)).join('')}
+    ` : ''}
+    <div class="cal-day-actions">
+      <button type="button" id="calLogRunBtn" class="ghost-btn">+ Log run</button>
+      <button type="button" id="calLogWorkoutBtn" class="ghost-btn">+ Log workout</button>
+    </div>
   `;
-  panel.querySelectorAll('.cal-day-item').forEach((btn) => {
+  panel.querySelectorAll('.cal-day-item[data-id]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const s = sessions.find((x) => x.id === btn.dataset.id);
       if (s) openEditSheet(s);
     });
   });
-  $('calLogBtn').addEventListener('click', () => openLogSheet(calSelectedDate));
+  panel.querySelectorAll('.cal-day-item[data-workout-id]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const w = workouts.find((x) => x.id === btn.dataset.workoutId);
+      if (w) openWorkoutEditSheet(w);
+    });
+  });
+  $('calLogRunBtn').addEventListener('click', () => openLogSheet(calSelectedDate));
+  $('calLogWorkoutBtn').addEventListener('click', () => openWorkoutSheet(calSelectedDate));
 }
 
-/** A simplified, at-a-glance summary of one session for the calendar day panel. */
-function calDaySummaryHTML(s) {
+/** A compact {badgeHTML, metaHTML} summary of one session — shared by the
+ *  calendar day panel and the dashboard's recent-activity feed. */
+function sessionCompactSummary(s) {
   const type = sessionTypeOf(s);
   const isInterval = type === 'interval';
-  let badgeHTML;
+  const badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
   let metaHTML;
   if (isInterval) {
     const avgs = (s.intervals || []).map((iv) => iv.avgHR).filter((v) => v != null);
     const avgHR = avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
-    badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
     metaHTML = `<span class="mono">${s.intervalsCompleted} interval${s.intervalsCompleted === 1 ? '' : 's'}${avgHR != null ? ` · avg ${avgHR}` : ''}</span>`;
   } else {
-    badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
     metaHTML = `<span class="mono">${[
       s.distanceKm != null ? `${s.distanceKm}km` : null,
       s.durationMin != null ? `${s.durationMin}min` : null,
     ].filter(Boolean).join(' · ')}</span>`;
   }
+  return { badgeHTML, metaHTML };
+}
+
+/** A compact {badgeHTML, metaHTML} summary of one workout — same role as
+ *  sessionCompactSummary, for the calendar day panel and recent activity. */
+function workoutCompactSummary(w) {
+  const exCount = (w.exercises || []).length;
+  const badgeHTML = `<span class="pill pill-type">${w.name ? escapeHTML(w.name) : 'Workout'}</span>`;
+  const metaHTML = `<span class="mono">${exCount} exercise${exCount === 1 ? '' : 's'} · ${workoutVolume(w)}kg</span>`;
+  return { badgeHTML, metaHTML };
+}
+
+/** A simplified, at-a-glance summary of one session for the calendar day panel. */
+function calDaySummaryHTML(s) {
+  const { badgeHTML, metaHTML } = sessionCompactSummary(s);
   return `
     <button type="button" class="cal-day-item" data-id="${s.id}">
+      ${badgeHTML}
+      ${metaHTML}
+    </button>
+  `;
+}
+
+/** A simplified, at-a-glance summary of one workout for the calendar day panel. */
+function calDayWorkoutSummaryHTML(w) {
+  const { badgeHTML, metaHTML } = workoutCompactSummary(w);
+  return `
+    <button type="button" class="cal-day-item" data-workout-id="${w.id}">
       ${badgeHTML}
       ${metaHTML}
     </button>
@@ -445,6 +501,71 @@ $('calGrid').addEventListener('click', (e) => {
   const iso = cell.dataset.date;
   calSelectedDate = calSelectedDate === iso ? null : iso;
   renderCalendar();
+});
+
+/* ----------------------------------------------------------- DASHBOARD */
+
+function renderDashboard() {
+  const daysSinceRun = daysSinceLastSession(sessions);
+  const daysSinceWorkout = daysSinceLastWorkout(workouts);
+  const weekBuckets = mileageBuckets(sessions, 'week');
+  const mileageThisWeek = weekBuckets.length ? weekBuckets[weekBuckets.length - 1].km : 0;
+
+  $('dashStatGrid').innerHTML = [
+    [String(sessions.length), 'Runs logged'],
+    [String(workouts.length), 'Workouts logged'],
+    [`${mileageThisWeek}km`, 'Mileage this week'],
+    [`${volumeSince(workouts, 7)}kg`, 'Volume this week'],
+    [daysSinceRun != null ? String(daysSinceRun) : '—', 'Days since last run'],
+    [daysSinceWorkout != null ? String(daysSinceWorkout) : '—', 'Days since last workout'],
+  ].map(([value, label]) => `
+    <div class="stat-tile">
+      <div class="stat-value mono">${value}</div>
+      <div class="stat-label">${label}</div>
+    </div>
+  `).join('');
+
+  renderRecentActivity();
+}
+
+const RECENT_ACTIVITY_LIMIT = 6;
+
+function renderRecentActivity() {
+  const items = [
+    ...sessions.map((s) => ({ date: s.date, id: s.id, kind: 'run', data: s })),
+    ...workouts.map((w) => ({ date: w.date, id: w.id, kind: 'workout', data: w })),
+  ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, RECENT_ACTIVITY_LIMIT);
+
+  $('recentActivityEmpty').hidden = items.length > 0;
+  $('recentActivityList').innerHTML = items.map((item) => {
+    const { badgeHTML, metaHTML } = item.kind === 'run'
+      ? sessionCompactSummary(item.data)
+      : workoutCompactSummary(item.data);
+    const icon = item.kind === 'run' ? runIconSVG() : dumbbellIconSVG();
+    return `
+      <li>
+        <button type="button" class="history-item" data-kind="${item.kind}" data-id="${item.id}">
+          <div class="history-top">
+            <span class="history-date">${icon}${fmtDateLong(item.date)}</span>
+            ${badgeHTML}
+          </div>
+          <div class="history-meta">${metaHTML}</div>
+        </button>
+      </li>
+    `;
+  }).join('');
+}
+
+$('recentActivityList').addEventListener('click', (e) => {
+  const btn = e.target.closest('.history-item');
+  if (!btn) return;
+  if (btn.dataset.kind === 'run') {
+    const s = sessions.find((x) => x.id === btn.dataset.id);
+    if (s) openEditSheet(s);
+  } else {
+    const w = workouts.find((x) => x.id === btn.dataset.id);
+    if (w) openWorkoutEditSheet(w);
+  }
 });
 
 /* --------------------------------------------------------- edit sheet */
@@ -531,9 +652,9 @@ $('editDelete').addEventListener('click', () => {
   toast('Session deleted');
 });
 
-/* ------------------------------------------------------------- PROGRESS */
+/* ------------------------------------------------------------------ RUN */
 
-function renderProgress() {
+function renderRunTab() {
   const avgHR = averageIntervalHR(sessions);
   const daysSince = daysSinceLastSession(sessions);
 
@@ -553,6 +674,8 @@ function renderProgress() {
   $('mileageTotal').textContent = `${totalMileage(sessions)} km total`;
   $('mileageChartWrap').innerHTML = mileageBarChartSVG(mileageBuckets(sessions, mileageScope));
 }
+
+$('startRunBtn').addEventListener('click', () => openLogSheet(todayIso()));
 
 $('mileageScope').addEventListener('click', (e) => {
   const btn = e.target.closest('.scope');
@@ -966,6 +1089,7 @@ $('sFile').addEventListener('change', async () => {
     importAll(await file.text());
     settings = loadSettings();
     sessions = loadSessions();
+    workouts = loadWorkouts();
     renderAll();
     clearSaved($('settingsSaveBtn'));
     toast('Data imported');
@@ -987,9 +1111,10 @@ $('sReset').addEventListener('click', () => {
 
 function renderAll() {
   renderHeaderZone();
+  renderDashboard();
   renderHistory();
   renderCalendar();
-  renderProgress();
+  renderRunTab();
   renderWorkoutTab();
   renderZones();
   renderSettingsForm();

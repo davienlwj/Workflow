@@ -1,6 +1,6 @@
 /* HYBIRD - offline shell. Bump CACHE when the app files change. */
 
-const CACHE = 'vo2max-v28';
+const CACHE = 'vo2max-v30';
 
 const SHELL = [
   './',
@@ -10,6 +10,7 @@ const SHELL = [
   './js/block.js',
   './js/chart.js',
   './js/exercises.js',
+  './js/icons.js',
   './js/ics.js',
   './js/muscleDiagram.js',
   './js/store.js',

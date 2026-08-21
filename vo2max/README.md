@@ -29,40 +29,52 @@ npm run muscle-diagram:vo2max       # regenerate the muscle-diagram image assets
 
 ## What's in it
 
-- **Dashboard** — a month calendar is the main way in: days with a logged
-  session get a dot, tapping one opens a simplified summary of what ran that
-  day, and tapping that summary drills into the full edit sheet. Every day —
-  logged or not — also has a *+ Log session* action that opens the log popup
-  pre-filled with that date. Below the calendar: sessions logged (all types
-  combined), average interval HR, days since your last session, a VO2max
-  trend chart labeling each point with its exact value, a total-mileage bar
-  chart filterable by week/month/year, and the full chronological session
-  list (tap one to edit or delete it — *Add to Calendar* there downloads a
-  standard `.ics` file for that session that Apple Calendar, Google
-  Calendar, or Outlook can all import directly).
-- **Log popup** — opened from the calendar, not its own tab. Record an
-  **interval session** (Norwegian 4x4: intervals completed, per-set avg/peak
-  HR and actual duration, recovery quality), an **easy run**, or a **long
-  run** (duration, avg pace, distance, avg/max HR) — plus session RPE and
-  notes, shared by all three. Each interval set's duration input defaults to
-  the protocol's planned work time but is editable per set, for when an
-  actual set ran long or short; the session's average HR is calculated live
-  from whatever sets are filled in. For a run, key in avg pace and duration
-  and distance fills in automatically (still editable by hand if you'd
-  rather enter it directly). A VO2max reading isn't captured here — add one
-  after the fact from the Dashboard if your watch reports it.
-- **Workout** — strength training, tracked separately from the cardio
-  sessions above. *+ Log workout* opens a popup: add exercises from a
+Nav is Dashboard / Calendar / Run / Workout / Settings — cardio (Run) and
+strength (Workout) are tracked as separate, parallel domains throughout,
+with Dashboard and Calendar as the two places they come together.
+
+- **Dashboard** — a pure summary, no logging here: six stat tiles (runs
+  logged, workouts logged, mileage this week, volume this week, days since
+  your last run, days since your last workout) and a combined
+  **recent activity** feed — the last few runs and workouts, newest first,
+  each tagged with a small running-figure or dumbbell icon and tappable
+  straight into its edit sheet.
+- **Calendar** — a month grid where every day that has something logged
+  shows the same icons (a run gets the running-figure glyph, a workout gets
+  the dumbbell glyph, a day with both gets both). Tapping a day opens a
+  panel listing that day's runs and workouts separately (tap one to edit or
+  delete it), plus **+ Log run** and **+ Log workout** actions that open the
+  respective log popup pre-filled with that date — this is the only place
+  logging happens for a specific day; Run and Workout's own *+ Log* buttons
+  always default to today.
+- **Run** — the cardio detail view: sessions logged, average interval HR,
+  days since your last session, a VO2max trend chart labeling each point
+  with its exact value, a total-mileage bar chart filterable by
+  week/month/year, and the full chronological session list (tap one to edit
+  or delete it — *Add to Calendar* there downloads a standard `.ics` file
+  for that session that Apple Calendar, Google Calendar, or Outlook can all
+  import directly). *+ Log run* opens the same popup as Calendar's, defaulted
+  to today: record an **interval session** (Norwegian 4x4: intervals
+  completed, per-set avg/peak HR and actual duration, recovery quality), an
+  **easy run**, or a **long run** (duration, avg pace, distance, avg/max
+  HR) — plus session RPE and notes, shared by all three. Each interval
+  set's duration input defaults to the protocol's planned work time but is
+  editable per set; the session's average HR is calculated live from
+  whatever sets are filled in. For a run, key in avg pace and duration and
+  distance fills in automatically. A VO2max reading isn't captured on the
+  log form — add one after the fact from the edit sheet if your watch
+  reports it.
+- **Workout** — the strength detail view: workouts logged, this week's
+  total volume, days since your last workout, a card per exercise you've
+  ever logged (its muscle diagram and current PR — tap through to a detail
+  sheet with best weight, estimated 1RM, times logged, and a
+  weight-over-time progress chart), and the full workout history (tap one
+  to edit or delete it). *+ Log workout* opens a popup: add exercises from a
   built-in ~50-exercise library (searchable, filterable by muscle group),
   each showing a front/back muscle diagram with its worked muscles
-  highlighted in red, plus a "last time" hint recalled from your most recent
-  session with that exercise. Log any number of weight × reps sets per
-  exercise.
-  Below that: workouts logged, this week's total volume, days since your
-  last workout, a card per exercise you've ever logged (its muscle diagram
-  and current PR — tap through to a detail sheet with best weight,
-  estimated 1RM, times logged, and a weight-over-time progress chart), and
-  the full workout history (tap one to edit or delete it).
+  highlighted in red, plus a "last time" hint recalled from your most
+  recent session with that exercise. Log any number of weight × reps sets
+  per exercise.
 - **Settings** — every number above (baseline VO2max, resting/max/threshold
   HR, which zone model is primary, and all of the protocol's
   reps/timing/frequency) is editable here — nothing is hardcoded once you've
@@ -99,6 +111,7 @@ js/block.js                 cardio progress stats — pure functions
 js/workout.js                strength progress stats — PRs, last-performance, volume; pure functions
 js/exercises.js              the built-in exercise library (name, equipment, muscles)
 js/muscleDiagram.js          stacks the muscle-diagram image assets for an exercise's muscles
+js/icons.js                  the running-figure / dumbbell pictograms (calendar, recent activity)
 js/chart.js                 dependency-free SVG charts: VO2max trend, mileage bars, exercise progress
 js/ics.js                   builds a per-session .ics file for calendar export
 js/app.js                   rendering and events
@@ -108,5 +121,5 @@ tools/gen-icons.py           crops/centers it into the icon set (needs Pillow, n
 tools/muscle-chart-source.jpg the anatomy illustration the muscle diagrams are built from
 tools/gen-muscle-diagram.py  recolors it lighter grey and cuts a red highlight overlay per
                               muscle group (needs Pillow, numpy, scipy) -> icons/muscles/
-../tests/vo2max-*.test.mjs   zone, progress-stats, workout, exercise, muscle-diagram, chart and ics-export test suites
+../tests/vo2max-*.test.mjs   zone, progress-stats, workout, exercise, muscle-diagram, icons, chart and ics-export test suites
 ```

@@ -449,7 +449,7 @@ button { font-family: var(--font-mono); }
 
 .cal-cell.pad { background: transparent; border-color: transparent; visibility: hidden; }
 
-.cal-cell.has-session { color: var(--ink); border-color: var(--dim); font-weight: 700; }
+.cal-cell.has-activity { color: var(--ink); border-color: var(--dim); font-weight: 700; }
 
 /* Diagonal hatching, not just a border, so today reads at a glance even
    among a grid of otherwise-identical cells. */
@@ -483,7 +483,31 @@ button { font-family: var(--font-mono); }
   );
 }
 
-.cal-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+/* Running-figure / dumbbell pictograms: calendar cells, the day panel's
+   section labels, and the dashboard's recent-activity feed. currentColor'd,
+   so they pick up whatever text color their container is set to. */
+.glyph-icon { width: 14px; height: 14px; flex-shrink: 0; color: var(--ink); }
+.glyph-run circle { fill: currentColor; }
+.glyph-workout rect { fill: currentColor; }
+
+.cal-icons { display: flex; gap: 3px; }
+.cal-icons .glyph-icon { width: 11px; height: 11px; }
+.cal-cell.selected .glyph-icon { color: var(--bg); }
+
+.cal-legend {
+  display: flex;
+  gap: 16px;
+  margin: -4px 0 12px;
+}
+
+.cal-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--dim);
+}
+.cal-legend-item .glyph-icon { width: 12px; height: 12px; color: var(--dim); }
 
 .cal-day-panel {
   display: flex;
@@ -496,6 +520,17 @@ button { font-family: var(--font-mono); }
   font-size: 13px;
   font-weight: 700;
   color: var(--dim);
+}
+
+.cal-day-section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--dimmer);
+  margin: 6px 0 -2px;
 }
 
 .cal-day-item {
@@ -512,6 +547,13 @@ button { font-family: var(--font-mono); }
   color: inherit;
   cursor: pointer;
 }
+
+.cal-day-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.cal-day-actions .ghost-btn { flex: 1; }
 
 /* --------------------------------------------------------------- history */
 
@@ -531,8 +573,8 @@ button { font-family: var(--font-mono); }
   cursor: pointer;
 }
 
-.history-top { display: flex; justify-content: space-between; align-items: baseline; }
-.history-date { font-family: var(--font-mono); font-weight: 700; font-size: 14px; }
+.history-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.history-date { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-weight: 700; font-size: 14px; }
 .history-meta { font-size: 12px; color: var(--dim); display: flex; gap: 10px; flex-wrap: wrap; }
 .history-notes { font-size: 12px; color: var(--dimmer); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -610,15 +652,18 @@ button { font-family: var(--font-mono); }
 
 .tab {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   color: var(--dimmer);
-  font-size: 14px;
-  padding: 10px 4px 8px;
+  font-size: 11px;
+  letter-spacing: -0.01em;
+  padding: 9px 2px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  white-space: nowrap;
 }
 
 .tab[aria-selected="true"] { color: var(--accent); }

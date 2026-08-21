@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>HYBIRD</title>
-<meta name="description" content="Norwegian 4x4 VO2max training tracker — log sessions, watch the trend, offline.">
+<meta name="description" content="Running and strength training tracker — log runs and workouts, watch the trend, offline.">
 
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#f5f5f5">
@@ -37,6 +37,17 @@
   <section id="view-dashboard" class="view">
     <h1 class="view-title">Dashboard</h1>
 
+    <div id="dashStatGrid" class="stat-grid"></div>
+
+    <h2 class="section-title">Recent activity</h2>
+    <ul id="recentActivityList" class="history-list"></ul>
+    <p id="recentActivityEmpty" class="empty" hidden>Nothing logged yet — head to Calendar to log a run or workout.</p>
+  </section>
+
+  <!-- CALENDAR -->
+  <section id="view-calendar" class="view" hidden>
+    <h1 class="view-title">Calendar</h1>
+
     <div class="cal-header">
       <button type="button" id="calPrev" class="cal-nav" aria-label="Previous month">‹</button>
       <span id="calMonthLabel" class="cal-month mono"></span>
@@ -44,9 +55,17 @@
     </div>
     <div id="calWeekdays" class="cal-weekdays"></div>
     <div id="calGrid" class="cal-grid"></div>
+    <div id="calLegend" class="cal-legend"></div>
     <div id="calDayPanel" class="cal-day-panel" hidden></div>
+  </section>
+
+  <!-- RUN -->
+  <section id="view-run" class="view" hidden>
+    <h1 class="view-title">Run</h1>
 
     <div id="statGrid" class="stat-grid"></div>
+
+    <button type="button" id="startRunBtn" class="primary block">+ Log run</button>
 
     <h2 class="section-title">VO<sub>2</sub>max trend</h2>
     <div id="chartWrap" class="chart-wrap"></div>
@@ -184,6 +203,8 @@
 
 <nav id="tabs" class="tabs" role="tablist" aria-label="Sections">
   <button type="button" class="tab" data-view="dashboard" role="tab" aria-selected="true">Dashboard</button>
+  <button type="button" class="tab" data-view="calendar" role="tab" aria-selected="false">Calendar</button>
+  <button type="button" class="tab" data-view="run" role="tab" aria-selected="false">Run</button>
   <button type="button" class="tab" data-view="workout" role="tab" aria-selected="false">Workout</button>
   <button type="button" class="tab" data-view="settings" role="tab" aria-selected="false">Settings</button>
 </nav>
