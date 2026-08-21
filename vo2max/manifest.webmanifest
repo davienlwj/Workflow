@@ -1,6 +1,6 @@
 {
-  "name": "VO2max Tracker",
-  "short_name": "VO2max",
+  "name": "HYBIRD",
+  "short_name": "HYBIRD",
   "description": "Norwegian 4x4 VO2max training tracker — log sessions, watch the trend, offline.",
   "start_url": "./",
   "scope": "./",

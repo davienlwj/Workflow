@@ -1,6 +1,6 @@
-/* VO2max Tracker - offline shell. Bump CACHE when the app files change. */
+/* HYBIRD - offline shell. Bump CACHE when the app files change. */
 
-const CACHE = 'vo2max-v19';
+const CACHE = 'vo2max-v20';
 
 const SHELL = [
   './',

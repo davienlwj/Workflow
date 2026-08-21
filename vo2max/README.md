@@ -1,4 +1,4 @@
-# VO2max Tracker
+# HYBIRD
 
 A personal training log for the Norwegian 4x4 VO2max protocol. No account, no
 server — everything is stored in `localStorage` on your device, and the app
@@ -84,6 +84,7 @@ js/chart.js                 dependency-free SVG charts: VO2max trend line, milea
 js/ics.js                   builds a per-session .ics file for calendar export
 js/app.js                   rendering and events
 sw.js                        offline cache
-tools/gen-icons.mjs          draws the icons, no dependencies
+tools/icon-source.jpg        the hand-drawn mark the icons are built from
+tools/gen-icons.py           crops/centers it into the icon set (needs Pillow, numpy)
 ../tests/vo2max-*.test.mjs   zone, progress-stats, chart and ics-export test suites
 ```
