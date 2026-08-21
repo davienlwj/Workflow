@@ -7,7 +7,7 @@ import {
 import { lthrZoneTable, rhrZoneTable, targetZone } from './zones.js';
 import {
   todayIso,
-  daysSinceLastSession, averageIntervalHR, vo2maxSeries,
+  daysSinceLastSession, averageSessionHR, vo2maxSeries,
   mileageBuckets, totalMileage,
 } from './block.js';
 import {
@@ -96,54 +96,10 @@ function fmtDateShort(iso) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-/* --------------------------------------------------------- interval rows */
-
-function buildIntervalRows(container, count, existing = []) {
-  const prevAvg = [...container.querySelectorAll('.iv-avg')].map((i) => i.value);
-  const prevPeak = [...container.querySelectorAll('.iv-peak')].map((i) => i.value);
-  const prevDuration = [...container.querySelectorAll('.iv-duration')].map((i) => i.value);
-  const defaultDuration = settings.protocol.workMin;
-  container.innerHTML = '';
-  for (let i = 0; i < count; i++) {
-    const row = document.createElement('div');
-    row.className = 'interval-row';
-    const avgVal = existing[i]?.avgHR ?? prevAvg[i] ?? '';
-    const peakVal = existing[i]?.peakHR ?? prevPeak[i] ?? '';
-    const durationVal = existing[i]?.durationMin ?? prevDuration[i] ?? defaultDuration;
-    row.innerHTML = `
-      <span class="iv-label">S${i + 1}</span>
-      <input class="iv-avg" type="number" inputmode="numeric" min="60" max="230" placeholder="avg" value="${avgVal}">
-      <input class="iv-peak" type="number" inputmode="numeric" min="60" max="230" placeholder="peak" value="${peakVal}">
-      <input class="iv-duration" type="number" inputmode="decimal" step="0.1" min="0" max="60" placeholder="min" value="${durationVal}">
-    `;
-    container.appendChild(row);
-  }
-}
-
-function readIntervalRows(container) {
-  return [...container.querySelectorAll('.interval-row')].map((row) => ({
-    avgHR: numOrNull(row.querySelector('.iv-avg').value),
-    peakHR: numOrNull(row.querySelector('.iv-peak').value),
-    durationMin: numOrNull(row.querySelector('.iv-duration').value),
-  }));
-}
-
 function numOrNull(v) {
   if (v === '' || v == null) return null;
   const n = Number(v);
   return Number.isNaN(n) ? null : n;
-}
-
-/** Live "Average HR" readout under the interval rows, from whatever avg values are filled in so far. */
-function updateComputedAvgHR(prefix) {
-  const el = $(`${prefix}AvgHR`);
-  if (!el) return;
-  const vals = [...$(`${prefix}IntervalRows`).querySelectorAll('.iv-avg')]
-    .map((i) => numOrNull(i.value))
-    .filter((v) => v != null);
-  el.innerHTML = vals.length
-    ? `Session avg HR: <span class="mono">${Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)}</span> bpm`
-    : '';
 }
 
 /** Distance = duration / pace, whenever both are present; otherwise left alone for manual entry. */
@@ -159,11 +115,6 @@ function updateComputedDistance(prefix) {
 
 /* --------------------------------------------------------------- LOG tab */
 
-function toggleTypeFields(prefix, type) {
-  $(`${prefix}IntervalFields`).hidden = type !== 'interval';
-  $(`${prefix}RunFields`).hidden = type === 'interval';
-}
-
 function sessionTypeOf(session) {
   return session.type ?? 'interval';
 }
@@ -171,11 +122,6 @@ function sessionTypeOf(session) {
 function resetLogForm() {
   $('logDate').value = todayIso();
   $('logType').value = 'interval';
-  toggleTypeFields('log', 'interval');
-  $('logIntervals').value = settings.protocol.reps;
-  buildIntervalRows($('logIntervalRows'), settings.protocol.reps);
-  updateComputedAvgHR('log');
-  $('logRecovery').value = 'moderate';
   $('logDurationMin').value = '';
   $('logAvgPace').value = '';
   $('logDistanceKm').value = '';
@@ -186,54 +132,33 @@ function resetLogForm() {
   $('logNotes').value = '';
 }
 
-$('logType').addEventListener('change', () => toggleTypeFields('log', $('logType').value));
-
-$('logIntervals').addEventListener('input', () => {
-  const n = Math.max(0, Math.min(20, Number($('logIntervals').value) || 0));
-  buildIntervalRows($('logIntervalRows'), n);
-  updateComputedAvgHR('log');
-});
-
-$('logIntervalRows').addEventListener('input', (e) => {
-  if (e.target.classList.contains('iv-avg')) updateComputedAvgHR('log');
-});
-
 $('logDurationMin').addEventListener('input', () => updateComputedDistance('log'));
 $('logAvgPace').addEventListener('input', () => updateComputedDistance('log'));
 
 $('logRPE').addEventListener('input', () => { $('logRPEOut').textContent = $('logRPE').value; });
 
+// Every session type shares the same fields now (duration/pace/distance/HR).
+// intervalsCompleted/intervals/recovery are deliberately left out of this
+// object rather than zeroed out: addSession simply won't have them, and
+// updateSession's patch merge (`{...existing, ...patch}`) leaves an older
+// interval session's per-rep HR breakdown untouched when it's re-saved,
+// since the edit form no longer collects or shows those fields.
 function readSessionForm(prefix) {
   const type = $(`${prefix}Type`).value;
   // The Log form has no VO2max field (only Edit does, for filling one in after the fact).
   const vo2maxEl = $(`${prefix}VO2max`);
-  const base = {
+  return {
     type,
     date: $(`${prefix}Date`).value,
     rpe: Number($(`${prefix}RPE`).value),
     vo2max: vo2maxEl ? numOrNull(vo2maxEl.value) : null,
     notes: $(`${prefix}Notes`).value.trim(),
-    intervalsCompleted: 0,
-    intervals: [],
-    recovery: null,
-    durationMin: null,
-    avgPace: null,
-    distanceKm: null,
-    avgHR: null,
-    maxHR: null,
+    durationMin: numOrNull($(`${prefix}DurationMin`).value),
+    avgPace: numOrNull($(`${prefix}AvgPace`).value),
+    distanceKm: numOrNull($(`${prefix}DistanceKm`).value),
+    avgHR: numOrNull($(`${prefix}RunAvgHR`).value),
+    maxHR: numOrNull($(`${prefix}RunMaxHR`).value),
   };
-  if (type === 'interval') {
-    base.intervalsCompleted = Number($(`${prefix}Intervals`).value) || 0;
-    base.intervals = readIntervalRows($(`${prefix}IntervalRows`));
-    base.recovery = $(`${prefix}Recovery`).value;
-  } else {
-    base.durationMin = numOrNull($(`${prefix}DurationMin`).value);
-    base.avgPace = numOrNull($(`${prefix}AvgPace`).value);
-    base.distanceKm = numOrNull($(`${prefix}DistanceKm`).value);
-    base.avgHR = numOrNull($(`${prefix}RunAvgHR`).value);
-    base.maxHR = numOrNull($(`${prefix}RunMaxHR`).value);
-  }
-  return base;
 }
 
 /** Opens the Log session popup for a given date (from a calendar day). */
@@ -269,6 +194,12 @@ const recoveryLabel = { easy: 'Easy', moderate: 'Moderate', hard: 'Hard' };
 const recoverySymbol = { easy: '○', moderate: '◐', hard: '●' };
 const typeLabel = { interval: '4x4', 'easy-run': 'Easy run', 'long-run': 'Long run' };
 
+/** True for sessions logged before every type shared the same fields, back
+ *  when "Interval (Norwegian 4x4)" had its own per-rep HR breakdown. */
+function hasLegacyIntervalData(s) {
+  return Boolean(s.intervalsCompleted) || Boolean((s.intervals || []).length);
+}
+
 function renderHistory() {
   const list = $('historyList');
   const sorted = [...sessions].sort((a, b) => b.date.localeCompare(a.date));
@@ -277,36 +208,30 @@ function renderHistory() {
 
   for (const s of sorted) {
     const type = sessionTypeOf(s);
-    const isInterval = type === 'interval';
-    let metaHTML;
-    let badgeHTML;
-
-    if (isInterval) {
+    const badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
+    let legacyHTML = '';
+    if (hasLegacyIntervalData(s)) {
       const avgs = (s.intervals || []).map((iv) => iv.avgHR).filter((v) => v != null);
       const peaks = (s.intervals || []).map((iv) => iv.peakHR).filter((v) => v != null);
       const avgHR = avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
       const peakHR = peaks.length ? Math.max(...peaks) : null;
-      badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
-      metaHTML = `
+      legacyHTML = `
         <span>${s.intervalsCompleted} interval${s.intervalsCompleted === 1 ? '' : 's'}</span>
         ${avgHR != null ? `<span class="mono">avg ${avgHR}</span>` : ''}
         ${peakHR != null ? `<span class="mono">peak ${peakHR}</span>` : ''}
         ${s.recovery ? `<span>${recoverySymbol[s.recovery] ?? ''} ${recoveryLabel[s.recovery] ?? s.recovery}</span>` : ''}
-        <span class="mono">RPE ${s.rpe}</span>
-        ${s.vo2max != null ? `<span class="mono">VO2 ${s.vo2max}</span>` : ''}
-      `;
-    } else {
-      badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
-      metaHTML = `
-        ${s.durationMin != null ? `<span class="mono">${s.durationMin}min</span>` : ''}
-        ${s.distanceKm != null ? `<span class="mono">${s.distanceKm}km</span>` : ''}
-        ${s.avgPace != null ? `<span class="mono">${s.avgPace}/km</span>` : ''}
-        ${s.avgHR != null ? `<span class="mono">avg ${s.avgHR}</span>` : ''}
-        ${s.maxHR != null ? `<span class="mono">max ${s.maxHR}</span>` : ''}
-        <span class="mono">RPE ${s.rpe}</span>
-        ${s.vo2max != null ? `<span class="mono">VO2 ${s.vo2max}</span>` : ''}
       `;
     }
+    const metaHTML = `
+      ${legacyHTML}
+      ${s.durationMin != null ? `<span class="mono">${s.durationMin}min</span>` : ''}
+      ${s.distanceKm != null ? `<span class="mono">${s.distanceKm}km</span>` : ''}
+      ${s.avgPace != null ? `<span class="mono">${s.avgPace}/km</span>` : ''}
+      ${s.avgHR != null ? `<span class="mono">avg ${s.avgHR}</span>` : ''}
+      ${s.maxHR != null ? `<span class="mono">max ${s.maxHR}</span>` : ''}
+      <span class="mono">RPE ${s.rpe}</span>
+      ${s.vo2max != null ? `<span class="mono">VO2 ${s.vo2max}</span>` : ''}
+    `;
 
     const li = document.createElement('li');
     const btn = document.createElement('button');
@@ -441,10 +366,9 @@ function renderCalDayPanel(byDate) {
  *  calendar day panel and the dashboard's recent-activity feed. */
 function sessionCompactSummary(s) {
   const type = sessionTypeOf(s);
-  const isInterval = type === 'interval';
   const badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
   let metaHTML;
-  if (isInterval) {
+  if (hasLegacyIntervalData(s)) {
     const avgs = (s.intervals || []).map((iv) => iv.avgHR).filter((v) => v != null);
     const avgHR = avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
     metaHTML = `<span class="mono">${s.intervalsCompleted} interval${s.intervalsCompleted === 1 ? '' : 's'}${avgHR != null ? ` · avg ${avgHR}` : ''}</span>`;
@@ -578,11 +502,6 @@ function openEditSheet(session) {
   const type = sessionTypeOf(session);
   $('editDate').value = session.date;
   $('editType').value = type;
-  toggleTypeFields('edit', type);
-  $('editIntervals').value = session.intervalsCompleted || 0;
-  buildIntervalRows($('editIntervalRows'), session.intervalsCompleted || 0, session.intervals || []);
-  updateComputedAvgHR('edit');
-  $('editRecovery').value = session.recovery ?? 'moderate';
   $('editDurationMin').value = session.durationMin ?? '';
   $('editAvgPace').value = session.avgPace ?? '';
   $('editDistanceKm').value = session.distanceKm ?? '';
@@ -610,18 +529,6 @@ $('scrim').addEventListener('click', () => {
   closeExerciseSheet();
 });
 $('editCancel').addEventListener('click', closeEditSheet);
-
-$('editType').addEventListener('change', () => toggleTypeFields('edit', $('editType').value));
-
-$('editIntervals').addEventListener('input', () => {
-  const n = Math.max(0, Math.min(20, Number($('editIntervals').value) || 0));
-  buildIntervalRows($('editIntervalRows'), n);
-  updateComputedAvgHR('edit');
-});
-
-$('editIntervalRows').addEventListener('input', (e) => {
-  if (e.target.classList.contains('iv-avg')) updateComputedAvgHR('edit');
-});
 
 $('editDurationMin').addEventListener('input', () => updateComputedDistance('edit'));
 $('editAvgPace').addEventListener('input', () => updateComputedDistance('edit'));
@@ -658,12 +565,12 @@ $('editDelete').addEventListener('click', () => {
 /* ------------------------------------------------------------------ RUN */
 
 function renderRunTab() {
-  const avgHR = averageIntervalHR(sessions);
+  const avgHR = averageSessionHR(sessions);
   const daysSince = daysSinceLastSession(sessions);
 
   $('statGrid').innerHTML = [
     [String(sessions.length), 'Sessions logged'],
-    [avgHR != null ? `${avgHR}` : '—', 'Avg interval HR'],
+    [avgHR != null ? `${avgHR}` : '—', 'Avg session HR'],
     [daysSince != null ? String(daysSince) : '—', 'Days since last session'],
   ].map(([value, label]) => `
     <div class="stat-tile">

@@ -47,23 +47,23 @@ with Dashboard and Calendar as the two places they come together.
   respective log popup pre-filled with that date — this is the only place
   logging happens for a specific day; Run and Workout's own *+ Log* buttons
   always default to today.
-- **Run** — the cardio detail view: sessions logged, average interval HR,
+- **Run** — the cardio detail view: sessions logged, average session HR,
   days since your last session, a VO2max trend chart labeling each point
   with its exact value, a total-mileage bar chart filterable by
   week/month/year, and the full chronological session list (tap one to edit
   or delete it — *Add to Calendar* there downloads a standard `.ics` file
   for that session that Apple Calendar, Google Calendar, or Outlook can all
   import directly). *+ Log run* opens the same popup as Calendar's, defaulted
-  to today: record an **interval session** (Norwegian 4x4: intervals
-  completed, per-set avg/peak HR and actual duration, recovery quality), an
-  **easy run**, or a **long run** (duration, avg pace, distance, avg/max
-  HR) — plus session RPE and notes, shared by all three. Each interval
-  set's duration input defaults to the protocol's planned work time but is
-  editable per set; the session's average HR is calculated live from
-  whatever sets are filled in. For a run, key in avg pace and duration and
-  distance fills in automatically. A VO2max reading isn't captured on the
-  log form — add one after the fact from the edit sheet if your watch
-  reports it.
+  to today: pick a **session type** — **interval** (Norwegian 4x4),
+  **easy run**, or **long run** — then the same fields for all three:
+  duration, avg pace, distance (fills in automatically once duration and
+  pace are both entered), avg/max HR, session RPE and notes. A VO2max
+  reading isn't captured on the log form — add one after the fact from the
+  edit sheet if your watch reports it. Interval sessions logged before this
+  shared field set (with a per-set avg/peak HR breakdown and recovery
+  quality) still display and export to `.ics` correctly; editing one keeps
+  that history intact even though the edit form itself no longer shows
+  those fields.
 - **Workout** — the strength detail view: workouts logged, this week's
   total volume, days since your last workout, a muscle-balance radar chart
   (sets logged per muscle group, filterable to week/month/year/all — a set

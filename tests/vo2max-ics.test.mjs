@@ -98,3 +98,27 @@ test('sessionToICS treats a session with no type field as interval (pre-dates th
   assert.match(unfolded, /SUMMARY:VO2max: 4 intervals \(Moderate\)/);
   assert.match(unfolded, /Intervals completed: 4/);
 });
+
+// Every session type now shares the same duration/pace/distance/HR fields;
+// "interval" sessions logged after that change have no intervalsCompleted,
+// intervals or recovery, so they must summarize like a run, not show
+// "undefined" in place of the old per-interval breakdown.
+test('sessionToICS builds a run-style summary for an interval session logged with the unified fields', () => {
+  const newStyleInterval = {
+    id: 'iv789',
+    type: 'interval',
+    date: '2026-08-20',
+    durationMin: 32,
+    distanceKm: 6,
+    avgHR: 178,
+    rpe: 8,
+    vo2max: null,
+    notes: '',
+  };
+  const unfolded = sessionToICS(newStyleInterval).replaceAll('\r\n ', '');
+  assert.match(unfolded, /SUMMARY:4x4: 32min\\, 6km/);
+  assert.match(unfolded, /Duration: 32 min/);
+  assert.match(unfolded, /Average HR: 178 bpm/);
+  assert.doesNotMatch(unfolded, /Intervals completed/);
+  assert.doesNotMatch(unfolded, /undefined/);
+});

@@ -26,8 +26,13 @@ export function daysSinceLastSession(sessions, now = todayIso()) {
   return daysBetween(last.date, now);
 }
 
-export function averageIntervalHR(sessions) {
-  const all = sessions.flatMap((s) => s.intervals || []).map((iv) => iv.avgHR).filter((v) => v != null);
+/** Average HR pooled across every session that has one: the unified avgHR
+ *  field, plus each per-interval avgHR reading on older interval sessions
+ *  logged before all session types shared the same fields. */
+export function averageSessionHR(sessions) {
+  const direct = sessions.map((s) => s.avgHR).filter((v) => v != null);
+  const legacy = sessions.flatMap((s) => s.intervals || []).map((iv) => iv.avgHR).filter((v) => v != null);
+  const all = [...direct, ...legacy];
   if (all.length === 0) return null;
   return Math.round(all.reduce((sum, v) => sum + v, 0) / all.length);
 }

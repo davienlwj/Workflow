@@ -46,27 +46,28 @@ function nextDateOnly(iso) {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
 }
 
-function intervalDescriptionText(session) {
-  const lines = [`Intervals completed: ${session.intervalsCompleted}`];
-  const intervals = session.intervals || [];
-  if (intervals.some((iv) => iv.avgHR != null || iv.peakHR != null || iv.durationMin != null)) {
-    const perInterval = intervals
-      .map((iv, i) => {
-        const duration = iv.durationMin != null ? ` (${iv.durationMin}min)` : '';
-        return `S${i + 1} ${iv.avgHR ?? '—'}/${iv.peakHR ?? '—'}${duration}`;
-      })
-      .join(', ');
-    lines.push(`Per-interval HR (avg/peak): ${perInterval}`);
-  }
-  lines.push(`Recovery quality: ${recoveryLabel[session.recovery] ?? session.recovery}`);
-  lines.push(`Session RPE: ${session.rpe}/10`);
-  if (session.vo2max != null) lines.push(`VO2max reading: ${session.vo2max} ml/kg/min`);
-  if (session.notes) lines.push(`Notes: ${session.notes}`);
-  return lines.join('\n');
+// True for sessions logged before every type shared the same fields, back
+// when "Interval (Norwegian 4x4)" had its own per-rep HR breakdown.
+function hasLegacyIntervalData(session) {
+  return Boolean(session.intervalsCompleted) || Boolean((session.intervals || []).length);
 }
 
-function easyRunDescriptionText(session) {
+function descriptionText(session) {
   const lines = [];
+  if (hasLegacyIntervalData(session)) {
+    lines.push(`Intervals completed: ${session.intervalsCompleted}`);
+    const intervals = session.intervals || [];
+    if (intervals.some((iv) => iv.avgHR != null || iv.peakHR != null || iv.durationMin != null)) {
+      const perInterval = intervals
+        .map((iv, i) => {
+          const duration = iv.durationMin != null ? ` (${iv.durationMin}min)` : '';
+          return `S${i + 1} ${iv.avgHR ?? '—'}/${iv.peakHR ?? '—'}${duration}`;
+        })
+        .join(', ');
+      lines.push(`Per-interval HR (avg/peak): ${perInterval}`);
+    }
+    if (session.recovery) lines.push(`Recovery quality: ${recoveryLabel[session.recovery] ?? session.recovery}`);
+  }
   if (session.durationMin != null) lines.push(`Duration: ${session.durationMin} min`);
   if (session.avgPace != null) lines.push(`Avg pace: ${session.avgPace} min/km`);
   if (session.distanceKm != null) lines.push(`Distance: ${session.distanceKm} km`);
@@ -78,26 +79,22 @@ function easyRunDescriptionText(session) {
   return lines.join('\n');
 }
 
-const runTypeLabel = { 'easy-run': 'Easy run', 'long-run': 'Long run' };
+const typeLabel = { interval: '4x4', 'easy-run': 'Easy run', 'long-run': 'Long run' };
 
 // Sessions logged before the type field existed have no `type` at all — treat as interval.
 function typeOf(session) {
   return session.type ?? 'interval';
 }
 
-function descriptionText(session) {
-  return typeOf(session) === 'interval' ? intervalDescriptionText(session) : easyRunDescriptionText(session);
-}
-
 function summaryText(session) {
   const type = typeOf(session);
-  if (type !== 'interval') {
-    const duration = session.durationMin != null ? `${session.durationMin}min` : 'run';
-    const distance = session.distanceKm != null ? `, ${session.distanceKm}km` : '';
-    return `${runTypeLabel[type] ?? 'Run'}: ${duration}${distance}`;
+  if (hasLegacyIntervalData(session)) {
+    const recovery = recoveryLabel[session.recovery] ?? session.recovery;
+    return `VO2max: ${session.intervalsCompleted} interval${session.intervalsCompleted === 1 ? '' : 's'} (${recovery})`;
   }
-  const recovery = recoveryLabel[session.recovery] ?? session.recovery;
-  return `VO2max: ${session.intervalsCompleted} interval${session.intervalsCompleted === 1 ? '' : 's'} (${recovery})`;
+  const duration = session.durationMin != null ? `${session.durationMin}min` : 'run';
+  const distance = session.distanceKm != null ? `, ${session.distanceKm}km` : '';
+  return `${typeLabel[type] ?? 'Run'}: ${duration}${distance}`;
 }
 
 export function sessionToICS(session) {

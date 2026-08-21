@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  daysSinceLastSession, averageIntervalHR, vo2maxSeries,
+  daysSinceLastSession, averageSessionHR, vo2maxSeries,
   mileageBuckets, totalMileage,
 } from '../vo2max/js/block.js';
 
@@ -17,13 +17,23 @@ test('daysSinceLastSession looks at the most recent date', () => {
   assert.equal(daysSinceLastSession([]), null);
 });
 
-test('averageIntervalHR pools avgHR across all sessions', () => {
+test('averageSessionHR pools the unified avgHR field across all sessions', () => {
+  const sessions = [{ avgHR: 180 }, { avgHR: 182 }, { avgHR: 176 }];
+  assert.equal(averageSessionHR(sessions), Math.round((180 + 182 + 176) / 3));
+  assert.equal(averageSessionHR([]), null);
+});
+
+test('averageSessionHR also pools per-interval avgHR from older interval sessions', () => {
   const sessions = [
     { intervals: [{ avgHR: 180 }, { avgHR: 182 }] },
     { intervals: [{ avgHR: 176 }] },
   ];
-  assert.equal(averageIntervalHR(sessions), Math.round((180 + 182 + 176) / 3));
-  assert.equal(averageIntervalHR([]), null);
+  assert.equal(averageSessionHR(sessions), Math.round((180 + 182 + 176) / 3));
+});
+
+test('averageSessionHR pools both the unified field and legacy per-interval readings together', () => {
+  const sessions = [{ avgHR: 200 }, { intervals: [{ avgHR: 100 }] }];
+  assert.equal(averageSessionHR(sessions), 150);
 });
 
 test('vo2maxSeries starts with baseline and includes only sessions with a reading', () => {
