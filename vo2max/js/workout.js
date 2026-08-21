@@ -4,6 +4,7 @@
  */
 
 import { todayIso } from './block.js';
+import { MUSCLES, exerciseById } from './exercises.js';
 
 const DAY_MS = 86400000;
 const toDate = (iso) => new Date(`${iso}T00:00:00`);
@@ -100,4 +101,42 @@ export function volumeSince(workouts, days, now = todayIso()) {
       .filter((w) => toDate(w.date).getTime() >= cutoff)
       .reduce((sum, w) => sum + workoutVolume(w), 0),
   );
+}
+
+/** Local midnight the current 'week'|'month'|'year' range started; null for 'all'. */
+function rangeStart(range, now) {
+  const base = toDate(now);
+  if (range === 'week') {
+    const dayIdx = (base.getDay() + 6) % 7; // 0 = Monday
+    const d = new Date(base);
+    d.setDate(d.getDate() - dayIdx);
+    return d;
+  }
+  if (range === 'month') return new Date(base.getFullYear(), base.getMonth(), 1);
+  if (range === 'year') return new Date(base.getFullYear(), 0, 1);
+  return null;
+}
+
+/**
+ * Sets logged per muscle group within `range` ('week'|'month'|'year'|'all'),
+ * for the muscle-balance chart. A set is counted once for every muscle its
+ * exercise targets (an exercise's `muscles` list may have several), so the
+ * totals reflect how a compound lift like a bench press credits chest,
+ * triceps and shoulders alike rather than only its primary muscle.
+ * Returns one entry per MUSCLES id, zero included, in MUSCLES order.
+ */
+export function muscleSetBreakdown(workouts, range, now = todayIso()) {
+  const start = rangeStart(range, now);
+  const counts = new Map(MUSCLES.map((m) => [m, 0]));
+  for (const w of workouts) {
+    if (start && toDate(w.date) < start) continue;
+    for (const ex of w.exercises || []) {
+      const def = exerciseById(ex.exerciseId);
+      if (!def) continue;
+      const setCount = (ex.sets || []).filter((s) => s.weight != null || s.reps != null).length;
+      if (!setCount) continue;
+      for (const m of def.muscles) counts.set(m, (counts.get(m) || 0) + setCount);
+    }
+  }
+  return MUSCLES.map((muscle) => ({ muscle, sets: counts.get(muscle) }));
 }

@@ -3,6 +3,8 @@
  * Renders a string of SVG markup; the caller drops it into innerHTML.
  */
 
+import { MUSCLE_LABEL } from './exercises.js';
+
 const NS = 'http://www.w3.org/2000/svg';
 const W = 320;
 const H = 160;
@@ -152,5 +154,62 @@ export function mileageBarChartSVG(buckets) {
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}" class="chart-svg" role="img" aria-label="Mileage">
     <line x1="${PAD_L}" y1="${baseY}" x2="${W - PAD_R}" y2="${baseY}" class="chart-grid" />
     ${bars}
+  </svg>`;
+}
+
+const RADAR_SIZE = 380;
+const RADAR_CENTER = RADAR_SIZE / 2;
+const RADAR_R = 90;
+const RADAR_LABEL_R = RADAR_R + 28;
+
+/** @param {{muscle: string, sets: number}[]} breakdown one entry per muscle group (see muscleSetBreakdown) */
+export function muscleRadarSVG(breakdown) {
+  if (breakdown.every((b) => b.sets === 0)) {
+    return '<p class="chart-empty">No sets logged for this range yet.</p>';
+  }
+
+  const n = breakdown.length;
+  const maxVal = Math.max(...breakdown.map((b) => b.sets), 1) * 1.15;
+  const angleFor = (i) => -Math.PI / 2 + (i / n) * 2 * Math.PI;
+  const pointAt = (i, r) => {
+    const a = angleFor(i);
+    return [RADAR_CENTER + r * Math.cos(a), RADAR_CENTER + r * Math.sin(a)];
+  };
+
+  const rings = [1 / 3, 2 / 3, 1].map((f) => {
+    const pts = breakdown.map((_, i) => pointAt(i, RADAR_R * f).map((v) => v.toFixed(1)).join(',')).join(' ');
+    return `<polygon points="${pts}" class="chart-grid" fill="none" />`;
+  }).join('');
+
+  const spokes = breakdown.map((_, i) => {
+    const [x, y] = pointAt(i, RADAR_R);
+    return `<line x1="${RADAR_CENTER}" y1="${RADAR_CENTER}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" class="chart-grid" />`;
+  }).join('');
+
+  const dataPts = breakdown.map((b, i) => pointAt(i, (b.sets / maxVal) * RADAR_R));
+  const dataPath = `${dataPts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`).join(' ')} Z`;
+
+  const dots = breakdown.map((b, i) => {
+    const [x, y] = dataPts[i];
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" class="chart-dot">
+      <title>${MUSCLE_LABEL[b.muscle]}: ${b.sets} set${b.sets === 1 ? '' : 's'}</title>
+    </circle>`;
+  }).join('');
+
+  const labels = breakdown.map((b, i) => {
+    const a = angleFor(i);
+    const [x, y] = pointAt(i, RADAR_LABEL_R);
+    const cos = Math.cos(a);
+    const anchor = cos > 0.3 ? 'start' : cos < -0.3 ? 'end' : 'middle';
+    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" class="chart-axis chart-radar-label" text-anchor="${anchor}" dominant-baseline="middle">${MUSCLE_LABEL[b.muscle]}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${RADAR_SIZE} ${RADAR_SIZE}" xmlns="${NS}" class="chart-svg" role="img" aria-label="Muscle balance">
+    ${rings}
+    ${spokes}
+    <path d="${dataPath}" class="chart-radar-fill" />
+    <path d="${dataPath}" class="chart-line" fill="none" />
+    ${dots}
+    ${labels}
   </svg>`;
 }

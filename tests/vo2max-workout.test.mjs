@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   workoutVolume, lastPerformance, personalRecords, exerciseProgress,
-  loggedExerciseIds, daysSinceLastWorkout, volumeSince,
+  loggedExerciseIds, daysSinceLastWorkout, volumeSince, muscleSetBreakdown,
 } from '../vo2max/js/workout.js';
+import { MUSCLES } from '../vo2max/js/exercises.js';
 
 function makeWorkout(date, exercises) {
   return { id: date, date, exercises };
@@ -89,4 +90,87 @@ test('volumeSince sums workout volume within the trailing window, inclusive of t
     makeWorkout('2026-08-18', [{ exerciseId: 'squat', sets: [{ weight: 80, reps: 5 }] }]), // today, within window
   ];
   assert.equal(volumeSince(workouts, 7, '2026-08-18'), 60 * 8 + 80 * 5);
+});
+
+// 2026-08-18 is a Tuesday, so its Monday-start week begins 2026-08-17.
+const RANGE_WORKOUTS = [
+  makeWorkout('2026-08-17', [{ exerciseId: 'squat', sets: [{ weight: 80, reps: 5 }] }]), // this week
+  makeWorkout('2026-08-16', [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8 }] }]), // last week, this month
+  makeWorkout('2026-07-31', [{ exerciseId: 'barbell-curl', sets: [{ weight: 20, reps: 10 }] }]), // last month, this year
+  makeWorkout('2025-12-25', [{ exerciseId: 'deadlift', sets: [{ weight: 100, reps: 5 }] }]), // last year
+];
+
+function breakdownFor(range) {
+  const rows = muscleSetBreakdown(RANGE_WORKOUTS, range, '2026-08-18');
+  return Object.fromEntries(rows.map((r) => [r.muscle, r.sets]));
+}
+
+test('muscleSetBreakdown returns every muscle group, MUSCLES order, zero included', () => {
+  const rows = muscleSetBreakdown([], 'all', '2026-08-18');
+  assert.deepEqual(rows.map((r) => r.muscle), MUSCLES);
+  assert.ok(rows.every((r) => r.sets === 0));
+});
+
+test('muscleSetBreakdown "week" only includes workouts from the Monday-start current week', () => {
+  const counts = breakdownFor('week');
+  assert.equal(counts.quads, 1);
+  assert.equal(counts.glutes, 1);
+  assert.equal(counts.chest, 0);
+  assert.equal(counts.biceps, 0);
+  assert.equal(counts.back, 0);
+});
+
+test('muscleSetBreakdown "month" includes the whole current calendar month', () => {
+  const counts = breakdownFor('month');
+  assert.equal(counts.quads, 1);
+  assert.equal(counts.chest, 1);
+  assert.equal(counts.triceps, 1);
+  assert.equal(counts.shoulders, 1);
+  assert.equal(counts.biceps, 0);
+});
+
+test('muscleSetBreakdown "year" includes the whole current calendar year', () => {
+  const counts = breakdownFor('year');
+  assert.equal(counts.quads, 1);
+  assert.equal(counts.chest, 1);
+  assert.equal(counts.biceps, 1);
+  assert.equal(counts.back, 0);
+});
+
+test('muscleSetBreakdown "all" includes every workout regardless of date', () => {
+  const counts = breakdownFor('all');
+  assert.equal(counts.quads, 1);
+  assert.equal(counts.biceps, 1);
+  assert.equal(counts.back, 1);
+  assert.equal(counts.hamstrings, 1);
+  assert.equal(counts.glutes, 2); // squat + deadlift both work glutes
+});
+
+test('muscleSetBreakdown credits every muscle an exercise targets, not just the primary one', () => {
+  const workouts = [makeWorkout('2026-08-18', [
+    { exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8 }] },
+  ])];
+  const counts = Object.fromEntries(
+    muscleSetBreakdown(workouts, 'all', '2026-08-18').map((r) => [r.muscle, r.sets]),
+  );
+  assert.equal(counts.chest, 1);
+  assert.equal(counts.triceps, 1);
+  assert.equal(counts.shoulders, 1);
+});
+
+test('muscleSetBreakdown ignores sets missing both weight and reps', () => {
+  const workouts = [makeWorkout('2026-08-18', [
+    { exerciseId: 'squat', sets: [{ weight: null, reps: null }] },
+  ])];
+  const counts = Object.fromEntries(
+    muscleSetBreakdown(workouts, 'all', '2026-08-18').map((r) => [r.muscle, r.sets]),
+  );
+  assert.equal(counts.quads, 0);
+});
+
+test('muscleSetBreakdown skips exercises no longer in the library rather than crashing', () => {
+  const workouts = [makeWorkout('2026-08-18', [
+    { exerciseId: 'not-a-real-exercise', sets: [{ weight: 10, reps: 10 }] },
+  ])];
+  assert.doesNotThrow(() => muscleSetBreakdown(workouts, 'all', '2026-08-18'));
 });

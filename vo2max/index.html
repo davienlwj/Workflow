@@ -91,6 +91,15 @@
 
     <button type="button" id="startWorkoutBtn" class="primary block">+ Log workout</button>
 
+    <h2 class="section-title">Muscle balance</h2>
+    <div id="muscleScope" class="scopes" role="tablist" aria-label="Muscle balance range">
+      <button type="button" class="scope" role="tab" data-scope="week" aria-selected="true">Week</button>
+      <button type="button" class="scope" role="tab" data-scope="month" aria-selected="false">Month</button>
+      <button type="button" class="scope" role="tab" data-scope="year" aria-selected="false">Year</button>
+      <button type="button" class="scope" role="tab" data-scope="all" aria-selected="false">All</button>
+    </div>
+    <div id="muscleChartWrap" class="chart-wrap"></div>
+
     <h2 class="section-title">Exercises</h2>
     <div id="exerciseSummaryList" class="exercise-summary-list"></div>
     <p id="exerciseSummaryEmpty" class="empty" hidden>No workouts logged yet — the exercises you log will show up here with their progress.</p>

@@ -10,13 +10,15 @@ import {
   daysSinceLastSession, averageIntervalHR, vo2maxSeries,
   mileageBuckets, totalMileage,
 } from './block.js';
-import { vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG } from './chart.js';
+import {
+  vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG, muscleRadarSVG,
+} from './chart.js';
 import { sessionToICS } from './ics.js';
 import { MUSCLES, MUSCLE_LABEL, exerciseById, searchExercises } from './exercises.js';
 import { muscleDiagramHTML } from './muscleDiagram.js';
 import {
   workoutVolume, lastPerformance, personalRecords, exerciseProgress,
-  loggedExerciseIds, daysSinceLastWorkout, volumeSince,
+  loggedExerciseIds, daysSinceLastWorkout, volumeSince, muscleSetBreakdown,
 } from './workout.js';
 import { runIconSVG, dumbbellIconSVG } from './icons.js';
 
@@ -26,6 +28,7 @@ let workouts = loadWorkouts();
 let editingId = null;
 let workoutEditingId = null;
 let mileageScope = 'week';
+let muscleRange = 'week';
 
 const $ = (id) => document.getElementById(id);
 
@@ -991,9 +994,21 @@ function renderWorkoutTab() {
     </div>
   `).join('');
 
+  $('muscleChartWrap').innerHTML = muscleRadarSVG(muscleSetBreakdown(workouts, muscleRange));
+
   renderExerciseSummaries();
   renderWorkoutHistory();
 }
+
+$('muscleScope').addEventListener('click', (e) => {
+  const btn = e.target.closest('.scope');
+  if (!btn) return;
+  muscleRange = btn.dataset.scope;
+  $('muscleScope').querySelectorAll('.scope').forEach((b) => {
+    b.setAttribute('aria-selected', String(b === btn));
+  });
+  $('muscleChartWrap').innerHTML = muscleRadarSVG(muscleSetBreakdown(workouts, muscleRange));
+});
 
 /* --------------------------------------------------------------- ZONES */
 

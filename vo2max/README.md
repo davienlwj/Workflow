@@ -65,13 +65,16 @@ with Dashboard and Calendar as the two places they come together.
   log form — add one after the fact from the edit sheet if your watch
   reports it.
 - **Workout** — the strength detail view: workouts logged, this week's
-  total volume, days since your last workout, a card per exercise you've
-  ever logged (its muscle diagram and current PR — tap through to a detail
-  sheet with best weight, estimated 1RM, times logged, and a
-  weight-over-time progress chart), and the full workout history (tap one
-  to edit or delete it). *+ Log workout* opens a popup: add exercises from a
-  built-in ~50-exercise library (searchable, filterable by muscle group),
-  each showing a front/back muscle diagram with its worked muscles
+  total volume, days since your last workout, a muscle-balance radar chart
+  (sets logged per muscle group, filterable to week/month/year/all — a set
+  counts toward every muscle its exercise targets, not just the primary
+  one), a card per exercise you've ever logged (its muscle diagram and
+  current PR — tap through to a detail sheet with best weight, estimated
+  1RM, times logged, and a weight-over-time progress chart), and the full
+  workout history (tap one to edit or delete it). *+ Log workout* opens a
+  popup: add exercises from a built-in ~50-exercise library (searchable,
+  filterable by muscle group), each showing a front/back muscle diagram
+  with its worked muscles
   highlighted in red, plus a "last time" hint recalled from your most
   recent session with that exercise. Log any number of weight × reps sets
   per exercise.
