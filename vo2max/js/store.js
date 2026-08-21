@@ -8,6 +8,7 @@
 const SETTINGS_KEY = 'vo2max.settings.v1';
 const SESSIONS_KEY = 'vo2max.sessions.v1';
 const WORKOUTS_KEY = 'vo2max.workouts.v1';
+const CUSTOM_EXERCISES_KEY = 'vo2max.customExercises.v1';
 
 export const DEFAULT_SETTINGS = {
   baselineVO2max: 46,
@@ -139,11 +140,41 @@ export function deleteWorkout(id) {
   saveWorkouts(workouts);
 }
 
+/** User-created exercises, layered on top of the built-in library in js/exercises.js. */
+export function loadCustomExercises() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_EXERCISES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomExercises(exercises) {
+  localStorage.setItem(CUSTOM_EXERCISES_KEY, JSON.stringify(exercises));
+}
+
+export function addCustomExercise(exercise) {
+  const exercises = loadCustomExercises();
+  const record = { id: `custom-${makeId()}`, ...exercise };
+  exercises.push(record);
+  saveCustomExercises(exercises);
+  return record;
+}
+
+export function deleteCustomExercise(id) {
+  const exercises = loadCustomExercises().filter((e) => e.id !== id);
+  saveCustomExercises(exercises);
+}
+
 export function exportAll() {
   return JSON.stringify({
     settings: loadSettings(),
     sessions: loadSessions(),
     workouts: loadWorkouts(),
+    customExercises: loadCustomExercises(),
     exportedAt: new Date().toISOString(),
   }, null, 2);
 }
@@ -153,4 +184,5 @@ export function importAll(json) {
   if (data.settings) saveSettings({ ...clone(DEFAULT_SETTINGS), ...data.settings });
   if (Array.isArray(data.sessions)) saveSessions(data.sessions);
   if (Array.isArray(data.workouts)) saveWorkouts(data.workouts);
+  if (Array.isArray(data.customExercises)) saveCustomExercises(data.customExercises);
 }

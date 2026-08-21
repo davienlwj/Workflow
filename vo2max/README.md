@@ -66,21 +66,28 @@ with Dashboard and Calendar as the two places they come together.
   those fields.
 - **Workout** — the strength detail view: workouts logged, this week's
   total volume, days since your last workout, a muscle-balance radar chart
-  (sets logged per muscle group, filterable to week/month/year/all — a set
-  counts toward every muscle its exercise targets, not just the primary
-  one), a card per exercise you've ever logged (its muscle diagram and
-  current PR — tap through to a detail sheet with best weight, estimated
-  1RM, times logged, and a weight-over-time progress chart), and the full
-  workout history (tap one to edit or delete it). *+ Log workout* opens a
-  popup: add exercises from a built-in 100+-exercise library (searchable,
-  filterable by muscle group — 20 groups total: Upper/Mid/Lower Chest,
-  Front/Lateral/Rear Delts, Traps, Lats, Mid/Lower Back, Biceps, Triceps,
-  Forearms, Abs, Core, Side Abs, Quads, Hamstrings, Glutes, Calves), each
-  showing a front/back muscle diagram with its worked muscles highlighted
-  in red (several granular groups share one region's artwork, e.g. all
-  three chest groups highlight the same chest overlay), plus a "last time"
-  hint recalled from your most recent session with that exercise. Log any
-  number of weight × reps sets per exercise.
+  (sets logged, filterable to week/month/year/all, rolled up into 9 general
+  regions — Chest, Back, Shoulders, Arms, Quads, Hamstrings, Glutes, Abs,
+  Core — since the exercise library's 22 body-part groups are too granular
+  to plot as a readable chart), a card per exercise you've ever logged (its
+  muscle diagram and current PR — tap through to a detail sheet with best
+  weight, estimated 1RM, times logged, and a weight-over-time progress
+  chart), and the full workout history (tap one to edit or delete it).
+  *+ Log workout* opens a popup: add exercises from a built-in 100+-exercise
+  library (searchable, filterable by body part — 22 groups: Upper/Mid/Lower
+  Chest, Front/Lateral/Rear Delts, Traps, Lats, Mid/Lower Back, Biceps,
+  Triceps, Forearms, Abs, Core, Side Abs, Quads, Abductors, Adductors,
+  Hamstrings, Glutes, Calves), each showing a front/back muscle diagram with
+  its worked muscles highlighted in red (several granular groups share one
+  region's artwork, e.g. all three chest groups highlight the same chest
+  overlay), plus a "last time" hint recalled from your most recent session
+  with that exercise. Log any number of weight × reps sets per exercise.
+  *+ Create new exercise*, inside the same popup, adds your own: a name, an
+  equipment type (Barbell/Dumbbell/Kettlebell/Cable/Machine/Bodyweight/Band),
+  and any number of body parts it works — it's then searchable and loggable
+  right alongside the built-in library, and deletable from its detail sheet
+  (deleting it only removes the exercise definition; workouts that already
+  used it keep their logged sets).
 - **Settings** — every number above (baseline VO2max, resting/max/threshold
   HR, which zone model is primary, and all of the protocol's
   reps/timing/frequency) is editable here — nothing is hardcoded once you've
@@ -111,11 +118,11 @@ the defaults in this app.
 ```
 index.html                  markup and the four popup sheets (log/edit session, log/edit workout, exercise progress)
 css/style.css               the whole light theme
-js/store.js                 localStorage CRUD for settings, sessions and workouts
+js/store.js                 localStorage CRUD for settings, sessions, workouts and custom exercises
 js/zones.js                 zone tables, computed from settings
 js/block.js                 cardio progress stats — pure functions
 js/workout.js                strength progress stats — PRs, last-performance, volume; pure functions
-js/exercises.js              the built-in exercise library (name, equipment, muscles)
+js/exercises.js              the built-in exercise library (name, equipment, muscles) and the radar chart's muscle-group rollup
 js/muscleDiagram.js          stacks the muscle-diagram image assets for an exercise's muscles
 js/icons.js                  the running-figure / dumbbell pictograms (calendar, recent activity)
 js/chart.js                 dependency-free SVG charts: VO2max trend, mileage bars, exercise progress

@@ -4,7 +4,7 @@ import {
   workoutVolume, lastPerformance, personalRecords, exerciseProgress,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince, muscleSetBreakdown,
 } from '../vo2max/js/workout.js';
-import { MUSCLES } from '../vo2max/js/exercises.js';
+import { RADAR_GROUPS } from '../vo2max/js/exercises.js';
 
 function makeWorkout(date, exercises) {
   return { id: date, date, exercises };
@@ -105,57 +105,59 @@ function breakdownFor(range) {
   return Object.fromEntries(rows.map((r) => [r.muscle, r.sets]));
 }
 
-test('muscleSetBreakdown returns every muscle group, MUSCLES order, zero included', () => {
+test('muscleSetBreakdown returns every radar group, RADAR_GROUPS order, zero included', () => {
   const rows = muscleSetBreakdown([], 'all', '2026-08-18');
-  assert.deepEqual(rows.map((r) => r.muscle), MUSCLES);
+  assert.deepEqual(rows.map((r) => r.muscle), RADAR_GROUPS);
   assert.ok(rows.every((r) => r.sets === 0));
 });
 
 test('muscleSetBreakdown "week" only includes workouts from the Monday-start current week', () => {
   const counts = breakdownFor('week');
-  assert.equal(counts.quads, 1);
+  assert.equal(counts.quads, 1); // squat -> quads, glutes
   assert.equal(counts.glutes, 1);
-  assert.equal(counts['mid-chest'], 0);
-  assert.equal(counts.biceps, 0);
-  assert.equal(counts['lower-back'], 0);
+  assert.equal(counts.chest, 0);
+  assert.equal(counts.arms, 0);
+  assert.equal(counts.back, 0);
 });
 
 test('muscleSetBreakdown "month" includes the whole current calendar month', () => {
   const counts = breakdownFor('month');
-  assert.equal(counts.quads, 1);
-  assert.equal(counts['mid-chest'], 1);
-  assert.equal(counts.triceps, 1);
-  assert.equal(counts['front-delts'], 1);
-  assert.equal(counts.biceps, 0);
+  assert.equal(counts.quads, 1); // squat
+  // bench-press -> mid-chest/triceps/front-delts, rolled up into chest/arms/shoulders
+  assert.equal(counts.chest, 1);
+  assert.equal(counts.arms, 1);
+  assert.equal(counts.shoulders, 1);
+  assert.equal(counts.back, 0); // deadlift (last year) and barbell-curl (last month) excluded
 });
 
 test('muscleSetBreakdown "year" includes the whole current calendar year', () => {
   const counts = breakdownFor('year');
   assert.equal(counts.quads, 1);
-  assert.equal(counts['mid-chest'], 1);
-  assert.equal(counts.biceps, 1);
-  assert.equal(counts['lower-back'], 0);
+  assert.equal(counts.chest, 1);
+  // arms now gets bench-press's triceps AND barbell-curl's biceps (both this year)
+  assert.equal(counts.arms, 2);
+  assert.equal(counts.back, 0); // deadlift is last year, still excluded
 });
 
 test('muscleSetBreakdown "all" includes every workout regardless of date', () => {
   const counts = breakdownFor('all');
   assert.equal(counts.quads, 1);
-  assert.equal(counts.biceps, 1);
-  assert.equal(counts['lower-back'], 1);
-  assert.equal(counts.hamstrings, 1);
+  assert.equal(counts.arms, 2);
+  assert.equal(counts.back, 1); // deadlift -> lower-back
+  assert.equal(counts.hamstrings, 1); // deadlift
   assert.equal(counts.glutes, 2); // squat + deadlift both work glutes
 });
 
-test('muscleSetBreakdown credits every muscle an exercise targets, not just the primary one', () => {
+test('muscleSetBreakdown credits every radar group an exercise\'s muscles roll up into, not just the primary one', () => {
   const workouts = [makeWorkout('2026-08-18', [
     { exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8 }] },
   ])];
   const counts = Object.fromEntries(
     muscleSetBreakdown(workouts, 'all', '2026-08-18').map((r) => [r.muscle, r.sets]),
   );
-  assert.equal(counts['mid-chest'], 1);
-  assert.equal(counts.triceps, 1);
-  assert.equal(counts['front-delts'], 1);
+  assert.equal(counts.chest, 1); // mid-chest
+  assert.equal(counts.arms, 1); // triceps
+  assert.equal(counts.shoulders, 1); // front-delts
 });
 
 test('muscleSetBreakdown ignores sets missing both weight and reps', () => {

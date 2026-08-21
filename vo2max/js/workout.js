@@ -4,7 +4,9 @@
  */
 
 import { todayIso } from './block.js';
-import { MUSCLES, exerciseById } from './exercises.js';
+import {
+  EXERCISES, RADAR_GROUPS, RADAR_GROUP_FOR, exerciseById,
+} from './exercises.js';
 
 const DAY_MS = 86400000;
 const toDate = (iso) => new Date(`${iso}T00:00:00`);
@@ -118,25 +120,34 @@ function rangeStart(range, now) {
 }
 
 /**
- * Sets logged per muscle group within `range` ('week'|'month'|'year'|'all'),
- * for the muscle-balance chart. A set is counted once for every muscle its
- * exercise targets (an exercise's `muscles` list may have several), so the
- * totals reflect how a compound lift like a bench press credits chest,
- * triceps and shoulders alike rather than only its primary muscle.
- * Returns one entry per MUSCLES id, zero included, in MUSCLES order.
+ * Sets logged per general body region within `range`
+ * ('week'|'month'|'year'|'all'), for the muscle-balance radar chart. Each
+ * exercise's fine-grained muscles (see exercises.js's MUSCLES) roll up into
+ * one of RADAR_GROUPS via RADAR_GROUP_FOR - a chart with 22 spokes isn't
+ * readable, so this deliberately trades granularity for a chart that is. A
+ * set is counted once for every group its exercise reaches (an exercise's
+ * `muscles` list may span several), so a compound lift like a bench press
+ * credits chest, arms and shoulders alike rather than only its primary
+ * muscle. Returns one entry per RADAR_GROUPS id, zero included, in order.
+ * @param {typeof EXERCISES} [exercises] defaults to the built-in library;
+ *   pass a list that also includes the user's custom exercises to credit
+ *   sets logged against those too.
  */
-export function muscleSetBreakdown(workouts, range, now = todayIso()) {
+export function muscleSetBreakdown(workouts, range, now = todayIso(), exercises = EXERCISES) {
   const start = rangeStart(range, now);
-  const counts = new Map(MUSCLES.map((m) => [m, 0]));
+  const counts = new Map(RADAR_GROUPS.map((g) => [g, 0]));
   for (const w of workouts) {
     if (start && toDate(w.date) < start) continue;
     for (const ex of w.exercises || []) {
-      const def = exerciseById(ex.exerciseId);
+      const def = exerciseById(ex.exerciseId, exercises);
       if (!def) continue;
       const setCount = (ex.sets || []).filter((s) => s.weight != null || s.reps != null).length;
       if (!setCount) continue;
-      for (const m of def.muscles) counts.set(m, (counts.get(m) || 0) + setCount);
+      for (const m of def.muscles) {
+        const group = RADAR_GROUP_FOR[m];
+        if (group) counts.set(group, (counts.get(group) || 0) + setCount);
+      }
     }
   }
-  return MUSCLES.map((muscle) => ({ muscle, sets: counts.get(muscle) }));
+  return RADAR_GROUPS.map((muscle) => ({ muscle, sets: counts.get(muscle) }));
 }

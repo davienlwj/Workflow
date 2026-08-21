@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { vo2maxTrendSVG, mileageBarChartSVG, muscleRadarSVG } from '../vo2max/js/chart.js';
-import { MUSCLES } from '../vo2max/js/exercises.js';
+import { RADAR_GROUPS } from '../vo2max/js/exercises.js';
 
 test('vo2maxTrendSVG shows the empty state when there are no points', () => {
   assert.match(vo2maxTrendSVG([]), /No VO2max readings logged yet/);
@@ -41,7 +41,7 @@ test('mileageBarChartSVG draws one bar per bucket, labeled with its km and perio
 });
 
 function breakdown(overrides) {
-  return MUSCLES.map((muscle) => ({ muscle, sets: overrides[muscle] || 0 }));
+  return RADAR_GROUPS.map((muscle) => ({ muscle, sets: overrides[muscle] || 0 }));
 }
 
 test('muscleRadarSVG shows the empty state when every muscle has zero sets', () => {
@@ -49,28 +49,28 @@ test('muscleRadarSVG shows the empty state when every muscle has zero sets', () 
   assert.match(svg, /No sets logged for this range yet/);
 });
 
-test('muscleRadarSVG draws one vertex dot and label per muscle group when there is data', () => {
-  const svg = muscleRadarSVG(breakdown({ 'mid-chest': 3, lats: 2 }));
-  assert.equal((svg.match(/class="chart-dot"/g) || []).length, MUSCLES.length);
-  assert.match(svg, />Mid Chest</);
-  assert.match(svg, />Lats</);
-  assert.match(svg, /Mid Chest: 3 sets/);
-  assert.match(svg, /Lats: 2 sets/);
+test('muscleRadarSVG draws one vertex dot and label per radar group when there is data', () => {
+  const svg = muscleRadarSVG(breakdown({ chest: 3, back: 2 }));
+  assert.equal((svg.match(/class="chart-dot"/g) || []).length, RADAR_GROUPS.length);
+  assert.match(svg, />Chest</);
+  assert.match(svg, />Back</);
+  assert.match(svg, /Chest: 3 sets/);
+  assert.match(svg, /Back: 2 sets/);
 });
 
 test('muscleRadarSVG pluralizes the tooltip correctly for exactly one set', () => {
-  const svg = muscleRadarSVG(breakdown({ 'mid-chest': 1 }));
-  assert.match(svg, /Mid Chest: 1 set</);
-  assert.doesNotMatch(svg, /Mid Chest: 1 sets/);
+  const svg = muscleRadarSVG(breakdown({ chest: 1 }));
+  assert.match(svg, /Chest: 1 set</);
+  assert.doesNotMatch(svg, /Chest: 1 sets/);
 });
 
 test('muscleRadarSVG closes the data polygon back to its starting point', () => {
-  const svg = muscleRadarSVG(breakdown({ 'mid-chest': 3, biceps: 1 }));
+  const svg = muscleRadarSVG(breakdown({ chest: 3, arms: 1 }));
   assert.match(svg, /d="M[^"]*Z"[^>]*class="chart-radar-fill"/);
 });
 
 test('muscleRadarSVG labels each muscle with its share of total sets logged', () => {
-  const svg = muscleRadarSVG(breakdown({ 'mid-chest': 3, biceps: 1 })); // 4 total: 75% / 25%
+  const svg = muscleRadarSVG(breakdown({ chest: 3, arms: 1 })); // 4 total: 75% / 25%
   assert.match(svg, /class="chart-radar-pct">75%<\/tspan>/);
   assert.match(svg, /class="chart-radar-pct">25%<\/tspan>/);
   // Untouched muscles still get a 0% line rather than being left blank.

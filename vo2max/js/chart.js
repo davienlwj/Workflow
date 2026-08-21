@@ -3,7 +3,7 @@
  * Renders a string of SVG markup; the caller drops it into innerHTML.
  */
 
-import { MUSCLE_LABEL } from './exercises.js';
+import { RADAR_GROUP_LABEL } from './exercises.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const W = 320;
@@ -192,7 +192,7 @@ export function muscleRadarSVG(breakdown) {
   const dots = breakdown.map((b, i) => {
     const [x, y] = dataPts[i];
     return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" class="chart-dot">
-      <title>${MUSCLE_LABEL[b.muscle]}: ${b.sets} set${b.sets === 1 ? '' : 's'}</title>
+      <title>${RADAR_GROUP_LABEL[b.muscle]}: ${b.sets} set${b.sets === 1 ? '' : 's'}</title>
     </circle>`;
   }).join('');
 
@@ -205,7 +205,7 @@ export function muscleRadarSVG(breakdown) {
     const anchor = cos > 0.3 ? 'start' : cos < -0.3 ? 'end' : 'middle';
     const pct = totalSets ? Math.round((b.sets / totalSets) * 100) : 0;
     return `<text text-anchor="${anchor}" class="chart-radar-label">
-      <tspan x="${x.toFixed(1)}" y="${(y - 4).toFixed(1)}">${MUSCLE_LABEL[b.muscle]}</tspan>
+      <tspan x="${x.toFixed(1)}" y="${(y - 4).toFixed(1)}">${RADAR_GROUP_LABEL[b.muscle]}</tspan>
       <tspan x="${x.toFixed(1)}" y="${(y + 7).toFixed(1)}" class="chart-radar-pct">${pct}%</tspan>
     </text>`;
   }).join('');

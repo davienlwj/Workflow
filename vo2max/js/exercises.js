@@ -10,7 +10,7 @@ export const MUSCLES = [
   'traps', 'lats', 'mid-back', 'lower-back',
   'biceps', 'triceps', 'forearms',
   'abs', 'core', 'side-abs',
-  'quads', 'hamstrings', 'glutes', 'calves',
+  'quads', 'abductors', 'adductors', 'hamstrings', 'glutes', 'calves',
 ];
 
 export const MUSCLE_LABEL = {
@@ -31,9 +31,57 @@ export const MUSCLE_LABEL = {
   core: 'Core',
   'side-abs': 'Side Abs',
   quads: 'Quads',
+  abductors: 'Abductors',
+  adductors: 'Adductors',
   hamstrings: 'Hamstrings',
   glutes: 'Glutes',
   calves: 'Calves',
+};
+
+/** Equipment options offered when logging or creating an exercise. */
+export const EQUIPMENT = ['Barbell', 'Dumbbell', 'Kettlebell', 'Cable', 'Machine', 'Bodyweight', 'Band'];
+
+// The muscle-balance radar chart reads MUSCLES' 22 groups as too granular
+// to plot as a chart (see muscleSetBreakdown in workout.js) - it collapses
+// them into these 9 general regions instead.
+export const RADAR_GROUPS = ['chest', 'back', 'shoulders', 'arms', 'quads', 'hamstrings', 'glutes', 'abs', 'core'];
+
+export const RADAR_GROUP_LABEL = {
+  chest: 'Chest',
+  back: 'Back',
+  shoulders: 'Shoulders',
+  arms: 'Arms',
+  quads: 'Quads',
+  hamstrings: 'Hamstrings',
+  glutes: 'Glutes',
+  abs: 'Abs',
+  core: 'Core',
+};
+
+/** Which radar group each of MUSCLES' finer-grained ids rolls up into. */
+export const RADAR_GROUP_FOR = {
+  'upper-chest': 'chest',
+  'mid-chest': 'chest',
+  'lower-chest': 'chest',
+  'front-delts': 'shoulders',
+  'lateral-delts': 'shoulders',
+  'rear-delts': 'shoulders',
+  traps: 'back',
+  lats: 'back',
+  'mid-back': 'back',
+  'lower-back': 'back',
+  biceps: 'arms',
+  triceps: 'arms',
+  forearms: 'arms',
+  abs: 'abs',
+  core: 'core',
+  'side-abs': 'abs',
+  quads: 'quads',
+  abductors: 'glutes',
+  adductors: 'quads',
+  hamstrings: 'hamstrings',
+  glutes: 'glutes',
+  calves: 'quads',
 };
 
 export const EXERCISES = [
@@ -168,6 +216,22 @@ export const EXERCISES = [
   { id: 'lunge', name: 'Lunge', equipment: 'Dumbbell', muscles: ['quads', 'glutes'] },
   { id: 'bulgarian-split-squat', name: 'Bulgarian Split Squat', equipment: 'Dumbbell', muscles: ['quads', 'glutes'] },
 
+  // Abductors
+  { id: 'machine-hip-abduction', name: 'Machine Hip Abduction', equipment: 'Machine', muscles: ['abductors'] },
+  { id: 'cable-hip-abduction', name: 'Cable Hip Abduction', equipment: 'Cable', muscles: ['abductors'] },
+  { id: 'side-lying-hip-abduction', name: 'Side-Lying Hip Abduction', equipment: 'Bodyweight', muscles: ['abductors'] },
+  { id: 'banded-hip-abduction', name: 'Banded Hip Abduction', equipment: 'Band', muscles: ['abductors'] },
+  { id: 'lateral-band-walk', name: 'Lateral Band Walk', equipment: 'Band', muscles: ['abductors', 'glutes'] },
+  { id: 'fire-hydrant', name: 'Fire Hydrant', equipment: 'Bodyweight', muscles: ['abductors', 'glutes'] },
+
+  // Adductors
+  { id: 'machine-hip-adduction', name: 'Machine Hip Adduction', equipment: 'Machine', muscles: ['adductors'] },
+  { id: 'cable-hip-adduction', name: 'Cable Hip Adduction', equipment: 'Cable', muscles: ['adductors'] },
+  { id: 'sumo-squat', name: 'Sumo Squat', equipment: 'Barbell', muscles: ['adductors', 'quads', 'glutes'] },
+  { id: 'side-lunge', name: 'Side Lunge', equipment: 'Dumbbell', muscles: ['adductors', 'quads', 'glutes'] },
+  { id: 'copenhagen-plank', name: 'Copenhagen Plank', equipment: 'Bodyweight', muscles: ['adductors', 'core'] },
+  { id: 'banded-adductor-squeeze', name: 'Banded Adductor Squeeze', equipment: 'Band', muscles: ['adductors'] },
+
   // Hamstrings
   { id: 'romanian-deadlift', name: 'Romanian Deadlift', equipment: 'Barbell', muscles: ['hamstrings', 'glutes'] },
   { id: 'leg-curl', name: 'Leg Curl', equipment: 'Machine', muscles: ['hamstrings'] },
@@ -183,14 +247,18 @@ export const EXERCISES = [
   { id: 'seated-calf-raise', name: 'Seated Calf Raise', equipment: 'Machine', muscles: ['calves'] },
 ];
 
-export function exerciseById(id) {
-  return EXERCISES.find((e) => e.id === id) ?? null;
+/** @param {typeof EXERCISES} [list] defaults to the built-in library; pass a
+ *   list that also includes the user's custom exercises to search those too. */
+export function exerciseById(id, list = EXERCISES) {
+  return list.find((e) => e.id === id) ?? null;
 }
 
-/** Case-insensitive name search, optionally narrowed to one muscle group. */
-export function searchExercises(query, muscle) {
+/** Case-insensitive name search, optionally narrowed to one muscle group.
+ * @param {typeof EXERCISES} [list] defaults to the built-in library; pass a
+ *   list that also includes the user's custom exercises to search those too. */
+export function searchExercises(query, muscle, list = EXERCISES) {
   const q = (query || '').trim().toLowerCase();
-  return EXERCISES.filter((e) => {
+  return list.filter((e) => {
     if (muscle && !e.muscles.includes(muscle)) return false;
     return !q || e.name.toLowerCase().includes(q);
   });

@@ -371,6 +371,27 @@
     <div id="woPicker" class="wo-picker" hidden>
       <input id="woPickerSearch" type="text" class="wo-picker-search" placeholder="Search exercises…">
       <div id="woPickerChips" class="wo-picker-chips"></div>
+      <button type="button" id="woNewExerciseBtn" class="ghost-btn block">+ Create new exercise</button>
+
+      <div id="woNewExerciseForm" class="wo-new-exercise" hidden>
+        <label class="field">
+          <span>Exercise name</span>
+          <input id="newExName" type="text" placeholder="e.g. Cable Hip Abduction">
+        </label>
+        <label class="field">
+          <span>Equipment</span>
+          <select id="newExEquipment"></select>
+        </label>
+        <label class="field">
+          <span>Body part(s) <em>(tap all that apply)</em></span>
+          <div id="newExMuscles" class="wo-picker-chips"></div>
+        </label>
+        <div class="actions">
+          <button type="button" id="newExCancel" class="ghost-btn">Cancel</button>
+          <button type="button" id="newExSave" class="primary">Save exercise</button>
+        </div>
+      </div>
+
       <div id="woPickerResults" class="wo-picker-results"></div>
     </div>
     <button type="button" id="woAddExercise" class="ghost-btn block">+ Add exercise</button>
@@ -398,6 +419,7 @@
   <h3 class="section-title">Progress</h3>
   <div id="exDetailChart" class="chart-wrap"></div>
   <div class="actions">
+    <button type="button" id="exDetailDeleteCustom" class="danger-btn" hidden>Delete exercise</button>
     <button type="button" id="exDetailClose" class="ghost-btn block">Close</button>
   </div>
 </section>

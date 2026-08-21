@@ -30,6 +30,10 @@ export const MUSCLE_META = {
   core: { asset: 'abs', views: ['front'] },
   'side-abs': { asset: 'abs', views: ['front'] },
   quads: { asset: 'quads', views: ['front'] },
+  // No dedicated inner/outer-thigh artwork exists, so both reuse the quads
+  // overlay (the closest region visually) rather than showing nothing.
+  abductors: { asset: 'quads', views: ['front'] },
+  adductors: { asset: 'quads', views: ['front'] },
   hamstrings: { asset: 'hamstrings', views: ['back'] },
   glutes: { asset: 'glutes', views: ['back'] },
   calves: { asset: 'calves', views: ['back'] },

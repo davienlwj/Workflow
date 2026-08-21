@@ -2,6 +2,7 @@ import {
   loadSettings, saveSettings, resetSettings,
   loadSessions, addSession, updateSession, deleteSession,
   loadWorkouts, addWorkout, updateWorkout, deleteWorkout,
+  loadCustomExercises, addCustomExercise, deleteCustomExercise,
   exportAll, importAll,
 } from './store.js';
 import { lthrZoneTable, rhrZoneTable, targetZone } from './zones.js';
@@ -14,7 +15,9 @@ import {
   vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG, muscleRadarSVG,
 } from './chart.js';
 import { sessionToICS } from './ics.js';
-import { MUSCLES, MUSCLE_LABEL, exerciseById, searchExercises } from './exercises.js';
+import {
+  EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, exerciseById, searchExercises,
+} from './exercises.js';
 import { muscleDiagramHTML } from './muscleDiagram.js';
 import {
   workoutVolume, lastPerformance, personalRecords, exerciseProgress,
@@ -25,12 +28,24 @@ import { runIconSVG, dumbbellIconSVG } from './icons.js';
 let settings = loadSettings();
 let sessions = loadSessions();
 let workouts = loadWorkouts();
+let customExercises = loadCustomExercises();
 let editingId = null;
 let workoutEditingId = null;
+let exerciseSheetId = null;
 let mileageScope = 'week';
 let muscleRange = 'week';
 
 const $ = (id) => document.getElementById(id);
+
+/** The built-in library plus the user's own custom exercises, for lookups
+ *  and search — a workout can reference either. */
+function allExercises() {
+  return [...EXERCISES, ...customExercises];
+}
+
+function findExercise(id) {
+  return exerciseById(id, allExercises());
+}
 
 /* ------------------------------------------------------------- tab views */
 
@@ -615,7 +630,7 @@ function setRowHTML(index, set = {}) {
 }
 
 function exerciseBlockHTML(exerciseId, sets) {
-  const ex = exerciseById(exerciseId);
+  const ex = findExercise(exerciseId);
   if (!ex) return '';
   const last = lastPerformance(workouts, exerciseId);
   const lastText = last
@@ -652,7 +667,7 @@ function renderWoPickerChips() {
 function renderWoPickerResults() {
   const q = $('woPickerSearch').value;
   const muscle = $('woPickerChips').querySelector('.chip.active')?.dataset.muscle || '';
-  const results = searchExercises(q, muscle);
+  const results = searchExercises(q, muscle, allExercises());
   $('woPickerResults').innerHTML = results.length
     ? results.map((e) => `
       <button type="button" class="wo-picker-result" data-id="${e.id}">
@@ -663,6 +678,55 @@ function renderWoPickerResults() {
     : '<p class="empty">No matching exercises.</p>';
 }
 
+/* ---------------------------------------------------- create new exercise */
+
+function renderNewExMuscleChips() {
+  $('newExMuscles').innerHTML = MUSCLES.map((m) => `<button type="button" class="chip" data-muscle="${m}">${MUSCLE_LABEL[m]}</button>`).join('');
+}
+
+function resetNewExerciseForm() {
+  $('newExName').value = '';
+  $('newExEquipment').innerHTML = EQUIPMENT.map((eq) => `<option value="${eq}">${eq}</option>`).join('');
+  renderNewExMuscleChips();
+}
+
+function openNewExerciseForm() {
+  resetNewExerciseForm();
+  $('woNewExerciseForm').hidden = false;
+  $('woPickerResults').hidden = true;
+  $('newExName').focus();
+}
+
+function closeNewExerciseForm() {
+  $('woNewExerciseForm').hidden = true;
+  $('woPickerResults').hidden = false;
+}
+
+$('woNewExerciseBtn').addEventListener('click', openNewExerciseForm);
+$('newExCancel').addEventListener('click', closeNewExerciseForm);
+
+// Multi-select: unlike the filter chips above (only one active at a time),
+// each tap here toggles just that one chip, since an exercise can work
+// several body parts at once.
+$('newExMuscles').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  chip.classList.toggle('active');
+});
+
+$('newExSave').addEventListener('click', () => {
+  const name = $('newExName').value.trim();
+  const equipment = $('newExEquipment').value;
+  const muscles = [...$('newExMuscles').querySelectorAll('.chip.active')].map((c) => c.dataset.muscle);
+  if (!name) { toast('Enter an exercise name'); return; }
+  if (muscles.length === 0) { toast('Pick at least one body part'); return; }
+  addCustomExercise({ name, equipment, muscles });
+  customExercises = loadCustomExercises();
+  closeNewExerciseForm();
+  renderWoPickerResults();
+  toast('Exercise added');
+});
+
 $('woAddExercise').addEventListener('click', () => {
   const opening = $('woPicker').hidden;
   $('woPicker').hidden = !opening;
@@ -670,6 +734,7 @@ $('woAddExercise').addEventListener('click', () => {
     $('woPickerSearch').value = '';
     renderWoPickerChips();
     renderWoPickerResults();
+    closeNewExerciseForm();
     $('woPickerSearch').focus();
   }
 });
@@ -804,8 +869,12 @@ $('woDelete').addEventListener('click', () => {
 });
 
 function openExerciseSheet(exerciseId) {
-  const ex = exerciseById(exerciseId);
+  const ex = findExercise(exerciseId);
   if (!ex) return;
+  exerciseSheetId = exerciseId;
+  // Not in the built-in static library (checked with no custom exercises
+  // mixed in) means the user created it themselves, and can delete it.
+  $('exDetailDeleteCustom').hidden = Boolean(exerciseById(exerciseId));
   const pr = personalRecords(workouts, exerciseId);
   $('exDetailName').textContent = ex.name;
   $('exDetailMeta').textContent = exerciseMetaText(ex);
@@ -827,17 +896,28 @@ function openExerciseSheet(exerciseId) {
 }
 
 function closeExerciseSheet() {
+  exerciseSheetId = null;
   $('scrim').hidden = true;
   $('exerciseSheet').hidden = true;
 }
 
 $('exDetailClose').addEventListener('click', closeExerciseSheet);
 
+$('exDetailDeleteCustom').addEventListener('click', () => {
+  if (!exerciseSheetId) return;
+  if (!confirm('Delete this custom exercise? Past workouts that used it will keep their logged sets but no longer show its name.')) return;
+  deleteCustomExercise(exerciseSheetId);
+  customExercises = loadCustomExercises();
+  closeExerciseSheet();
+  renderWorkoutTab();
+  toast('Exercise deleted');
+});
+
 function renderExerciseSummaries() {
   const ids = loggedExerciseIds(workouts);
   $('exerciseSummaryEmpty').hidden = ids.length > 0;
   $('exerciseSummaryList').innerHTML = ids.map((id) => {
-    const ex = exerciseById(id);
+    const ex = findExercise(id);
     if (!ex) return '';
     const pr = personalRecords(workouts, id);
     return `
@@ -901,7 +981,7 @@ function renderWorkoutTab() {
     </div>
   `).join('');
 
-  $('muscleChartWrap').innerHTML = muscleRadarSVG(muscleSetBreakdown(workouts, muscleRange));
+  $('muscleChartWrap').innerHTML = muscleRadarSVG(muscleSetBreakdown(workouts, muscleRange, todayIso(), allExercises()));
 
   renderExerciseSummaries();
   renderWorkoutHistory();
@@ -914,7 +994,7 @@ $('muscleScope').addEventListener('click', (e) => {
   $('muscleScope').querySelectorAll('.scope').forEach((b) => {
     b.setAttribute('aria-selected', String(b === btn));
   });
-  $('muscleChartWrap').innerHTML = muscleRadarSVG(muscleSetBreakdown(workouts, muscleRange));
+  $('muscleChartWrap').innerHTML = muscleRadarSVG(muscleSetBreakdown(workouts, muscleRange, todayIso(), allExercises()));
 });
 
 /* --------------------------------------------------------------- ZONES */
@@ -1012,6 +1092,7 @@ $('sFile').addEventListener('change', async () => {
     settings = loadSettings();
     sessions = loadSessions();
     workouts = loadWorkouts();
+    customExercises = loadCustomExercises();
     renderAll();
     clearSaved($('settingsSaveBtn'));
     toast('Data imported');

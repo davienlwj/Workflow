@@ -902,3 +902,13 @@ button { font-family: var(--font-mono); }
 }
 
 .wo-picker-result-meta { font-size: 11px; color: var(--dimmer); flex-shrink: 0; }
+.wo-picker-results[hidden] { display: none; }
+
+.wo-new-exercise {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.wo-new-exercise[hidden] { display: none; }
