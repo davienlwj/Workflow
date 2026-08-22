@@ -75,6 +75,12 @@ function findExercise(id) {
   return exerciseById(id, allExercises());
 }
 
+/** True for an exercise the user created themselves (via "+ Create new
+ *  exercise") rather than one from the built-in static library. */
+function isCustomExercise(id) {
+  return !exerciseById(id);
+}
+
 /** The user's bodyweight from Settings > Profile, or null if not set yet -
  *  added into the load for Bodyweight-equipment exercises (dips, pull-ups)
  *  when computing volume/PRs/progress. */
@@ -1691,11 +1697,12 @@ function openExerciseSheet(exerciseId) {
   if (!ex) return;
   exerciseSheetId = exerciseId;
   exDetailBrand = '';
-  // Not in the built-in static library (checked with no custom exercises
-  // mixed in) means the user created it themselves, and can edit/delete it.
-  const isCustom = !exerciseById(exerciseId);
+  // Not in the built-in static library means the user created it
+  // themselves, and can edit/delete it.
+  const isCustom = isCustomExercise(exerciseId);
   $('exDetailEditCustom').hidden = !isCustom;
   $('exDetailDeleteCustom').hidden = !isCustom;
+  $('exDetailCustomBadge').hidden = !isCustom;
   closeExEditForm();
   $('exDetailName').textContent = ex.name;
   $('exDetailMeta').textContent = exerciseMetaText(ex);
@@ -1780,7 +1787,7 @@ $('exDetailDeleteCustom').addEventListener('click', () => {
 });
 
 function renderExerciseFilterOptions() {
-  const options = ['<option value="">All body parts</option>']
+  const options = ['<option value="">All body parts</option>', '<option value="custom">Custom</option>']
     .concat(MUSCLES.map((m) => `<option value="${m}">${MUSCLE_LABEL[m]}</option>`));
   $('exerciseFilterMuscle').innerHTML = options.join('');
   $('exerciseFilterMuscle').value = exerciseFilterMuscle;
@@ -1791,26 +1798,36 @@ function renderExerciseFilterOptions() {
  *  always been); typing a search widens the pool to the whole library
  *  (built-in + custom) so you can look up and open an exercise you haven't
  *  done yet - its card just shows "No sets logged yet" like a fresh custom
- *  exercise would. */
+ *  exercise would. `exerciseFilterMuscle` doubles as a body-part filter and
+ *  a special "custom" filter (own exercises only) - not a real muscle id,
+ *  so it's stripped out before being passed to the muscle-matching helpers
+ *  and applied as its own pass afterwards. */
 function renderExerciseSummaries() {
   renderExerciseFilterOptions();
   const q = exerciseSearchQuery.trim();
-  const ids = q
-    ? searchExercises(q, exerciseFilterMuscle, allExercises()).map((e) => e.id)
+  const customOnly = exerciseFilterMuscle === 'custom';
+  const muscle = customOnly ? '' : exerciseFilterMuscle;
+  let ids = q
+    ? searchExercises(q, muscle, allExercises()).map((e) => e.id)
     : loggedExerciseIds(workouts).filter((id) => {
       const ex = findExercise(id);
       if (!ex) return false;
-      if (exerciseFilterMuscle && !ex.muscles.includes(exerciseFilterMuscle)) return false;
+      if (muscle && !ex.muscles.includes(muscle)) return false;
       return true;
     });
+  if (customOnly) ids = ids.filter(isCustomExercise);
   $('exerciseSummaryEmpty').hidden = ids.length > 0;
   $('exerciseSummaryEmpty').textContent = !exerciseFilterMuscle && !q
     ? 'No workouts logged yet — the exercises you log will show up here with their progress.'
-    : exerciseFilterMuscle && q
-      ? 'No exercises match this body part and search.'
-      : exerciseFilterMuscle
-        ? 'No logged exercises work this body part yet.'
-        : 'No exercises match your search.';
+    : customOnly && q
+      ? 'No custom exercises match your search.'
+      : customOnly
+        ? 'No logged custom exercises yet.'
+        : exerciseFilterMuscle && q
+          ? 'No exercises match this body part and search.'
+          : exerciseFilterMuscle
+            ? 'No logged exercises work this body part yet.'
+            : 'No exercises match your search.';
   $('exerciseSummaryList').innerHTML = ids.map((id) => {
     const ex = findExercise(id);
     if (!ex) return '';
@@ -1819,7 +1836,10 @@ function renderExerciseSummaries() {
       <button type="button" class="exercise-summary-card" data-id="${id}">
         ${muscleDiagramHTML(ex.muscles)}
         <div class="exercise-summary-info">
-          <div class="exercise-summary-name">${escapeHTML(ex.name)}</div>
+          <div class="exercise-summary-name-row">
+            <div class="exercise-summary-name">${escapeHTML(ex.name)}</div>
+            ${isCustomExercise(id) ? '<span class="badge">Custom</span>' : ''}
+          </div>
           <div class="exercise-summary-meta">${escapeHTML(exerciseMetaText(ex))}</div>
           <div class="exercise-summary-pr mono">${pr ? `PR ${pr.maxWeight}kg` : 'No sets logged yet'}</div>
         </div>

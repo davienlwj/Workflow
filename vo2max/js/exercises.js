@@ -110,6 +110,7 @@ export const EXERCISES = [
 
   // Lower chest
   { id: 'dip', name: 'Dip', equipment: 'Bodyweight', muscles: ['lower-chest', 'triceps'] },
+  { id: 'assisted-chest-dip', name: 'Assisted Chest Dip', equipment: 'Machine', muscles: ['lower-chest', 'triceps'] },
   { id: 'decline-bench-press', name: 'Decline Bench Press', equipment: 'Barbell', muscles: ['lower-chest', 'triceps'] },
   { id: 'decline-dumbbell-press', name: 'Decline Dumbbell Press', equipment: 'Dumbbell', muscles: ['lower-chest', 'triceps'] },
   { id: 'high-to-low-cable-fly', name: 'High-to-Low Cable Fly', equipment: 'Cable', muscles: ['lower-chest'] },
@@ -144,6 +145,8 @@ export const EXERCISES = [
   // Lats
   { id: 'pull-up', name: 'Pull-up', equipment: 'Bodyweight', muscles: ['lats', 'biceps'] },
   { id: 'chin-up', name: 'Chin-up', equipment: 'Bodyweight', muscles: ['lats', 'biceps'] },
+  { id: 'assisted-pull-up-wide-grip', name: 'Assisted Pull Up (Wide Grip)', equipment: 'Machine', muscles: ['lats', 'biceps'] },
+  { id: 'assisted-pull-up-neutral-grip', name: 'Assisted Pull Up (Neutral Grip)', equipment: 'Machine', muscles: ['lats', 'biceps'] },
   { id: 'lat-pulldown', name: 'Lat Pulldown', equipment: 'Cable', muscles: ['lats', 'biceps'] },
   { id: 'wide-grip-lat-pulldown', name: 'Wide-Grip Lat Pulldown', equipment: 'Cable', muscles: ['lats', 'biceps'] },
   { id: 'straight-arm-pulldown', name: 'Straight-Arm Pulldown', equipment: 'Cable', muscles: ['lats'] },
@@ -179,6 +182,7 @@ export const EXERCISES = [
   { id: 'overhead-tricep-extension', name: 'Overhead Tricep Extension', equipment: 'Dumbbell', muscles: ['triceps'] },
   { id: 'close-grip-bench-press', name: 'Close-Grip Bench Press', equipment: 'Barbell', muscles: ['triceps', 'mid-chest'] },
   { id: 'bench-dip', name: 'Bench Dip', equipment: 'Bodyweight', muscles: ['triceps'] },
+  { id: 'assisted-tricep-dip', name: 'Assisted Tricep Dip', equipment: 'Machine', muscles: ['triceps'] },
   { id: 'cable-overhead-tricep-extension', name: 'Cable Overhead Tricep Extension', equipment: 'Cable', muscles: ['triceps'] },
   { id: 'tricep-kickback', name: 'Tricep Kickback', equipment: 'Dumbbell', muscles: ['triceps'] },
   { id: 'diamond-push-up', name: 'Diamond Push-up', equipment: 'Bodyweight', muscles: ['triceps', 'mid-chest'] },

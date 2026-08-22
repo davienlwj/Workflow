@@ -25,6 +25,22 @@ test('every muscle group has at least one exercise', () => {
   }
 });
 
+test('the assisted pull-up/dip variants are in the built-in library as Machine equipment', () => {
+  const expected = {
+    'assisted-pull-up-wide-grip': { name: 'Assisted Pull Up (Wide Grip)', muscles: ['lats', 'biceps'] },
+    'assisted-pull-up-neutral-grip': { name: 'Assisted Pull Up (Neutral Grip)', muscles: ['lats', 'biceps'] },
+    'assisted-chest-dip': { name: 'Assisted Chest Dip', muscles: ['lower-chest', 'triceps'] },
+    'assisted-tricep-dip': { name: 'Assisted Tricep Dip', muscles: ['triceps'] },
+  };
+  for (const [id, { name, muscles }] of Object.entries(expected)) {
+    const ex = exerciseById(id);
+    assert.ok(ex, `${id} not found in EXERCISES`);
+    assert.equal(ex.name, name);
+    assert.equal(ex.equipment, 'Machine');
+    assert.deepEqual(ex.muscles, muscles);
+  }
+});
+
 test('exerciseById finds an exercise by id, or null', () => {
   assert.equal(exerciseById('bench-press').name, 'Bench Press');
   assert.equal(exerciseById('not-a-real-exercise'), null);

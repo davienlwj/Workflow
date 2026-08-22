@@ -1048,9 +1048,12 @@ button { font-family: var(--font-mono); }
 }
 
 .exercise-summary-info { flex: 1; min-width: 0; }
+.exercise-summary-name-row { display: flex; align-items: center; gap: 8px; }
 .exercise-summary-name { font-weight: 700; font-size: 15px; }
 .exercise-summary-meta { font-size: 12px; color: var(--dim); margin-top: 2px; }
 .exercise-summary-pr { font-size: 13px; color: var(--ink); margin-top: 4px; }
+
+.exercise-detail-title-row { display: flex; align-items: center; gap: 8px; }
 
 .wo-exercise-list {
   display: flex;

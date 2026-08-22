@@ -1,32 +1,27 @@
 #!/usr/bin/env python3
 """
-Traces tools/icon-run-source.jpg (the user-provided reference icon) into
-clean SVG path data, normalized to a 0..24 viewBox, and writes it into
-js/icons.js's RUN_PATH_D so the app can render it as currentColor-able
-inline SVG.
+DEPRECATED / not currently wired up to anything - js/icons.js no longer has
+a RUN_PATH_D or DUMBBELL_PATH_D constant for this to write into. Both
+tools/icon-run-source.jpg and tools/icon-dumbbell-source.jpg are thin
+outline glyphs; tracing them (what this script does) reproduces that same
+hollow-outline look, which reads much lighter/smaller than a solid
+silhouette at the tiny sizes these icons render at in the app. js/icons.js
+hand-draws both as solid shapes instead (see its header comment).
 
-DUMBBELL_PATH_D is intentionally NOT regenerated here: tools/icon-dumbbell-
-source.jpg is a thin outline glyph that traces to mostly white space and
-reads much lighter/smaller than the solid runner silhouette at matching
-sizes, so js/icons.js instead hand-draws it as a solid bar-and-plates
-silhouette. Re-run icon-dumbbell-source.jpg through this script's
-trace_to_path_d() only if you're deliberately replacing that hand-drawn
-artwork with a newly traced source image.
+Kept only as a reference for trace_to_path_d()'s potrace usage and its
+normalize-into-0..24-viewBox logic, in case a future icon genuinely needs
+to be traced from a filled/solid source image.
 
 Requires Pillow, numpy and potracer (`pip install pillow numpy potracer`,
 importing as `potrace`).
-
-    python3 vo2max/tools/gen-activity-icons.py
 """
 
-import re
 from pathlib import Path as FsPath
 import numpy as np
 from PIL import Image
 import potrace
 
 HERE = FsPath(__file__).resolve().parent
-APP_JS_ICONS = HERE.parent / "js" / "icons.js"
 DARK_THRESHOLD = 128
 VIEWBOX = 24
 
@@ -83,21 +78,13 @@ def trace_to_path_d(image_path):
     return " ".join(parts)
 
 
-def replace_between(text, start_marker, end_marker, new_body):
-    pattern = re.compile(re.escape(start_marker) + r".*?" + re.escape(end_marker), re.DOTALL)
-    replacement = f"{start_marker}{new_body}{end_marker}"
-    if not pattern.search(text):
-        raise ValueError(f"markers not found: {start_marker!r} .. {end_marker!r}")
-    return pattern.sub(replacement, text, count=1)
-
-
 def main():
-    run_d = trace_to_path_d(HERE / "icon-run-source.jpg")
-
-    js = APP_JS_ICONS.read_text()
-    js = replace_between(js, "RUN_PATH_D = '", "'", run_d)
-    APP_JS_ICONS.write_text(js)
-    print(f"wrote traced RUN_PATH_D into {APP_JS_ICONS} (DUMBBELL_PATH_D is hand-drawn - see icons.js)")
+    raise SystemExit(
+        "gen-activity-icons.py is deprecated: js/icons.js hand-draws both "
+        "the run and dumbbell glyphs now, and no longer has a RUN_PATH_D or "
+        "DUMBBELL_PATH_D constant for this script to write into. See this "
+        "file's header comment."
+    )
 
 
 if __name__ == "__main__":

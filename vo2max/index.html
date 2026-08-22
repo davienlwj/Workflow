@@ -533,7 +533,10 @@
 <!-- Exercise progress sheet (popup, opened from an exercise card) -->
 <section id="exerciseSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Exercise progress">
   <div class="grabber"></div>
-  <h2 id="exDetailName" class="view-title"></h2>
+  <div class="exercise-detail-title-row">
+    <h2 id="exDetailName" class="view-title"></h2>
+    <span id="exDetailCustomBadge" class="badge" hidden>Custom</span>
+  </div>
   <p id="exDetailMeta" class="exercise-summary-meta"></p>
 
   <div id="exDetailViewMode">

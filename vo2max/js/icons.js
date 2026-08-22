@@ -3,31 +3,33 @@
  * at a glance (calendar day cells, the day panel, the dashboard's
  * recent-activity feed). currentColor'd, so callers set color via CSS.
  *
- * RUN_PATH_D is traced from the user-supplied reference icon by
- * tools/gen-activity-icons.py — see that script to regenerate it.
- * DUMBBELL_PATH_D is hand-drawn (a solid bar + plates silhouette, not
- * traced) since the reference dumbbell icon is a thin outline glyph that
- * traces to mostly white space and reads much lighter/smaller than the
- * solid runner silhouette at matching sizes; gen-activity-icons.py leaves
- * it alone for that reason.
+ * Both are hand-drawn as solid silhouettes (a circle + rotated rounded
+ * rects for the runner, plain rectangles for the dumbbell) rather than
+ * traced from the reference JPEGs in tools/: those reference icons are
+ * thin outline glyphs, and tracing them (as an earlier version of this
+ * file did) reproduces that same hollow-outline look, which reads much
+ * lighter/smaller than a solid silhouette at the tiny sizes these render
+ * at. tools/gen-activity-icons.py is therefore unused - see its header
+ * comment.
  */
 
 const NS = 'http://www.w3.org/2000/svg';
 
-// Traced path data, 0..24 viewBox. Nested contours (the white space inside
-// each outline stroke) rely on fill-rule="evenodd" to render as holes.
-const RUN_PATH_D = 'M13.98,23.84 C13.61,23.66 13.21,23.28 13.04,22.94 C12.76,22.39 12.76,22.37 12.76,19.74 C12.76,17.33 12.76,17.31 12.66,17.25 C12.60,17.21 12.55,17.19 12.54,17.20 C12.53,17.21 12.41,17.76 12.27,18.42 C11.97,19.82 11.89,20.01 11.49,20.27 L11.22,20.45 L10.56,20.45 C9.96,20.44 9.77,20.42 8.67,20.19 C6.44,19.73 4.29,19.21 3.96,19.05 C3.57,18.86 3.15,18.43 2.96,18.04 C2.82,17.75 2.82,17.71 2.82,17.04 C2.82,16.37 2.82,16.34 2.96,16.05 C3.24,15.47 3.86,14.99 4.52,14.85 C4.94,14.76 5.17,14.78 6.69,15.08 C7.48,15.24 8.14,15.36 8.14,15.35 C8.16,15.34 8.40,14.10 8.40,14.02 C8.40,13.98 8.28,13.96 7.97,13.96 C7.03,13.97 6.29,13.52 5.90,12.71 C5.67,12.23 5.65,11.94 5.67,9.45 L5.68,7.18 L6.73,6.75 C7.31,6.51 8.22,6.14 8.74,5.93 C10.99,5.01 11.59,4.77 11.61,4.74 C11.62,4.73 11.58,4.59 11.51,4.43 C11.14,3.60 11.16,2.61 11.56,1.77 C11.91,1.03 12.47,0.50 13.25,0.16 L13.62,0.00 L14.46,0.00 C15.20,-0.00 15.34,0.01 15.58,0.10 C16.35,0.39 17.02,0.98 17.36,1.67 C17.63,2.22 17.71,2.57 17.71,3.16 C17.71,4.37 17.11,5.39 16.06,5.98 L15.81,6.13 L16.27,6.92 C16.73,7.69 17.11,8.23 17.40,8.47 C17.90,8.92 18.53,9.25 19.18,9.41 C20.07,9.63 20.68,10.07 21.01,10.74 C21.18,11.08 21.18,11.09 21.18,11.74 C21.18,12.38 21.18,12.41 21.03,12.73 C20.71,13.40 20.05,13.85 19.34,13.90 C18.42,13.96 16.73,13.42 15.62,12.71 C15.40,12.57 15.33,12.55 15.30,12.60 C15.28,12.63 15.26,12.68 15.26,12.71 C15.26,12.74 15.70,13.20 16.24,13.74 L17.22,14.72 L17.21,18.56 L17.19,22.41 L17.01,22.79 C16.79,23.26 16.43,23.63 16.00,23.84 C15.69,24.00 15.67,24.00 14.99,24.00 C14.30,24.00 14.29,24.00 13.98,23.84 Z M15.38,22.78 C15.63,22.67 15.78,22.52 15.90,22.26 C15.98,22.08 15.99,21.87 15.99,18.64 L15.99,15.22 L14.98,14.20 C14.42,13.63 13.95,13.17 13.94,13.16 C13.94,13.15 14.06,12.47 14.23,11.66 C14.39,10.85 14.52,10.17 14.52,10.16 C14.52,10.15 14.68,10.31 14.88,10.51 C15.50,11.17 16.11,11.62 16.87,12.00 C17.62,12.38 18.66,12.69 19.16,12.69 C19.82,12.69 20.25,11.91 19.92,11.28 C19.72,10.89 19.49,10.76 18.66,10.53 C17.65,10.26 16.64,9.58 15.97,8.72 C15.86,8.57 15.48,7.98 15.14,7.41 C14.47,6.28 14.32,6.11 13.80,5.87 C13.42,5.68 12.91,5.64 12.51,5.74 C12.37,5.78 11.76,6.02 11.17,6.26 C10.57,6.50 9.41,6.98 8.58,7.32 C7.75,7.66 7.03,7.96 6.98,7.98 C6.88,8.03 6.88,8.10 6.88,9.91 C6.88,11.43 6.90,11.83 6.95,12.03 C7.21,12.91 8.38,13.00 8.83,12.18 C8.90,12.04 8.92,11.85 8.93,10.69 L8.95,9.36 L9.81,9.02 C10.28,8.83 10.67,8.68 10.68,8.68 C10.68,8.69 10.63,9.01 10.55,9.40 C9.61,14.31 9.13,16.77 9.12,16.79 C9.11,16.79 8.19,16.62 7.07,16.40 C5.56,16.11 4.99,16.02 4.83,16.04 C4.23,16.12 3.83,16.74 3.99,17.33 C4.05,17.56 4.28,17.85 4.49,17.95 C4.72,18.07 8.11,18.85 9.52,19.10 C10.25,19.24 10.85,19.29 10.85,19.22 C10.85,19.20 11.77,14.91 11.79,14.83 C11.81,14.78 12.11,15.06 13.70,16.55 L13.98,16.81 L13.98,19.42 C13.98,21.23 14.00,22.08 14.04,22.19 C14.16,22.55 14.60,22.87 14.99,22.87 C15.10,22.87 15.27,22.83 15.38,22.78 Z M14.84,5.14 C16.13,4.90 16.86,3.48 16.30,2.29 C16.14,1.96 15.80,1.58 15.48,1.39 C15.06,1.15 14.47,1.07 14.01,1.19 C12.74,1.53 12.11,2.88 12.68,4.04 C12.96,4.61 13.49,5.02 14.09,5.14 C14.39,5.20 14.52,5.20 14.84,5.14 Z';
+export function runIconSVG(extraClass = '') {
+  return `<svg viewBox="0 0 24 24" class="glyph-icon glyph-run ${extraClass}" xmlns="${NS}" aria-hidden="true">
+    <circle cx="14" cy="4.2" r="2.3" fill="currentColor"/>
+    <rect x="12.7" y="6.4" width="2.4" height="7.2" rx="1.2" fill="currentColor"/>
+    <rect x="12" y="13.4" width="2.2" height="6.5" rx="1.1" fill="currentColor" transform="rotate(-22 13.1 13.4)"/>
+    <rect x="12" y="13.4" width="2.1" height="6.8" rx="1.05" fill="currentColor" transform="rotate(38 13.1 13.4)"/>
+    <rect x="12.5" y="7.2" width="1.8" height="5.2" rx="0.9" fill="currentColor" transform="rotate(-45 13.4 7.2)"/>
+    <rect x="12.5" y="7.2" width="1.7" height="4.6" rx="0.85" fill="currentColor" transform="rotate(55 13.4 7.2)"/>
+  </svg>`;
+}
 
 // Hand-drawn solid dumbbell: a thin center bar, two tall weight plates, and
 // two small end caps, all as plain non-overlapping rectangles so the single
 // filled path reads as one bold silhouette (no traced outline/holes).
 const DUMBBELL_PATH_D = 'M7,10.5 L17,10.5 L17,13.5 L7,13.5 Z M3,2 L7,2 L7,22 L3,22 Z M17,2 L21,2 L21,22 L17,22 Z M0,7 L3,7 L3,17 L0,17 Z M21,7 L24,7 L24,17 L21,17 Z';
-
-export function runIconSVG(extraClass = '') {
-  return `<svg viewBox="0 0 24 24" class="glyph-icon glyph-run ${extraClass}" xmlns="${NS}" aria-hidden="true">
-    <path d="${RUN_PATH_D}" fill="currentColor" fill-rule="evenodd"/>
-  </svg>`;
-}
 
 export function dumbbellIconSVG(extraClass = '') {
   return `<svg viewBox="0 0 24 24" class="glyph-icon glyph-workout ${extraClass}" xmlns="${NS}" aria-hidden="true">
