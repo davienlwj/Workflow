@@ -3,26 +3,28 @@
  * at a glance (calendar day cells, the day panel, the dashboard's
  * recent-activity feed). currentColor'd, so callers set color via CSS.
  *
- * Both are hand-drawn as solid silhouettes (a circle + rotated rounded
- * rects for the runner, plain rectangles for the dumbbell) rather than
- * traced from the reference JPEGs in tools/: those reference icons are
- * thin outline glyphs, and tracing them (as an earlier version of this
- * file did) reproduces that same hollow-outline look, which reads much
- * lighter/smaller than a solid silhouette at the tiny sizes these render
- * at. tools/gen-activity-icons.py is therefore unused - see its header
- * comment.
+ * RUN_PATH_D is traced from tools/icon-run-source.jpg (the user-provided
+ * reference icon) by tools/gen-activity-icons.py, but not verbatim: that
+ * source is a thin outline glyph, and a literal trace of it renders as
+ * that same hollow outline (see the script's own history / this file's
+ * git log), which reads much lighter/smaller than a solid shape at the
+ * tiny sizes this renders at in the app. The script instead keeps only
+ * the outline's outer boundary and fills it solid, so the path below is
+ * the exact same pose, just filled in - see gen-activity-icons.py to
+ * regenerate it.
+ * DUMBBELL_PATH_D is hand-drawn (a solid bar + plates silhouette, not
+ * traced) - see gen-activity-icons.py's header comment for why.
  */
 
 const NS = 'http://www.w3.org/2000/svg';
 
+// Filled silhouette traced from tools/icon-run-source.jpg - see the header
+// comment above and tools/gen-activity-icons.py.
+const RUN_PATH_D = 'M13.98,23.84 L13.23,23.23 L12.83,22.41 L12.66,17.25 L12.54,17.2 L12.06,19.35 L11.77,20.04 L11.22,20.45 L10.11,20.43 L3.96,19.05 L3.38,18.62 L2.93,17.98 L2.82,16.6 L2.96,16.05 L3.38,15.47 L4.52,14.85 L5.33,14.83 L8.14,15.35 L8.39,14.01 L7.39,13.91 L6.73,13.64 L6.2,13.18 L5.78,12.41 L5.68,7.18 L11.61,4.74 L11.29,3.69 L11.25,2.91 L11.48,1.95 L11.91,1.19 L12.63,0.5 L13.62,0.0 L15.06,0.01 L15.91,0.25 L16.76,0.85 L17.36,1.67 L17.69,2.7 L17.63,3.91 L17.28,4.8 L16.67,5.54 L15.81,6.13 L16.82,7.78 L17.51,8.57 L18.49,9.17 L20.02,9.73 L20.66,10.22 L21.15,11.07 L21.18,12.16 L21.03,12.73 L20.57,13.35 L19.93,13.76 L19.34,13.9 L17.55,13.59 L15.3,12.6 L15.36,12.83 L17.22,14.72 L17.19,22.41 L16.65,23.33 L15.88,23.9 L14.54,24.0 L13.98,23.84 Z';
+
 export function runIconSVG(extraClass = '') {
   return `<svg viewBox="0 0 24 24" class="glyph-icon glyph-run ${extraClass}" xmlns="${NS}" aria-hidden="true">
-    <circle cx="14" cy="4.2" r="2.3" fill="currentColor"/>
-    <rect x="12.7" y="6.4" width="2.4" height="7.2" rx="1.2" fill="currentColor"/>
-    <rect x="12" y="13.4" width="2.2" height="6.5" rx="1.1" fill="currentColor" transform="rotate(-22 13.1 13.4)"/>
-    <rect x="12" y="13.4" width="2.1" height="6.8" rx="1.05" fill="currentColor" transform="rotate(38 13.1 13.4)"/>
-    <rect x="12.5" y="7.2" width="1.8" height="5.2" rx="0.9" fill="currentColor" transform="rotate(-45 13.4 7.2)"/>
-    <rect x="12.5" y="7.2" width="1.7" height="4.6" rx="0.85" fill="currentColor" transform="rotate(55 13.4 7.2)"/>
+    <path d="${RUN_PATH_D}" fill="currentColor"/>
   </svg>`;
 }
 
