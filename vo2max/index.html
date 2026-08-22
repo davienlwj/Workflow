@@ -535,19 +535,42 @@
   <div class="grabber"></div>
   <h2 id="exDetailName" class="view-title"></h2>
   <p id="exDetailMeta" class="exercise-summary-meta"></p>
-  <div id="exDetailDiagram" class="exercise-detail-diagram"></div>
-  <div id="exDetailStatGrid" class="stat-grid"></div>
-  <div class="section-title-row">
-    <h3 class="section-title">Progress</h3>
-    <select id="exDetailBrandFilter" class="exercise-filter-select" hidden></select>
+
+  <div id="exDetailViewMode">
+    <div id="exDetailDiagram" class="exercise-detail-diagram"></div>
+    <div id="exDetailStatGrid" class="stat-grid"></div>
+    <div class="section-title-row">
+      <h3 class="section-title">Progress</h3>
+      <select id="exDetailBrandFilter" class="exercise-filter-select" hidden></select>
+    </div>
+    <p class="chart-label">Weight</p>
+    <div id="exDetailChart" class="chart-wrap"></div>
+    <p class="chart-label">Volume</p>
+    <div id="exDetailVolumeChart" class="chart-wrap"></div>
+    <div class="actions">
+      <button type="button" id="exDetailEditCustom" class="ghost-btn" hidden>Edit exercise</button>
+      <button type="button" id="exDetailDeleteCustom" class="danger-btn" hidden>Delete exercise</button>
+      <button type="button" id="exDetailClose" class="ghost-btn block">Close</button>
+    </div>
   </div>
-  <p class="chart-label">Weight</p>
-  <div id="exDetailChart" class="chart-wrap"></div>
-  <p class="chart-label">Volume</p>
-  <div id="exDetailVolumeChart" class="chart-wrap"></div>
-  <div class="actions">
-    <button type="button" id="exDetailDeleteCustom" class="danger-btn" hidden>Delete exercise</button>
-    <button type="button" id="exDetailClose" class="ghost-btn block">Close</button>
+
+  <div id="exDetailEditForm" class="wo-new-exercise" hidden>
+    <label class="field">
+      <span>Exercise name</span>
+      <input id="exEditName" type="text">
+    </label>
+    <label class="field">
+      <span>Equipment</span>
+      <select id="exEditEquipment"></select>
+    </label>
+    <label class="field">
+      <span>Body part(s) <em>(tap all that apply)</em></span>
+      <div id="exEditMuscles" class="wo-picker-chips"></div>
+    </label>
+    <div class="actions">
+      <button type="button" id="exEditCancel" class="ghost-btn">Cancel</button>
+      <button type="button" id="exEditSave" class="primary">Save changes</button>
+    </div>
   </div>
 </section>
 

@@ -171,6 +171,17 @@ export function deleteCustomExercise(id) {
   saveCustomExercises(exercises);
 }
 
+/** Overwrites one custom exercise's name/equipment/muscles in place - its id
+ *  and any logged workout entries that reference it are untouched. No-op if
+ *  `id` isn't a custom exercise. */
+export function updateCustomExercise(id, updates) {
+  const exercises = loadCustomExercises();
+  const idx = exercises.findIndex((e) => e.id === id);
+  if (idx === -1) return;
+  exercises[idx] = { ...exercises[idx], ...updates };
+  saveCustomExercises(exercises);
+}
+
 /** Named lists of exercises for quickly starting a live workout pre-loaded
  *  with your usual picks, instead of re-adding them one by one every time. */
 export function loadRoutines() {

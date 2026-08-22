@@ -2,7 +2,7 @@ import {
   loadSettings, saveSettings, resetSettings,
   loadSessions, addSession, updateSession, deleteSession,
   loadWorkouts, addWorkout, updateWorkout, deleteWorkout,
-  loadCustomExercises, addCustomExercise, deleteCustomExercise,
+  loadCustomExercises, addCustomExercise, deleteCustomExercise, updateCustomExercise,
   loadLiveWorkout, saveLiveWorkout, clearLiveWorkout,
   loadRoutines, addRoutine, deleteRoutine,
   loadCustomBrands, addCustomBrand,
@@ -1692,8 +1692,11 @@ function openExerciseSheet(exerciseId) {
   exerciseSheetId = exerciseId;
   exDetailBrand = '';
   // Not in the built-in static library (checked with no custom exercises
-  // mixed in) means the user created it themselves, and can delete it.
-  $('exDetailDeleteCustom').hidden = Boolean(exerciseById(exerciseId));
+  // mixed in) means the user created it themselves, and can edit/delete it.
+  const isCustom = !exerciseById(exerciseId);
+  $('exDetailEditCustom').hidden = !isCustom;
+  $('exDetailDeleteCustom').hidden = !isCustom;
+  closeExEditForm();
   $('exDetailName').textContent = ex.name;
   $('exDetailMeta').textContent = exerciseMetaText(ex);
   $('exDetailDiagram').innerHTML = muscleDiagramHTML(ex.muscles);
@@ -1716,6 +1719,46 @@ function openExerciseSheet(exerciseId) {
 $('exDetailBrandFilter').addEventListener('change', () => {
   exDetailBrand = $('exDetailBrandFilter').value;
   renderExerciseSheetStats();
+});
+
+/* -------------------------------------------------- edit custom exercise */
+
+function openExEditForm() {
+  const ex = findExercise(exerciseSheetId);
+  if (!ex) return;
+  $('exEditName').value = ex.name;
+  $('exEditEquipment').innerHTML = EQUIPMENT.map((eq) => `<option value="${eq}"${eq === ex.equipment ? ' selected' : ''}>${eq}</option>`).join('');
+  $('exEditMuscles').innerHTML = MUSCLES.map((m) => `<button type="button" class="chip${ex.muscles.includes(m) ? ' active' : ''}" data-muscle="${m}">${MUSCLE_LABEL[m]}</button>`).join('');
+  $('exDetailViewMode').hidden = true;
+  $('exDetailEditForm').hidden = false;
+}
+
+function closeExEditForm() {
+  $('exDetailEditForm').hidden = true;
+  $('exDetailViewMode').hidden = false;
+}
+
+$('exDetailEditCustom').addEventListener('click', openExEditForm);
+$('exEditCancel').addEventListener('click', closeExEditForm);
+
+$('exEditMuscles').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  chip.classList.toggle('active');
+});
+
+$('exEditSave').addEventListener('click', () => {
+  if (!exerciseSheetId) return;
+  const name = $('exEditName').value.trim();
+  const equipment = $('exEditEquipment').value;
+  const muscles = [...$('exEditMuscles').querySelectorAll('.chip.active')].map((c) => c.dataset.muscle);
+  if (!name) { toast('Enter an exercise name'); return; }
+  if (muscles.length === 0) { toast('Pick at least one body part'); return; }
+  updateCustomExercise(exerciseSheetId, { name, equipment, muscles });
+  customExercises = loadCustomExercises();
+  openExerciseSheet(exerciseSheetId);
+  renderWorkoutTab();
+  toast('Exercise updated');
 });
 
 function closeExerciseSheet() {
@@ -1743,24 +1786,31 @@ function renderExerciseFilterOptions() {
   $('exerciseFilterMuscle').value = exerciseFilterMuscle;
 }
 
+/** Card list ids for the Exercises section. With no search text, this stays
+ *  scoped to exercises you've actually logged (the "your history" view it's
+ *  always been); typing a search widens the pool to the whole library
+ *  (built-in + custom) so you can look up and open an exercise you haven't
+ *  done yet - its card just shows "No sets logged yet" like a fresh custom
+ *  exercise would. */
 function renderExerciseSummaries() {
   renderExerciseFilterOptions();
-  const q = exerciseSearchQuery.trim().toLowerCase();
-  const ids = loggedExerciseIds(workouts).filter((id) => {
-    const ex = findExercise(id);
-    if (!ex) return false;
-    if (exerciseFilterMuscle && !ex.muscles.includes(exerciseFilterMuscle)) return false;
-    if (q && !ex.name.toLowerCase().includes(q)) return false;
-    return true;
-  });
+  const q = exerciseSearchQuery.trim();
+  const ids = q
+    ? searchExercises(q, exerciseFilterMuscle, allExercises()).map((e) => e.id)
+    : loggedExerciseIds(workouts).filter((id) => {
+      const ex = findExercise(id);
+      if (!ex) return false;
+      if (exerciseFilterMuscle && !ex.muscles.includes(exerciseFilterMuscle)) return false;
+      return true;
+    });
   $('exerciseSummaryEmpty').hidden = ids.length > 0;
   $('exerciseSummaryEmpty').textContent = !exerciseFilterMuscle && !q
     ? 'No workouts logged yet — the exercises you log will show up here with their progress.'
     : exerciseFilterMuscle && q
-      ? 'No logged exercises match this body part and search.'
+      ? 'No exercises match this body part and search.'
       : exerciseFilterMuscle
         ? 'No logged exercises work this body part yet.'
-        : 'No logged exercises match your search.';
+        : 'No exercises match your search.';
   $('exerciseSummaryList').innerHTML = ids.map((id) => {
     const ex = findExercise(id);
     if (!ex) return '';
