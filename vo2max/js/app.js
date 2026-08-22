@@ -55,6 +55,7 @@ let exDetailBrand = ''; // '' = all brands, else a brand logged for the open exe
 let mileageScope = 'week';
 let muscleRange = 'week';
 let exerciseFilterMuscle = ''; // '' = all body parts, else a MUSCLES id
+let exerciseSearchQuery = ''; // free-text search over the Exercises list, name substring match
 let expandedRadarGroup = null;
 let liveSession = null; // { startedAt } while a live "today's workout" session is running
 let workoutSheetMode = 'instant'; // 'instant' | 'live' - which mode #workoutSheet is currently rendering
@@ -1718,15 +1719,22 @@ function renderExerciseFilterOptions() {
 
 function renderExerciseSummaries() {
   renderExerciseFilterOptions();
+  const q = exerciseSearchQuery.trim().toLowerCase();
   const ids = loggedExerciseIds(workouts).filter((id) => {
-    if (!exerciseFilterMuscle) return true;
     const ex = findExercise(id);
-    return ex && ex.muscles.includes(exerciseFilterMuscle);
+    if (!ex) return false;
+    if (exerciseFilterMuscle && !ex.muscles.includes(exerciseFilterMuscle)) return false;
+    if (q && !ex.name.toLowerCase().includes(q)) return false;
+    return true;
   });
   $('exerciseSummaryEmpty').hidden = ids.length > 0;
-  $('exerciseSummaryEmpty').textContent = exerciseFilterMuscle
-    ? 'No logged exercises work this body part yet.'
-    : 'No workouts logged yet — the exercises you log will show up here with their progress.';
+  $('exerciseSummaryEmpty').textContent = !exerciseFilterMuscle && !q
+    ? 'No workouts logged yet — the exercises you log will show up here with their progress.'
+    : exerciseFilterMuscle && q
+      ? 'No logged exercises match this body part and search.'
+      : exerciseFilterMuscle
+        ? 'No logged exercises work this body part yet.'
+        : 'No logged exercises match your search.';
   $('exerciseSummaryList').innerHTML = ids.map((id) => {
     const ex = findExercise(id);
     if (!ex) return '';
@@ -1751,6 +1759,11 @@ $('exerciseSummaryList').addEventListener('click', (e) => {
 
 $('exerciseFilterMuscle').addEventListener('change', () => {
   exerciseFilterMuscle = $('exerciseFilterMuscle').value;
+  renderExerciseSummaries();
+});
+
+$('exerciseSearchInput').addEventListener('input', () => {
+  exerciseSearchQuery = $('exerciseSearchInput').value;
   renderExerciseSummaries();
 });
 
