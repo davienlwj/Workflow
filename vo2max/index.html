@@ -40,7 +40,7 @@
   <nav id="menuDropdown" class="menu-dropdown" hidden role="menu" aria-label="Sections">
     <button type="button" class="menu-item" data-view="dashboard" role="menuitem" aria-selected="true">Dashboard</button>
     <button type="button" class="menu-item" data-view="run" role="menuitem" aria-selected="false">Run</button>
-    <button type="button" class="menu-item" data-view="workout" role="menuitem" aria-selected="false">Workout</button>
+    <button type="button" class="menu-item" data-view="workout" role="menuitem" aria-selected="false">Lift</button>
     <button type="button" class="menu-item" data-view="settings" role="menuitem" aria-selected="false">Settings</button>
   </nav>
 </header>
@@ -93,7 +93,7 @@
 
   <!-- WORKOUT -->
   <section id="view-workout" class="view" hidden>
-    <h1 class="view-title">Workout</h1>
+    <h1 class="view-title">Lift</h1>
 
     <div id="workoutStatGrid" class="stat-grid"></div>
 
@@ -129,105 +129,85 @@
     </div>
 
     <form id="settingsForm" class="form">
-      <h2 class="section-title">Profile</h2>
-      <label class="field">
-        <span>Name</span>
-        <input id="sName" type="text" placeholder="Your name">
-      </label>
-      <label class="field">
-        <span>Date of birth <em>(optional)</em></span>
-        <input id="sDob" type="date">
-      </label>
-      <div class="row">
-        <label class="field">
-          <span>Height (cm)</span>
-          <input id="sHeightCm" type="number" step="0.1" min="0" max="300">
-        </label>
-        <label class="field">
-          <span>Weight (kg)</span>
-          <input id="sWeightKg" type="number" step="0.1" min="0" max="400">
-        </label>
-      </div>
-      <p class="field-hint">Your weight is added to the load for bodyweight exercises (e.g. dips, pull-ups) — bodyweight-only sets use it as-is, and weighted sets add it to whatever extra weight you enter.</p>
+      <details class="settings-details">
+        <summary class="section-title">Profile</summary>
+        <div class="settings-details-body form">
+          <label class="field">
+            <span>Name</span>
+            <input id="sName" type="text" placeholder="Your name">
+          </label>
+          <label class="field">
+            <span>Date of birth <em>(optional)</em></span>
+            <input id="sDob" type="date">
+          </label>
+          <div class="row">
+            <label class="field">
+              <span>Height (cm)</span>
+              <input id="sHeightCm" type="number" step="0.1" min="0" max="300">
+            </label>
+            <label class="field">
+              <span>Weight (kg)</span>
+              <input id="sWeightKg" type="number" step="0.1" min="0" max="400">
+            </label>
+          </div>
+          <p class="field-hint">Your weight is added to the load for bodyweight exercises (e.g. dips, pull-ups) — bodyweight-only sets use it as-is, and weighted sets add it to whatever extra weight you enter.</p>
+        </div>
+      </details>
 
-      <h2 class="section-title">Baseline</h2>
-      <div class="row">
-        <label class="field">
-          <span>Baseline VO2max</span>
-          <input id="sBaselineVO2max" type="number" step="0.1" min="0">
-        </label>
-        <label class="field">
-          <span>Recorded on</span>
-          <input id="sBaselineDate" type="date">
-        </label>
-      </div>
-      <label class="field">
-        <span>Device</span>
-        <input id="sDevice" type="text" placeholder="Watch / app used to measure">
-      </label>
+      <details class="settings-details">
+        <summary class="section-title">Baseline</summary>
+        <div class="settings-details-body form">
+          <div class="row">
+            <label class="field">
+              <span>Baseline VO2max</span>
+              <input id="sBaselineVO2max" type="number" step="0.1" min="0">
+            </label>
+            <label class="field">
+              <span>Recorded on</span>
+              <input id="sBaselineDate" type="date">
+            </label>
+          </div>
+          <label class="field">
+            <span>Device</span>
+            <input id="sDevice" type="text" placeholder="Watch / app used to measure">
+          </label>
+        </div>
+      </details>
 
-      <h2 class="section-title">Heart rate</h2>
-      <div class="row">
-        <label class="field">
-          <span>Resting HR</span>
-          <input id="sRestingHR" type="number" min="20" max="120">
-        </label>
-        <label class="field">
-          <span>Max HR</span>
-          <input id="sMaxHR" type="number" min="100" max="230">
-        </label>
-        <label class="field">
-          <span>LTHR</span>
-          <input id="sLTHR" type="number" min="80" max="220">
-        </label>
-      </div>
+      <details class="settings-details">
+        <summary class="section-title">Heart rate</summary>
+        <div class="settings-details-body form">
+          <div class="row">
+            <label class="field">
+              <span>Resting HR</span>
+              <input id="sRestingHR" type="number" min="20" max="120">
+            </label>
+            <label class="field">
+              <span>Max HR</span>
+              <input id="sMaxHR" type="number" min="100" max="230">
+            </label>
+            <label class="field">
+              <span>LTHR</span>
+              <input id="sLTHR" type="number" min="80" max="220">
+            </label>
+          </div>
 
-      <label class="field">
-        <span>Primary zone model</span>
-        <select id="sPrimaryModel">
-          <option value="lthr">LTHR-based</option>
-          <option value="rhr">RHR-based (Karvonen)</option>
-        </select>
-      </label>
-
-      <h2 class="section-title">Protocol</h2>
-      <div class="row">
-        <label class="field">
-          <span>Reps</span>
-          <input id="sReps" type="number" min="1" max="10">
-        </label>
-        <label class="field">
-          <span>Work (min)</span>
-          <input id="sWorkMin" type="number" min="1" max="20">
-        </label>
-        <label class="field">
-          <span>Rest (min)</span>
-          <input id="sRestMin" type="number" min="1" max="20">
-        </label>
-      </div>
-      <div class="row">
-        <label class="field">
-          <span>Warm-up (min)</span>
-          <input id="sWarmupMin" type="number" min="0" max="30">
-        </label>
-        <label class="field">
-          <span>Cool-down (min)</span>
-          <input id="sCooldownMin" type="number" min="0" max="30">
-        </label>
-      </div>
-      <label class="field">
-        <span>Sessions / week</span>
-        <input id="sFreq" type="number" min="1" max="7">
-      </label>
+          <label class="field">
+            <span>Primary zone model</span>
+            <select id="sPrimaryModel">
+              <option value="lthr">LTHR-based</option>
+              <option value="rhr">RHR-based (Karvonen)</option>
+            </select>
+          </label>
+        </div>
+      </details>
 
       <button type="submit" id="settingsSaveBtn" class="primary block">Save settings</button>
     </form>
 
-    <details class="zones-details">
-      <summary class="section-title">Zones &amp; protocol reference</summary>
-      <div class="zones-details-body">
-        <div id="protocolCard" class="card protocol-card"></div>
-
+    <details class="settings-details">
+      <summary class="section-title">Zones reference</summary>
+      <div class="settings-details-body">
         <h2 class="section-title">LTHR-based zones <span id="lthrPrimaryBadge" class="badge" hidden>primary</span></h2>
         <div id="lthrZoneTable" class="zone-table"></div>
 

@@ -26,14 +26,6 @@ export const DEFAULT_SETTINGS = {
   maxHR: 194,
   lthr: 181,
   primaryZoneModel: 'lthr', // 'lthr' | 'rhr'
-  protocol: {
-    reps: 4,
-    workMin: 4,
-    restMin: 3,
-    warmupMin: 10,
-    cooldownMin: 8,
-    freqPerWeek: 2,
-  },
 };
 
 function clone(value) {
@@ -50,7 +42,6 @@ export function loadSettings() {
       ...clone(DEFAULT_SETTINGS),
       ...parsed,
       profile: { ...DEFAULT_SETTINGS.profile, ...(parsed.profile || {}) },
-      protocol: { ...DEFAULT_SETTINGS.protocol, ...(parsed.protocol || {}) },
     };
   } catch {
     return clone(DEFAULT_SETTINGS);

@@ -75,7 +75,7 @@ function bodyweightKg() {
 
 /* ------------------------------------------------------------- tab views */
 
-const VIEW_LABEL = { dashboard: 'Dashboard', run: 'Run', workout: 'Workout', settings: 'Settings' };
+const VIEW_LABEL = { dashboard: 'Dashboard', run: 'Run', workout: 'Lift', settings: 'Settings' };
 
 const menuItems = document.querySelectorAll('.menu-item');
 menuItems.forEach((btn) => {
@@ -1535,15 +1535,6 @@ function renderZones() {
   $('rhrZoneTable').innerHTML = rhrZoneTable(settings).map(renderZoneRow).join('');
   $('lthrPrimaryBadge').hidden = settings.primaryZoneModel !== 'lthr';
   $('rhrPrimaryBadge').hidden = settings.primaryZoneModel !== 'rhr';
-
-  const p = settings.protocol;
-  $('protocolCard').innerHTML = `
-    <div><span class="k">Structure</span><span class="v">${p.reps} × ${p.workMin}min</span></div>
-    <div><span class="k">Recovery between</span><span class="v">${p.restMin}min</span></div>
-    <div><span class="k">Warm-up</span><span class="v">${p.warmupMin}min</span></div>
-    <div><span class="k">Cool-down</span><span class="v">${p.cooldownMin}min</span></div>
-    <div><span class="k">Frequency</span><span class="v">${p.freqPerWeek}×/week</span></div>
-  `;
 }
 
 /* ------------------------------------------------------------- SETTINGS */
@@ -1563,12 +1554,6 @@ function renderSettingsForm() {
   $('sMaxHR').value = settings.maxHR;
   $('sLTHR').value = settings.lthr;
   $('sPrimaryModel').value = settings.primaryZoneModel;
-  $('sReps').value = settings.protocol.reps;
-  $('sWorkMin').value = settings.protocol.workMin;
-  $('sRestMin').value = settings.protocol.restMin;
-  $('sWarmupMin').value = settings.protocol.warmupMin;
-  $('sCooldownMin').value = settings.protocol.cooldownMin;
-  $('sFreq').value = settings.protocol.freqPerWeek;
 }
 
 $('sTheme').addEventListener('click', (e) => {
@@ -1597,14 +1582,6 @@ $('settingsForm').addEventListener('submit', (e) => {
     maxHR: Number($('sMaxHR').value),
     lthr: Number($('sLTHR').value),
     primaryZoneModel: $('sPrimaryModel').value,
-    protocol: {
-      reps: Number($('sReps').value),
-      workMin: Number($('sWorkMin').value),
-      restMin: Number($('sRestMin').value),
-      warmupMin: Number($('sWarmupMin').value),
-      cooldownMin: Number($('sCooldownMin').value),
-      freqPerWeek: Number($('sFreq').value),
-    },
   };
   saveSettings(settings);
   renderAll();
