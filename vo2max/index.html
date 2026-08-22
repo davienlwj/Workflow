@@ -442,6 +442,52 @@
   </form>
 </section>
 
+<!-- Start-workout choice sheet (popup, shown by "Start Workout" before a fresh live session begins) -->
+<section id="startChoiceSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Start workout">
+  <div class="grabber"></div>
+  <h2 class="view-title">Start Workout</h2>
+  <div class="actions-row">
+    <button type="button" id="startChoiceRoutine" class="primary block">Select Routine</button>
+    <button type="button" id="startChoiceNew" class="ghost-btn block">Start New Workout</button>
+  </div>
+</section>
+
+<!-- Routines sheet (popup, browse/start/delete saved routines) -->
+<section id="routinesSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Routines">
+  <div class="grabber"></div>
+  <h2 class="view-title">Routines</h2>
+  <button type="button" id="addRoutineBtn" class="ghost-btn block">+ Create Routine</button>
+  <ul id="routinesList" class="history-list"></ul>
+  <p id="routinesEmpty" class="empty" hidden>No routines yet — create one to quickly start a workout with your usual exercises.</p>
+  <div class="actions">
+    <button type="button" id="routinesClose" class="ghost-btn block">Close</button>
+  </div>
+</section>
+
+<!-- Routine builder sheet (popup, name + pick exercises, opened from Routines or "Save as Routine") -->
+<section id="routineBuilderSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="New routine">
+  <div class="grabber"></div>
+  <h2 class="view-title">New Routine</h2>
+  <form id="routineForm" class="form">
+    <label class="field">
+      <span>Routine name</span>
+      <input id="routineName" type="text" placeholder="e.g. Push Day">
+    </label>
+
+    <div id="routineSelectedList" class="routine-selected-list"></div>
+    <p id="routineSelectedEmpty" class="empty" hidden>No exercises picked yet — search below to add some.</p>
+
+    <input id="routinePickerSearch" type="text" class="wo-picker-search" placeholder="Search exercises…">
+    <div id="routinePickerChips" class="wo-picker-chips"></div>
+    <div id="routinePickerResults" class="wo-picker-results"></div>
+
+    <div class="actions">
+      <button type="button" id="routineCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" id="routineSave" class="primary">Save routine</button>
+    </div>
+  </form>
+</section>
+
 <!-- Workout summary sheet (popup, shown right after finishing a live workout) -->
 <section id="workoutSummarySheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Workout summary">
   <div class="grabber"></div>
@@ -449,6 +495,7 @@
   <div id="summaryDuration" class="summary-duration mono"></div>
   <div id="summaryExercises" class="summary-exercises"></div>
   <div class="actions">
+    <button type="button" id="summarySaveRoutine" class="ghost-btn block">Save as Routine</button>
     <button type="button" id="summaryDone" class="primary block">Done</button>
   </div>
 </section>

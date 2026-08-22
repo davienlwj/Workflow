@@ -4,6 +4,8 @@ import {
   loadWorkouts, addWorkout, updateWorkout, deleteWorkout,
   loadCustomExercises, addCustomExercise, deleteCustomExercise,
   loadLiveWorkout, saveLiveWorkout, clearLiveWorkout,
+  loadRoutines, addRoutine, deleteRoutine,
+  loadCustomBrands, addCustomBrand,
   exportAll, importAll,
 } from './store.js';
 import { lthrZoneTable, rhrZoneTable } from './zones.js';
@@ -17,7 +19,7 @@ import {
 } from './chart.js';
 import { sessionToICS } from './ics.js';
 import {
-  EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
+  EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
   exerciseById, searchExercises,
 } from './exercises.js';
 import { muscleDiagramHTML } from './muscleDiagram.js';
@@ -44,6 +46,8 @@ applyTheme(settings.theme);
 let sessions = loadSessions();
 let workouts = loadWorkouts();
 let customExercises = loadCustomExercises();
+let routines = loadRoutines();
+let customBrands = loadCustomBrands();
 let editingId = null;
 let workoutEditingId = null;
 let exerciseSheetId = null;
@@ -53,6 +57,8 @@ let expandedRadarGroup = null;
 let liveSession = null; // { startedAt } while a live "today's workout" session is running
 let workoutSheetMode = 'instant'; // 'instant' | 'live' - which mode #workoutSheet is currently rendering
 let liveTimerInterval = null;
+let lastFinishedWorkout = null; // set by openWorkoutSummarySheet, read by "Save as Routine"
+let routineSelectedIds = []; // exercise ids chosen so far in the open routine builder
 
 const $ = (id) => document.getElementById(id);
 
@@ -613,6 +619,9 @@ $('scrim').addEventListener('click', () => {
   closeWorkoutSheet();
   closeExerciseSheet();
   closeCalDaySheet();
+  closeStartChoiceSheet();
+  closeRoutinesSheet();
+  closeRoutineBuilderSheet();
   $('workoutSummarySheet').hidden = true;
 });
 $('editCancel').addEventListener('click', closeEditSheet);
@@ -724,23 +733,43 @@ function cycleSetType(btn) {
   btn.closest('.wo-set-row').dataset.type = next;
 }
 
+/** Machine/Cable equipment only - a resistance profile differs enough by
+ *  brand to be worth recording per logged exercise. `selected` is the
+ *  currently-chosen brand (or falsy for the "-" default). */
+function brandOptionsHTML(selected) {
+  const all = [...BRANDS, ...customBrands];
+  const options = all
+    .map((b) => `<option value="${escapeHTML(b)}"${b === selected ? ' selected' : ''}>${escapeHTML(b)}</option>`)
+    .join('');
+  return `<option value="">-</option>${options}<option value="__add__">+ Add brand…</option>`;
+}
+
 /** @param {string} [supersetId] if this exercise is already paired into a
  *  superset, its group id — suppresses the "⚭ Superset" button (v1 only
- *  supports pairs, formed/broken via that button and the group's unpair ✕). */
-function exerciseBlockHTML(exerciseId, sets, supersetId) {
+ *  supports pairs, formed/broken via that button and the group's unpair ✕).
+ * @param {string} [brand] the machine brand last chosen for this exercise
+ *  entry (Machine/Cable equipment only - see brandOptionsHTML). */
+function exerciseBlockHTML(exerciseId, sets, supersetId, brand) {
   const ex = findExercise(exerciseId);
   if (!ex) return '';
   const last = lastPerformance(workouts, exerciseId);
   const lastText = last
-    ? `Last (${fmtDateShort(last.date)}): ${last.sets.map((s) => `${s.weight}kg×${s.reps}`).join(', ') || '—'}`
+    ? `Last (${fmtDateShort(last.date)}${last.brand ? `, ${last.brand}` : ''}): ${last.sets.map((s) => `${s.weight}kg×${s.reps}`).join(', ') || '—'}`
     : 'No previous data for this exercise';
   const supersetBtnHTML = supersetId ? '' : '<button type="button" class="wo-superset-btn" title="Superset with another exercise">⚭</button>';
   const bw = bodyweightKg();
   const bwHintHTML = ex.equipment !== 'Bodyweight' ? '' : bw
     ? `<p class="wo-bodyweight-hint">Your bodyweight (${bw}kg) is added automatically — the kg field below is just extra weight (e.g. a belt or vest), leave it blank for bodyweight only.</p>`
     : `<p class="wo-bodyweight-hint">Set your weight in Settings → Profile to include your bodyweight in this exercise's volume. The kg field below is extra weight only.</p>`;
+  const isBrandable = ex.equipment === 'Machine' || ex.equipment === 'Cable';
+  const brandHTML = !isBrandable ? '' : `
+    <div class="wo-brand-row">
+      <span>Machine</span>
+      <select class="wo-brand-select">${brandOptionsHTML(brand)}</select>
+    </div>
+  `;
   return `
-    <div class="wo-exercise-block" data-exercise-id="${exerciseId}"${supersetId ? ` data-superset-id="${supersetId}"` : ''}>
+    <div class="wo-exercise-block" data-exercise-id="${exerciseId}"${supersetId ? ` data-superset-id="${supersetId}"` : ''}${isBrandable && brand ? ` data-brand="${escapeHTML(brand)}"` : ''}>
       <div class="wo-exercise-header">
         <div>
           <div class="wo-exercise-name">${escapeHTML(ex.name)}</div>
@@ -754,6 +783,7 @@ function exerciseBlockHTML(exerciseId, sets, supersetId) {
       ${muscleDiagramHTML(ex.muscles)}
       <p class="wo-last-performance">${lastText}</p>
       ${bwHintHTML}
+      ${brandHTML}
       <div class="wo-set-row-heading"><span></span><span>Set</span><span>kg</span><span>Reps</span>${workoutSheetMode === 'live' ? '<span></span>' : ''}<span></span></div>
       <div class="wo-set-rows">${sets.map((s, i) => setRowHTML(i, s, last?.sets[i])).join('')}</div>
       <button type="button" class="wo-add-set ghost-btn">+ Add set</button>
@@ -1004,10 +1034,42 @@ $('woExerciseList').addEventListener('click', (e) => {
   }
 });
 
+/** Re-renders every brand <select>'s options (e.g. after a new custom brand
+ *  is added) while preserving each one's currently-chosen value. */
+function refreshBrandSelects() {
+  $('woExerciseList').querySelectorAll('.wo-brand-select').forEach((select) => {
+    select.innerHTML = brandOptionsHTML(select.closest('.wo-exercise-block').dataset.brand || '');
+  });
+}
+
+$('woExerciseList').addEventListener('change', (e) => {
+  const select = e.target.closest('.wo-brand-select');
+  if (!select) return;
+  const block = select.closest('.wo-exercise-block');
+  if (select.value === '__add__') {
+    const name = window.prompt('New brand name:')?.trim();
+    if (name) {
+      addCustomBrand(name);
+      customBrands = loadCustomBrands();
+      refreshBrandSelects();
+      select.value = name;
+      block.dataset.brand = name;
+    } else {
+      select.value = block.dataset.brand || '';
+    }
+  } else if (select.value) {
+    block.dataset.brand = select.value;
+  } else {
+    delete block.dataset.brand;
+  }
+  syncLiveWorkout();
+});
+
 function readWorkoutForm() {
   const exercises = [...$('woExerciseList').querySelectorAll('.wo-exercise-block')].map((block) => ({
     exerciseId: block.dataset.exerciseId,
     supersetId: block.dataset.supersetId || null,
+    brand: block.dataset.brand || null,
     sets: [...block.querySelectorAll('.wo-set-row')]
       .map((row) => {
         const doneEl = row.querySelector('.wo-set-done');
@@ -1057,7 +1119,7 @@ function openWorkoutEditSheet(workout) {
   $('woName').value = workout.name || '';
   $('woNotes').value = workout.notes || '';
   $('woExerciseList').innerHTML = (workout.exercises || [])
-    .map((ex) => exerciseBlockHTML(ex.exerciseId, ex.sets && ex.sets.length ? ex.sets : [{}], ex.supersetId))
+    .map((ex) => exerciseBlockHTML(ex.exerciseId, ex.sets && ex.sets.length ? ex.sets : [{}], ex.supersetId, ex.brand))
     .join('');
   regroupSupersets();
   $('woPicker').hidden = true;
@@ -1178,8 +1240,10 @@ function discardLiveWorkout() {
 }
 
 /** Opens #workoutSheet in a fresh live session: running timer, tick marks,
- *  persisted so backgrounding the PWA mid-workout doesn't lose it. */
-function openLiveWorkoutSheet() {
+ *  persisted so backgrounding the PWA mid-workout doesn't lose it.
+ * @param {string[]} [exerciseIds] pre-load these exercises (one empty set
+ *  each) instead of starting blank - used when starting from a routine. */
+function openLiveWorkoutSheet(exerciseIds = []) {
   workoutEditingId = null;
   pairingSourceBlock = null;
   liveSession = { startedAt: new Date().toISOString() };
@@ -1187,7 +1251,7 @@ function openLiveWorkoutSheet() {
   $('woDate').value = todayIso();
   $('woName').value = '';
   $('woNotes').value = '';
-  $('woExerciseList').innerHTML = '';
+  $('woExerciseList').innerHTML = exerciseIds.map((id) => exerciseBlockHTML(id, [{}])).join('');
   $('woPicker').hidden = true;
   $('woDelete').hidden = true;
   saveLiveWorkoutState();
@@ -1210,15 +1274,195 @@ function reopenLiveWorkoutSheet() {
 }
 
 /** Routes "Start Workout" / a calendar day's "+ Log workout": today's date
- *  always means the live session (new or resumed); any other date keeps
+ *  with no session yet running asks whether to start from a routine or
+ *  blank; an already-running session just resumes; any other date keeps
  *  using the plain instant form, since a timer/tick-off flow only makes
  *  sense for something not yet done. */
 function startOrOpenWorkoutFor(iso) {
   if (iso !== todayIso()) { openWorkoutSheet(iso); return; }
-  if (liveSession) reopenLiveWorkoutSheet(); else openLiveWorkoutSheet();
+  if (liveSession) { reopenLiveWorkoutSheet(); return; }
+  openStartChoiceSheet();
 }
 
+function openStartChoiceSheet() {
+  $('scrim').hidden = false;
+  $('startChoiceSheet').hidden = false;
+}
+
+function closeStartChoiceSheet() {
+  $('scrim').hidden = true;
+  $('startChoiceSheet').hidden = true;
+}
+
+$('startChoiceNew').addEventListener('click', () => {
+  closeStartChoiceSheet();
+  openLiveWorkoutSheet();
+});
+
+$('startChoiceRoutine').addEventListener('click', () => {
+  closeStartChoiceSheet();
+  openRoutinesSheet();
+});
+
+/* ------------------------------------------------------------- routines */
+
+function routineRowHTML(routine) {
+  const count = routine.exerciseIds.length;
+  return `
+    <li class="routine-row">
+      <button type="button" class="history-item routine-item" data-id="${routine.id}">
+        <div class="history-top">
+          <span class="history-date">${escapeHTML(routine.name)}</span>
+        </div>
+        <div class="history-meta"><span>${count} exercise${count === 1 ? '' : 's'}</span></div>
+      </button>
+      <button type="button" class="routine-delete" data-id="${routine.id}" aria-label="Delete routine">✕</button>
+    </li>
+  `;
+}
+
+function renderRoutinesList() {
+  $('routinesEmpty').hidden = routines.length > 0;
+  $('routinesList').innerHTML = routines.map(routineRowHTML).join('');
+}
+
+function openRoutinesSheet() {
+  renderRoutinesList();
+  $('scrim').hidden = false;
+  $('routinesSheet').hidden = false;
+  $('routinesSheet').scrollTop = 0;
+}
+
+function closeRoutinesSheet() {
+  $('scrim').hidden = true;
+  $('routinesSheet').hidden = true;
+}
+
+$('routinesClose').addEventListener('click', closeRoutinesSheet);
+
+$('routinesList').addEventListener('click', (e) => {
+  const deleteBtn = e.target.closest('.routine-delete');
+  if (deleteBtn) {
+    if (!confirm('Delete this routine?')) return;
+    deleteRoutine(deleteBtn.dataset.id);
+    routines = loadRoutines();
+    renderRoutinesList();
+    toast('Routine deleted');
+    return;
+  }
+  const item = e.target.closest('.routine-item');
+  if (!item) return;
+  const routine = routines.find((r) => r.id === item.dataset.id);
+  if (!routine) return;
+  closeRoutinesSheet();
+  openLiveWorkoutSheet(routine.exerciseIds);
+});
+
+$('addRoutineBtn').addEventListener('click', () => {
+  closeRoutinesSheet();
+  openRoutineBuilderSheet();
+});
+
+/* ------------------------------------------------------- routine builder */
+
+function renderRoutinePickerChips() {
+  $('routinePickerChips').innerHTML = MUSCLES.map((m) => `<button type="button" class="chip" data-muscle="${m}">${MUSCLE_LABEL[m]}</button>`).join('');
+}
+
+function renderRoutineSelectedList() {
+  $('routineSelectedEmpty').hidden = routineSelectedIds.length > 0;
+  $('routineSelectedList').innerHTML = routineSelectedIds.map((id) => {
+    const ex = findExercise(id);
+    if (!ex) return '';
+    return `
+      <div class="routine-selected-item">
+        <div>
+          <div class="wo-exercise-name">${escapeHTML(ex.name)}</div>
+          <div class="wo-exercise-meta">${escapeHTML(exerciseMetaText(ex))}</div>
+        </div>
+        <button type="button" class="routine-selected-remove" data-id="${id}" aria-label="Remove exercise">✕</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderRoutinePickerResults() {
+  const q = $('routinePickerSearch').value;
+  const muscle = $('routinePickerChips').querySelector('.chip.active')?.dataset.muscle || '';
+  const results = searchExercises(q, muscle, allExercises());
+  $('routinePickerResults').innerHTML = results.length
+    ? results.map((e) => `
+      <button type="button" class="wo-picker-result${routineSelectedIds.includes(e.id) ? ' selected' : ''}" data-id="${e.id}">
+        <span>${escapeHTML(e.name)}</span>
+        <span class="wo-picker-result-meta">${routineSelectedIds.includes(e.id) ? '✓ added' : escapeHTML(e.equipment)}</span>
+      </button>
+    `).join('')
+    : '<p class="empty">No matching exercises.</p>';
+}
+
+/** Opens the routine builder blank, or pre-seeded with `exerciseIds` (used
+ *  by "Save as Routine" on the finish-workout summary). */
+function openRoutineBuilderSheet(exerciseIds = []) {
+  routineSelectedIds = [...new Set(exerciseIds)];
+  $('routineName').value = '';
+  $('routinePickerSearch').value = '';
+  renderRoutinePickerChips();
+  renderRoutineSelectedList();
+  renderRoutinePickerResults();
+  $('scrim').hidden = false;
+  $('routineBuilderSheet').hidden = false;
+  $('routineBuilderSheet').scrollTop = 0;
+}
+
+function closeRoutineBuilderSheet() {
+  $('scrim').hidden = true;
+  $('routineBuilderSheet').hidden = true;
+}
+
+$('routineCancel').addEventListener('click', closeRoutineBuilderSheet);
+
+$('routinePickerChips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  const wasActive = chip.classList.contains('active');
+  $('routinePickerChips').querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+  if (!wasActive) chip.classList.add('active');
+  renderRoutinePickerResults();
+});
+
+$('routinePickerSearch').addEventListener('input', renderRoutinePickerResults);
+
+$('routinePickerResults').addEventListener('click', (e) => {
+  const btn = e.target.closest('.wo-picker-result');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const idx = routineSelectedIds.indexOf(id);
+  if (idx === -1) routineSelectedIds.push(id); else routineSelectedIds.splice(idx, 1);
+  renderRoutineSelectedList();
+  renderRoutinePickerResults();
+});
+
+$('routineSelectedList').addEventListener('click', (e) => {
+  const btn = e.target.closest('.routine-selected-remove');
+  if (!btn) return;
+  routineSelectedIds = routineSelectedIds.filter((id) => id !== btn.dataset.id);
+  renderRoutineSelectedList();
+  renderRoutinePickerResults();
+});
+
+$('routineForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = $('routineName').value.trim();
+  if (!name) { toast('Enter a routine name'); return; }
+  if (routineSelectedIds.length === 0) { toast('Add at least one exercise'); return; }
+  addRoutine({ name, exerciseIds: routineSelectedIds });
+  routines = loadRoutines();
+  closeRoutineBuilderSheet();
+  toast('Routine saved');
+});
+
 function openWorkoutSummarySheet(workout, durationMs) {
+  lastFinishedWorkout = workout;
   $('summaryDuration').textContent = fmtElapsed(durationMs);
   const rows = workoutSummaryByExercise(workout, allExercises(), bodyweightKg());
   $('summaryExercises').innerHTML = rows.length
@@ -1233,6 +1477,12 @@ function openWorkoutSummarySheet(workout, durationMs) {
   $('workoutSummarySheet').hidden = false;
   $('workoutSummarySheet').scrollTop = 0;
 }
+
+$('summarySaveRoutine').addEventListener('click', () => {
+  $('workoutSummarySheet').hidden = true;
+  const ids = (lastFinishedWorkout?.exercises || []).map((ex) => ex.exerciseId);
+  openRoutineBuilderSheet(ids);
+});
 
 function finishLiveWorkout(data) {
   const durationMs = Date.now() - new Date(liveSession.startedAt).getTime();
@@ -1264,7 +1514,7 @@ function resumeLiveWorkoutIfAny() {
   $('woName').value = saved.name || '';
   $('woNotes').value = saved.notes || '';
   $('woExerciseList').innerHTML = (saved.exercises || [])
-    .map((ex) => exerciseBlockHTML(ex.exerciseId, ex.sets && ex.sets.length ? ex.sets : [{}], ex.supersetId))
+    .map((ex) => exerciseBlockHTML(ex.exerciseId, ex.sets && ex.sets.length ? ex.sets : [{}], ex.supersetId, ex.brand))
     .join('');
   regroupSupersets();
   $('woPicker').hidden = true;

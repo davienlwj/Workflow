@@ -41,6 +41,12 @@ export const MUSCLE_LABEL = {
 /** Equipment options offered when logging or creating an exercise. */
 export const EQUIPMENT = ['Barbell', 'Dumbbell', 'Kettlebell', 'Cable', 'Machine', 'Bodyweight', 'Band'];
 
+/** Machine brands offered for Machine/Cable equipment - their resistance
+ *  profiles differ enough to be worth recording per logged exercise. The
+ *  "-" default isn't in this list; it's the dropdown's own placeholder
+ *  option, same as other selects in the app. */
+export const BRANDS = ['Hammer Strength', 'Life Fitness', 'Precor', 'Technogym', 'Ziva'];
+
 // The muscle-balance radar chart reads MUSCLES' 22 groups as too granular
 // to plot as a chart (see muscleSetBreakdown in workout.js) - it collapses
 // them into these 9 general regions instead.

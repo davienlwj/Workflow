@@ -72,6 +72,7 @@ export function lastPerformance(workouts, exerciseId) {
   return {
     date: withThis[0].date,
     sets: (ex.sets || []).filter((s) => s.weight != null && s.reps != null),
+    brand: ex.brand || null,
   };
 }
 

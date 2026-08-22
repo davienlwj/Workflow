@@ -10,6 +10,8 @@ const SESSIONS_KEY = 'vo2max.sessions.v1';
 const WORKOUTS_KEY = 'vo2max.workouts.v1';
 const CUSTOM_EXERCISES_KEY = 'vo2max.customExercises.v1';
 const LIVE_WORKOUT_KEY = 'vo2max.liveWorkout.v1';
+const ROUTINES_KEY = 'vo2max.routines.v1';
+const CUSTOM_BRANDS_KEY = 'vo2max.customBrands.v1';
 
 export const DEFAULT_SETTINGS = {
   theme: 'light', // 'light' | 'dark'
@@ -169,6 +171,62 @@ export function deleteCustomExercise(id) {
   saveCustomExercises(exercises);
 }
 
+/** Named lists of exercises for quickly starting a live workout pre-loaded
+ *  with your usual picks, instead of re-adding them one by one every time. */
+export function loadRoutines() {
+  try {
+    const raw = localStorage.getItem(ROUTINES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveRoutines(routines) {
+  localStorage.setItem(ROUTINES_KEY, JSON.stringify(routines));
+}
+
+export function addRoutine(routine) {
+  const routines = loadRoutines();
+  const record = { id: `routine-${makeId()}`, ...routine };
+  routines.push(record);
+  saveRoutines(routines);
+  return record;
+}
+
+export function deleteRoutine(id) {
+  const routines = loadRoutines().filter((r) => r.id !== id);
+  saveRoutines(routines);
+}
+
+/** User-added machine brands, layered on top of the built-in list in
+ *  js/exercises.js (BRANDS), same role as customExercises above. */
+export function loadCustomBrands() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_BRANDS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomBrands(brands) {
+  localStorage.setItem(CUSTOM_BRANDS_KEY, JSON.stringify(brands));
+}
+
+export function addCustomBrand(name) {
+  const brands = loadCustomBrands();
+  if (!brands.includes(name)) {
+    brands.push(name);
+    saveCustomBrands(brands);
+  }
+  return brands;
+}
+
 /** In-progress "today's workout" live session, so backgrounding/killing the
  *  PWA mid-workout at the gym doesn't lose it. Shape: { startedAt, date,
  *  name, notes, exercises } - same as readWorkoutForm()'s output plus
@@ -196,6 +254,8 @@ export function exportAll() {
     sessions: loadSessions(),
     workouts: loadWorkouts(),
     customExercises: loadCustomExercises(),
+    routines: loadRoutines(),
+    customBrands: loadCustomBrands(),
     exportedAt: new Date().toISOString(),
   }, null, 2);
 }
@@ -206,4 +266,6 @@ export function importAll(json) {
   if (Array.isArray(data.sessions)) saveSessions(data.sessions);
   if (Array.isArray(data.workouts)) saveWorkouts(data.workouts);
   if (Array.isArray(data.customExercises)) saveCustomExercises(data.customExercises);
+  if (Array.isArray(data.routines)) saveRoutines(data.routines);
+  if (Array.isArray(data.customBrands)) saveCustomBrands(data.customBrands);
 }

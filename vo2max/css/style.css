@@ -673,6 +673,57 @@ button { font-family: var(--font-mono); }
 .history-meta { font-size: 13px; color: var(--dim); display: flex; gap: 10px; flex-wrap: wrap; }
 .history-notes { font-size: 13px; color: var(--dimmer); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.routine-row { display: flex; align-items: center; gap: 8px; }
+.routine-row .routine-item { flex: 1; }
+
+.routine-delete {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--dim);
+  width: 34px;
+  height: 34px;
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.routine-selected-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.routine-selected-item {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.routine-selected-remove {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--dim);
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.wo-picker-result.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+.wo-picker-result.selected .wo-picker-result-meta { color: var(--bg); }
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -1059,6 +1110,21 @@ button { font-family: var(--font-mono); }
   font-size: 12px;
   color: var(--dim);
   margin: -4px 0 8px;
+}
+
+.wo-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.wo-brand-select {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 13px;
 }
 
 .wo-set-row-heading {

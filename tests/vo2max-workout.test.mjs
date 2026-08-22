@@ -78,6 +78,19 @@ test('lastPerformance returns null when the exercise has never been logged', () 
   assert.equal(lastPerformance([], 'bench-press'), null);
 });
 
+test('lastPerformance returns the machine brand logged with the most recent session', () => {
+  const workouts = [
+    makeWorkout('2026-08-01', [{ exerciseId: 'leg-press', brand: 'Precor', sets: [{ weight: 100, reps: 10 }] }]),
+    makeWorkout('2026-08-10', [{ exerciseId: 'leg-press', brand: 'Life Fitness', sets: [{ weight: 110, reps: 8 }] }]),
+  ];
+  assert.equal(lastPerformance(workouts, 'leg-press').brand, 'Life Fitness');
+});
+
+test('lastPerformance returns brand: null when no brand was logged', () => {
+  const workouts = [makeWorkout('2026-08-01', [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8 }] }])];
+  assert.equal(lastPerformance(workouts, 'bench-press').brand, null);
+});
+
 test('personalRecords finds the max weight, best est. 1RM, best set volume, and session count', () => {
   const workouts = [
     makeWorkout('2026-08-01', [{ exerciseId: 'bench-press', sets: [{ weight: 55, reps: 8 }] }]),
