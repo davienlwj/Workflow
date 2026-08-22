@@ -15,7 +15,7 @@ import {
   mileageBuckets, totalMileage,
 } from './block.js';
 import {
-  vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG, muscleRadarSVG,
+  vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG, exerciseVolumeSVG, muscleRadarSVG,
 } from './chart.js';
 import { sessionToICS } from './ics.js';
 import {
@@ -24,7 +24,7 @@ import {
 } from './exercises.js';
 import { muscleDiagramHTML } from './muscleDiagram.js';
 import {
-  workoutVolume, lastPerformance, personalRecords, exerciseProgress,
+  workoutVolume, lastPerformance, personalRecords, exerciseProgress, exerciseVolumeProgress, loggedBrandsForExercise,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince,
   muscleSetBreakdown, muscleSetBreakdownDetailed, workoutSummaryByExercise,
 } from './workout.js';
@@ -51,6 +51,7 @@ let customBrands = loadCustomBrands();
 let editingId = null;
 let workoutEditingId = null;
 let exerciseSheetId = null;
+let exDetailBrand = ''; // '' = all brands, else a brand logged for the open exercise
 let mileageScope = 'week';
 let muscleRange = 'week';
 let exerciseFilterMuscle = ''; // '' = all body parts, else a MUSCLES id
@@ -1401,6 +1402,52 @@ function renderRoutinePickerResults() {
     : '<p class="empty">No matching exercises.</p>';
 }
 
+/* ------------------------------------------ routine builder: new exercise */
+
+function renderRoutineNewExMuscleChips() {
+  $('routineNewExMuscles').innerHTML = MUSCLES.map((m) => `<button type="button" class="chip" data-muscle="${m}">${MUSCLE_LABEL[m]}</button>`).join('');
+}
+
+function resetRoutineNewExerciseForm() {
+  $('routineNewExName').value = '';
+  $('routineNewExEquipment').innerHTML = EQUIPMENT.map((eq) => `<option value="${eq}">${eq}</option>`).join('');
+  renderRoutineNewExMuscleChips();
+}
+
+function openRoutineNewExerciseForm() {
+  resetRoutineNewExerciseForm();
+  $('routineNewExerciseForm').hidden = false;
+  $('routinePickerResults').hidden = true;
+  $('routineNewExName').focus();
+}
+
+function closeRoutineNewExerciseForm() {
+  $('routineNewExerciseForm').hidden = true;
+  $('routinePickerResults').hidden = false;
+}
+
+$('routineNewExerciseBtn').addEventListener('click', openRoutineNewExerciseForm);
+$('routineNewExCancel').addEventListener('click', closeRoutineNewExerciseForm);
+
+$('routineNewExMuscles').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  chip.classList.toggle('active');
+});
+
+$('routineNewExSave').addEventListener('click', () => {
+  const name = $('routineNewExName').value.trim();
+  const equipment = $('routineNewExEquipment').value;
+  const muscles = [...$('routineNewExMuscles').querySelectorAll('.chip.active')].map((c) => c.dataset.muscle);
+  if (!name) { toast('Enter an exercise name'); return; }
+  if (muscles.length === 0) { toast('Pick at least one body part'); return; }
+  addCustomExercise({ name, equipment, muscles });
+  customExercises = loadCustomExercises();
+  closeRoutineNewExerciseForm();
+  renderRoutinePickerResults();
+  toast('Exercise added');
+});
+
 /** Opens the routine builder blank, or pre-seeded with `exerciseIds` (used
  *  by "Save as Routine" on the finish-workout summary). */
 function openRoutineBuilderSheet(exerciseIds = []) {
@@ -1410,6 +1457,7 @@ function openRoutineBuilderSheet(exerciseIds = []) {
   renderRoutinePickerChips();
   renderRoutineSelectedList();
   renderRoutinePickerResults();
+  closeRoutineNewExerciseForm();
   $('scrim').hidden = false;
   $('routineBuilderSheet').hidden = false;
   $('routineBuilderSheet').scrollTop = 0;
@@ -1588,17 +1636,15 @@ $('woDelete').addEventListener('click', () => {
   toast('Workout deleted');
 });
 
-function openExerciseSheet(exerciseId) {
-  const ex = findExercise(exerciseId);
+/** Repaints the stat grid and both progress charts for the currently-open
+ *  exercise sheet, respecting the selected brand filter (if any). Split out
+ *  from openExerciseSheet so the filter's change handler can re-render
+ *  without rebuilding the whole sheet (name, diagram, filter options). */
+function renderExerciseSheetStats() {
+  const ex = findExercise(exerciseSheetId);
   if (!ex) return;
-  exerciseSheetId = exerciseId;
-  // Not in the built-in static library (checked with no custom exercises
-  // mixed in) means the user created it themselves, and can delete it.
-  $('exDetailDeleteCustom').hidden = Boolean(exerciseById(exerciseId));
-  const pr = personalRecords(workouts, exerciseId, allExercises(), bodyweightKg());
-  $('exDetailName').textContent = ex.name;
-  $('exDetailMeta').textContent = exerciseMetaText(ex);
-  $('exDetailDiagram').innerHTML = muscleDiagramHTML(ex.muscles);
+  const brand = exDetailBrand || null;
+  const pr = personalRecords(workouts, exerciseSheetId, allExercises(), bodyweightKg(), brand);
   $('exDetailStatGrid').innerHTML = [
     [pr ? `${pr.maxWeight}kg` : '—', 'Best weight'],
     [pr ? `${pr.best1RM}kg` : '—', 'Est. 1RM'],
@@ -1609,11 +1655,41 @@ function openExerciseSheet(exerciseId) {
       <div class="stat-label">${label}</div>
     </div>
   `).join('');
-  $('exDetailChart').innerHTML = exerciseProgressSVG(exerciseProgress(workouts, exerciseId, allExercises(), bodyweightKg()));
+  $('exDetailChart').innerHTML = exerciseProgressSVG(exerciseProgress(workouts, exerciseSheetId, allExercises(), bodyweightKg(), brand));
+  $('exDetailVolumeChart').innerHTML = exerciseVolumeSVG(exerciseVolumeProgress(workouts, exerciseSheetId, allExercises(), bodyweightKg(), brand));
+}
+
+function openExerciseSheet(exerciseId) {
+  const ex = findExercise(exerciseId);
+  if (!ex) return;
+  exerciseSheetId = exerciseId;
+  exDetailBrand = '';
+  // Not in the built-in static library (checked with no custom exercises
+  // mixed in) means the user created it themselves, and can delete it.
+  $('exDetailDeleteCustom').hidden = Boolean(exerciseById(exerciseId));
+  $('exDetailName').textContent = ex.name;
+  $('exDetailMeta').textContent = exerciseMetaText(ex);
+  $('exDetailDiagram').innerHTML = muscleDiagramHTML(ex.muscles);
+  // Brand filter only makes sense for Machine/Cable equipment, and only
+  // once there's actually more than one brand's worth of data to filter.
+  const loggedBrands = (ex.equipment === 'Machine' || ex.equipment === 'Cable')
+    ? loggedBrandsForExercise(workouts, exerciseId)
+    : [];
+  $('exDetailBrandFilter').hidden = loggedBrands.length === 0;
+  $('exDetailBrandFilter').innerHTML = ['<option value="">All brands</option>']
+    .concat(loggedBrands.map((b) => `<option value="${escapeHTML(b)}">${escapeHTML(b)}</option>`))
+    .join('');
+  $('exDetailBrandFilter').value = '';
+  renderExerciseSheetStats();
   $('scrim').hidden = false;
   $('exerciseSheet').hidden = false;
   $('exerciseSheet').scrollTop = 0;
 }
+
+$('exDetailBrandFilter').addEventListener('change', () => {
+  exDetailBrand = $('exDetailBrandFilter').value;
+  renderExerciseSheetStats();
+});
 
 function closeExerciseSheet() {
   exerciseSheetId = null;

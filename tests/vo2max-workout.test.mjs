@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  workoutVolume, lastPerformance, personalRecords, exerciseProgress,
+  workoutVolume, lastPerformance, personalRecords, exerciseProgress, exerciseVolumeProgress, loggedBrandsForExercise,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince, muscleSetBreakdown,
   muscleSetBreakdownDetailed, workoutSummaryByExercise,
 } from '../vo2max/js/workout.js';
@@ -178,6 +178,57 @@ test('exerciseProgress picks the heaviest set per workout date, sorted oldest to
     { date: '2026-08-01', value: 55, reps: 8 },
     { date: '2026-08-10', value: 65, reps: 3 },
   ]);
+});
+
+test('exerciseVolumeProgress sums weight x reps per workout date, sorted oldest to newest', () => {
+  const workouts = [
+    makeWorkout('2026-08-10', [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8 }, { weight: 65, reps: 3 }] }]),
+    makeWorkout('2026-08-01', [{ exerciseId: 'bench-press', sets: [{ weight: 55, reps: 8 }] }]),
+  ];
+  const series = exerciseVolumeProgress(workouts, 'bench-press');
+  assert.deepEqual(series, [
+    { date: '2026-08-01', value: 55 * 8 },
+    { date: '2026-08-10', value: 60 * 8 + 65 * 3 },
+  ]);
+});
+
+test('exerciseVolumeProgress excludes warm-up sets, matching workoutVolume\'s convention', () => {
+  const workouts = [makeWorkout('2026-08-10', [{
+    exerciseId: 'bench-press',
+    sets: [{ weight: 40, reps: 10, type: 'warmup' }, { weight: 60, reps: 8 }],
+  }])];
+  assert.deepEqual(exerciseVolumeProgress(workouts, 'bench-press'), [{ date: '2026-08-10', value: 60 * 8 }]);
+});
+
+test('exerciseVolumeProgress adds the user\'s bodyweight for bodyweight exercises', () => {
+  const workouts = [makeWorkout('2026-08-10', [{ exerciseId: 'dip', sets: [{ reps: 10 }] }])];
+  assert.deepEqual(exerciseVolumeProgress(workouts, 'dip', undefined, 80), [{ date: '2026-08-10', value: 80 * 10 }]);
+});
+
+test('personalRecords, exerciseProgress and exerciseVolumeProgress filter to only the given brand', () => {
+  const workouts = [
+    makeWorkout('2026-08-01', [{ exerciseId: 'leg-press', brand: 'Precor', sets: [{ weight: 100, reps: 10 }] }]),
+    makeWorkout('2026-08-10', [{ exerciseId: 'leg-press', brand: 'Life Fitness', sets: [{ weight: 150, reps: 5 }] }]),
+  ];
+  assert.equal(personalRecords(workouts, 'leg-press', undefined, null, 'Precor').maxWeight, 100);
+  assert.deepEqual(exerciseProgress(workouts, 'leg-press', undefined, null, 'Precor'), [{ date: '2026-08-01', value: 100, reps: 10 }]);
+  assert.deepEqual(exerciseVolumeProgress(workouts, 'leg-press', undefined, null, 'Precor'), [{ date: '2026-08-01', value: 1000 }]);
+  // no brand filter -> both sessions included
+  assert.equal(personalRecords(workouts, 'leg-press').maxWeight, 150);
+});
+
+test('loggedBrandsForExercise lists distinct brands logged for an exercise, alphabetically', () => {
+  const workouts = [
+    makeWorkout('2026-08-01', [{ exerciseId: 'leg-press', brand: 'Precor', sets: [{ weight: 100, reps: 10 }] }]),
+    makeWorkout('2026-08-05', [{ exerciseId: 'leg-press', brand: 'Precor', sets: [{ weight: 105, reps: 8 }] }]),
+    makeWorkout('2026-08-10', [{ exerciseId: 'leg-press', brand: 'Life Fitness', sets: [{ weight: 110, reps: 8 }] }]),
+    makeWorkout('2026-08-12', [{ exerciseId: 'leg-press', sets: [{ weight: 110, reps: 8 }] }]), // no brand logged
+  ];
+  assert.deepEqual(loggedBrandsForExercise(workouts, 'leg-press'), ['Life Fitness', 'Precor']);
+});
+
+test('loggedBrandsForExercise returns an empty list when nothing has been logged', () => {
+  assert.deepEqual(loggedBrandsForExercise([], 'leg-press'), []);
 });
 
 test('volumeSince adds the user\'s bodyweight for bodyweight exercises within the window', () => {

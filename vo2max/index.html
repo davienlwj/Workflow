@@ -482,6 +482,27 @@
 
     <input id="routinePickerSearch" type="text" class="wo-picker-search" placeholder="Search exercises…">
     <div id="routinePickerChips" class="wo-picker-chips"></div>
+    <button type="button" id="routineNewExerciseBtn" class="ghost-btn block">+ Create new exercise</button>
+
+    <div id="routineNewExerciseForm" class="wo-new-exercise" hidden>
+      <label class="field">
+        <span>Exercise name</span>
+        <input id="routineNewExName" type="text" placeholder="e.g. Cable Hip Abduction">
+      </label>
+      <label class="field">
+        <span>Equipment</span>
+        <select id="routineNewExEquipment"></select>
+      </label>
+      <label class="field">
+        <span>Body part(s) <em>(tap all that apply)</em></span>
+        <div id="routineNewExMuscles" class="wo-picker-chips"></div>
+      </label>
+      <div class="actions">
+        <button type="button" id="routineNewExCancel" class="ghost-btn">Cancel</button>
+        <button type="button" id="routineNewExSave" class="primary">Save exercise</button>
+      </div>
+    </div>
+
     <div id="routinePickerResults" class="wo-picker-results"></div>
 
     <div class="actions">
@@ -510,8 +531,14 @@
   <p id="exDetailMeta" class="exercise-summary-meta"></p>
   <div id="exDetailDiagram" class="exercise-detail-diagram"></div>
   <div id="exDetailStatGrid" class="stat-grid"></div>
-  <h3 class="section-title">Progress</h3>
+  <div class="section-title-row">
+    <h3 class="section-title">Progress</h3>
+    <select id="exDetailBrandFilter" class="exercise-filter-select" hidden></select>
+  </div>
+  <p class="chart-label">Weight</p>
   <div id="exDetailChart" class="chart-wrap"></div>
+  <p class="chart-label">Volume</p>
+  <div id="exDetailVolumeChart" class="chart-wrap"></div>
   <div class="actions">
     <button type="button" id="exDetailDeleteCustom" class="danger-btn" hidden>Delete exercise</button>
     <button type="button" id="exDetailClose" class="ghost-btn block">Close</button>

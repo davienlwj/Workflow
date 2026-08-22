@@ -71,10 +71,16 @@ export function vo2maxTrendSVG(points) {
   </svg>`;
 }
 
-/** @param {{date: string, value: number, reps: number}[]} points oldest to newest: an exercise's heaviest set per session */
-export function exerciseProgressSVG(points) {
+/** Shared renderer for the two "exercise metric over time" charts (weight,
+ *  volume) - near-identical to vo2maxTrendSVG by design (see that function),
+ *  but factored out since both callers were being touched in the same
+ *  change and adding a y-axis unit label to both by hand would've meant
+ *  keeping three copies of this logic in sync.
+ * @param {{date: string, value: number}[]} points oldest to newest
+ * @param {{emptyMessage: string, axisLabel: string, ariaLabel: string, tooltip: (p) => string}} opts */
+function exerciseLineChartSVG(points, { emptyMessage, axisLabel, ariaLabel, tooltip }) {
   if (points.length === 0) {
-    return '<p class="chart-empty">No sets logged for this exercise yet.</p>';
+    return `<p class="chart-empty">${emptyMessage}</p>`;
   }
 
   const values = points.map((p) => p.value);
@@ -105,7 +111,7 @@ export function exerciseProgressSVG(points) {
     const cy = y(p.value).toFixed(1);
     const labelY = Math.max(9, Number(cy) - 8).toFixed(1);
     return `<circle cx="${cx}" cy="${cy}" r="3" class="chart-dot">
-      <title>${fmtDate(p.date)}: ${p.value}kg × ${p.reps}</title>
+      <title>${tooltip(p)}</title>
     </circle>
     <text x="${cx}" y="${labelY}" class="chart-value-label" text-anchor="middle">${p.value}</text>`;
   }).join('');
@@ -115,13 +121,34 @@ export function exerciseProgressSVG(points) {
     ? `<text x="${x(points.length - 1).toFixed(1)}" y="${H - 6}" class="chart-axis" text-anchor="end">${fmtDate(points[points.length - 1].date)}</text>`
     : '';
 
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}" class="chart-svg" role="img" aria-label="Exercise progress">
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}" class="chart-svg" role="img" aria-label="${ariaLabel}">
+    <text x="2" y="12" class="chart-axis" text-anchor="start">${axisLabel}</text>
     ${gridLines}
     <path d="${linePath}" class="chart-line" fill="none" />
     ${dots}
     ${firstLabel}
     ${lastLabel}
   </svg>`;
+}
+
+/** @param {{date: string, value: number, reps: number}[]} points oldest to newest: an exercise's heaviest set per session */
+export function exerciseProgressSVG(points) {
+  return exerciseLineChartSVG(points, {
+    emptyMessage: 'No sets logged for this exercise yet.',
+    axisLabel: 'kg',
+    ariaLabel: 'Exercise progress',
+    tooltip: (p) => `${fmtDate(p.date)}: ${p.value}kg × ${p.reps}`,
+  });
+}
+
+/** @param {{date: string, value: number}[]} points oldest to newest: an exercise's total weight x reps per session */
+export function exerciseVolumeSVG(points) {
+  return exerciseLineChartSVG(points, {
+    emptyMessage: 'No sets logged for this exercise yet.',
+    axisLabel: 'kg',
+    ariaLabel: 'Exercise volume',
+    tooltip: (p) => `${fmtDate(p.date)}: ${p.value}kg volume`,
+  });
 }
 
 /** @param {{label: string, km: number}[]} buckets oldest to newest */

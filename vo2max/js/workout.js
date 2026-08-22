@@ -45,21 +45,38 @@ export function workoutVolume(workout, exercises = EXERCISES, bodyweightKg = nul
  *  oldest first - feeds PRs and the progress chart, which a light warm-up
  *  set would otherwise understate or distort. A Bodyweight-equipment set
  *  only needs reps logged (weight is optional extra load); every other
- *  equipment still requires an explicit weight, as before. */
-function setsForExercise(workouts, exerciseId, exercises = EXERCISES, bodyweightKg = null) {
+ *  equipment still requires an explicit weight, as before.
+ * @param {string|null} [brand] when set, only sets logged against this exact
+ *   machine/cable brand are included (an exercise entry with no matching
+ *   brand is skipped entirely, not just its sets). */
+function setsForExercise(workouts, exerciseId, exercises = EXERCISES, bodyweightKg = null, brand = null) {
   const isBodyweight = exerciseById(exerciseId, exercises)?.equipment === 'Bodyweight';
   const out = [];
   for (const w of [...workouts].sort((a, b) => a.date.localeCompare(b.date))) {
     const ex = (w.exercises || []).find((e) => e.exerciseId === exerciseId);
     if (!ex) continue;
+    if (brand && (ex.brand || null) !== brand) continue;
     for (const set of ex.sets || []) {
       if (set.reps == null) continue;
       if (!isBodyweight && set.weight == null) continue;
       if (set.type === 'warmup') continue;
-      out.push({ date: w.date, weight: loadWeight(set, isBodyweight, bodyweightKg), reps: set.reps });
+      out.push({
+        date: w.date, weight: loadWeight(set, isBodyweight, bodyweightKg), reps: set.reps, brand: ex.brand || null,
+      });
     }
   }
   return out;
+}
+
+/** Distinct brands ever logged against this exercise, alphabetically - for
+ *  populating the exercise-detail brand filter dropdown. */
+export function loggedBrandsForExercise(workouts, exerciseId) {
+  const brands = new Set();
+  for (const w of workouts) {
+    const ex = (w.exercises || []).find((e) => e.exerciseId === exerciseId);
+    if (ex && ex.brand) brands.add(ex.brand);
+  }
+  return [...brands].sort();
 }
 
 /** The most recent workout's sets for this exercise, for a "last time" hint while logging. */
@@ -83,9 +100,9 @@ function estOneRM(weight, reps) {
 
 /** Best weight, best estimated 1RM, best single-set volume, and how many
  *  sessions this exercise has appeared in. See workoutVolume for the
- *  `exercises`/`bodyweightKg` params. */
-export function personalRecords(workouts, exerciseId, exercises = EXERCISES, bodyweightKg = null) {
-  const sets = setsForExercise(workouts, exerciseId, exercises, bodyweightKg);
+ *  `exercises`/`bodyweightKg` params, setsForExercise for `brand`. */
+export function personalRecords(workouts, exerciseId, exercises = EXERCISES, bodyweightKg = null, brand = null) {
+  const sets = setsForExercise(workouts, exerciseId, exercises, bodyweightKg, brand);
   if (!sets.length) return null;
   return {
     maxWeight: Math.max(...sets.map((s) => s.weight)),
@@ -97,9 +114,9 @@ export function personalRecords(workouts, exerciseId, exercises = EXERCISES, bod
 
 /** One point per workout date this exercise appears in (that day's heaviest
  *  set), for a progress chart. See workoutVolume for the `exercises`/
- *  `bodyweightKg` params. */
-export function exerciseProgress(workouts, exerciseId, exercises = EXERCISES, bodyweightKg = null) {
-  const sets = setsForExercise(workouts, exerciseId, exercises, bodyweightKg);
+ *  `bodyweightKg` params, setsForExercise for `brand`. */
+export function exerciseProgress(workouts, exerciseId, exercises = EXERCISES, bodyweightKg = null, brand = null) {
+  const sets = setsForExercise(workouts, exerciseId, exercises, bodyweightKg, brand);
   const byDate = new Map();
   for (const s of sets) {
     const prev = byDate.get(s.date);
@@ -108,6 +125,21 @@ export function exerciseProgress(workouts, exerciseId, exercises = EXERCISES, bo
   return [...byDate.values()]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((s) => ({ date: s.date, value: s.weight, reps: s.reps }));
+}
+
+/** One point per workout date this exercise appears in (that day's total
+ *  weight x reps across its non-warm-up sets), for a volume progress chart.
+ *  See workoutVolume for the `exercises`/`bodyweightKg` params, setsForExercise
+ *  for `brand`. */
+export function exerciseVolumeProgress(workouts, exerciseId, exercises = EXERCISES, bodyweightKg = null, brand = null) {
+  const sets = setsForExercise(workouts, exerciseId, exercises, bodyweightKg, brand);
+  const byDate = new Map();
+  for (const s of sets) {
+    byDate.set(s.date, (byDate.get(s.date) || 0) + s.weight * s.reps);
+  }
+  return [...byDate.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, value]) => ({ date, value }));
 }
 
 /**

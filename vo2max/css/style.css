@@ -420,6 +420,13 @@ button { font-family: var(--font-mono); }
 
 /* ----------------------------------------------------------------- chart */
 
+.chart-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  margin: 12px 0 4px;
+}
+
 .chart-wrap {
   background: var(--panel);
   border: 1px solid var(--line);
