@@ -627,6 +627,10 @@ button { font-family: var(--font-mono); }
   color: var(--dim);
 }
 .cal-legend-item .glyph-icon { width: 12px; height: 12px; color: var(--dim); }
+/* The dumbbell glyph's "ink" sits in a narrower band of its 24x24 viewBox
+   than the runner's, so it reads smaller at the same box size - bump it up
+   to match the run icon's visual weight. */
+.cal-legend-item .glyph-workout { width: 16px; height: 16px; }
 
 .cal-day-panel {
   display: flex;

@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 """
-Traces tools/icon-run-source.jpg and tools/icon-dumbbell-source.jpg (the
-user-provided reference icons) into clean SVG path data, normalized to a
-0..24 viewBox, and writes the two <path> `d` strings into js/icons.js so
-the app can render them as currentColor-able inline SVG.
+Traces tools/icon-run-source.jpg (the user-provided reference icon) into
+clean SVG path data, normalized to a 0..24 viewBox, and writes it into
+js/icons.js's RUN_PATH_D so the app can render it as currentColor-able
+inline SVG.
+
+DUMBBELL_PATH_D is intentionally NOT regenerated here: tools/icon-dumbbell-
+source.jpg is a thin outline glyph that traces to mostly white space and
+reads much lighter/smaller than the solid runner silhouette at matching
+sizes, so js/icons.js instead hand-draws it as a solid bar-and-plates
+silhouette. Re-run icon-dumbbell-source.jpg through this script's
+trace_to_path_d() only if you're deliberately replacing that hand-drawn
+artwork with a newly traced source image.
 
 Requires Pillow, numpy and potracer (`pip install pillow numpy potracer`,
 importing as `potrace`).
@@ -85,13 +93,11 @@ def replace_between(text, start_marker, end_marker, new_body):
 
 def main():
     run_d = trace_to_path_d(HERE / "icon-run-source.jpg")
-    dumbbell_d = trace_to_path_d(HERE / "icon-dumbbell-source.jpg")
 
     js = APP_JS_ICONS.read_text()
     js = replace_between(js, "RUN_PATH_D = '", "'", run_d)
-    js = replace_between(js, "DUMBBELL_PATH_D = '", "'", dumbbell_d)
     APP_JS_ICONS.write_text(js)
-    print(f"wrote traced path data into {APP_JS_ICONS}")
+    print(f"wrote traced RUN_PATH_D into {APP_JS_ICONS} (DUMBBELL_PATH_D is hand-drawn - see icons.js)")
 
 
 if __name__ == "__main__":
