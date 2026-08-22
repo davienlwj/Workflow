@@ -1,4 +1,4 @@
-# HYBIRD
+# HYBR.
 
 A personal training log for the Norwegian 4x4 VO2max protocol. No account, no
 server — everything is stored in `localStorage` on your device, and the app
