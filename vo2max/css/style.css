@@ -131,7 +131,7 @@ body {
 .menu-dropdown {
   position: absolute;
   top: 100%;
-  left: 16px;
+  right: 16px;
   margin-top: 6px;
   z-index: 15;
   display: flex;
