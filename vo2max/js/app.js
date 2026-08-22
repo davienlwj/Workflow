@@ -1324,9 +1324,14 @@ function routineRowHTML(routine) {
   `;
 }
 
+/** Renders the routines list into both places it's shown: the popup sheet
+ *  (reached via "Start Workout" → "Select Routine") and the inline Routines
+ *  section on the Lift tab, which share the same markup/behavior. */
 function renderRoutinesList() {
   $('routinesEmpty').hidden = routines.length > 0;
   $('routinesList').innerHTML = routines.map(routineRowHTML).join('');
+  $('routinesTabEmpty').hidden = routines.length > 0;
+  $('routinesTabList').innerHTML = routines.map(routineRowHTML).join('');
 }
 
 function openRoutinesSheet() {
@@ -1365,6 +1370,26 @@ $('addRoutineBtn').addEventListener('click', () => {
   closeRoutinesSheet();
   openRoutineBuilderSheet();
 });
+
+$('routinesTabList').addEventListener('click', (e) => {
+  const deleteBtn = e.target.closest('.routine-delete');
+  if (deleteBtn) {
+    if (!confirm('Delete this routine?')) return;
+    deleteRoutine(deleteBtn.dataset.id);
+    routines = loadRoutines();
+    renderRoutinesList();
+    toast('Routine deleted');
+    return;
+  }
+  const item = e.target.closest('.routine-item');
+  if (!item) return;
+  const routine = routines.find((r) => r.id === item.dataset.id);
+  if (!routine) return;
+  if (liveSession) { toast('Finish or cancel your live workout first'); return; }
+  openLiveWorkoutSheet(routine.exerciseIds);
+});
+
+$('addRoutineTabBtn').addEventListener('click', () => openRoutineBuilderSheet());
 
 /* ------------------------------------------------------- routine builder */
 
@@ -1507,6 +1532,7 @@ $('routineForm').addEventListener('submit', (e) => {
   if (routineSelectedIds.length === 0) { toast('Add at least one exercise'); return; }
   addRoutine({ name, exerciseIds: routineSelectedIds });
   routines = loadRoutines();
+  renderRoutinesList();
   closeRoutineBuilderSheet();
   toast('Routine saved');
 });
@@ -1813,6 +1839,7 @@ function renderWorkoutTab() {
   renderMuscleRadar();
   renderExerciseSummaries();
   renderWorkoutHistory();
+  renderRoutinesList();
 }
 
 /** Redraws the radar chart and, if a label is expanded, its breakdown panel below it. */
