@@ -201,6 +201,23 @@ main.has-live-bar {
   gap: 8px;
 }
 
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 24px 0 10px;
+}
+.section-title-row .section-title { margin: 0; }
+
+.exercise-filter-select {
+  width: auto;
+  height: auto;
+  padding: 6px 8px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
 .empty {
   color: var(--dimmer);
   font-size: 15px;

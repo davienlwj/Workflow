@@ -53,6 +53,7 @@ let workoutEditingId = null;
 let exerciseSheetId = null;
 let mileageScope = 'week';
 let muscleRange = 'week';
+let exerciseFilterMuscle = ''; // '' = all body parts, else a MUSCLES id
 let expandedRadarGroup = null;
 let liveSession = null; // { startedAt } while a live "today's workout" session is running
 let workoutSheetMode = 'instant'; // 'instant' | 'live' - which mode #workoutSheet is currently rendering
@@ -1632,9 +1633,24 @@ $('exDetailDeleteCustom').addEventListener('click', () => {
   toast('Exercise deleted');
 });
 
+function renderExerciseFilterOptions() {
+  const options = ['<option value="">All body parts</option>']
+    .concat(MUSCLES.map((m) => `<option value="${m}">${MUSCLE_LABEL[m]}</option>`));
+  $('exerciseFilterMuscle').innerHTML = options.join('');
+  $('exerciseFilterMuscle').value = exerciseFilterMuscle;
+}
+
 function renderExerciseSummaries() {
-  const ids = loggedExerciseIds(workouts);
+  renderExerciseFilterOptions();
+  const ids = loggedExerciseIds(workouts).filter((id) => {
+    if (!exerciseFilterMuscle) return true;
+    const ex = findExercise(id);
+    return ex && ex.muscles.includes(exerciseFilterMuscle);
+  });
   $('exerciseSummaryEmpty').hidden = ids.length > 0;
+  $('exerciseSummaryEmpty').textContent = exerciseFilterMuscle
+    ? 'No logged exercises work this body part yet.'
+    : 'No workouts logged yet — the exercises you log will show up here with their progress.';
   $('exerciseSummaryList').innerHTML = ids.map((id) => {
     const ex = findExercise(id);
     if (!ex) return '';
@@ -1655,6 +1671,11 @@ function renderExerciseSummaries() {
 $('exerciseSummaryList').addEventListener('click', (e) => {
   const card = e.target.closest('.exercise-summary-card');
   if (card) openExerciseSheet(card.dataset.id);
+});
+
+$('exerciseFilterMuscle').addEventListener('change', () => {
+  exerciseFilterMuscle = $('exerciseFilterMuscle').value;
+  renderExerciseSummaries();
 });
 
 function renderWorkoutHistory() {
