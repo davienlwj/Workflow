@@ -442,9 +442,7 @@ button { font-family: var(--font-mono); }
 }
 
 .stat-tile .stat-label {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 13px;
   color: var(--dim);
   margin-top: 4px;
 }
