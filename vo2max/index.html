@@ -7,7 +7,7 @@
 <meta name="description" content="Running and strength training tracker — log runs and workouts, watch the trend, offline.">
 
 <link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#f5f5f5">
+<meta name="theme-color" content="#000000">
 
 <!-- Add to Home Screen on iOS -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -25,6 +25,12 @@
 <link rel="stylesheet" href="./css/style.css">
 </head>
 <body>
+
+<!-- Boot splash: covers the app until app.js finishes its first render, so
+     a cold load (or a home-screen launch, before the OS-generated splash
+     hands off to the page) shows this instead of unstyled/blank content.
+     Removed by app.js once renderAll() has run - see js/app.js. -->
+<div id="bootSplash" aria-hidden="true"><span>HYBR.</span></div>
 
 <header class="bar">
   <div class="bar-left">

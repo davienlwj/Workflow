@@ -79,6 +79,36 @@ body {
 
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
+/* ------------------------------------------------------------ boot splash */
+
+/* Black + centered wordmark, independent of the light/dark theme variables
+   above - the point is a fixed black background regardless of which theme
+   the user lands on, and it's gone before their theme preference would be
+   visually relevant anyway. Visible immediately since it's plain HTML/CSS
+   (no JS needed to show it, only to hide it) - it covers the very first
+   paint on a cold load, before app.js has run at all. app.js adds the
+   "hide" class once renderAll() finishes, fading it out rather than
+   snapping away, then removes the element outright after the transition. */
+#bootSplash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  opacity: 1;
+  transition: opacity 0.15s ease-out;
+}
+#bootSplash.hide { opacity: 0; pointer-events: none; }
+#bootSplash span {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
 /* ---------------------------------------------------------------- header */
 
 .bar {

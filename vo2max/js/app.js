@@ -2118,6 +2118,16 @@ renderAll();
 switchView('dashboard');
 resumeLiveWorkoutIfAny();
 
+// The boot splash (index.html) has done its job now that the real UI is
+// rendered - fade it out, then drop it from the DOM once the transition
+// (see its CSS) finishes, rather than leaving an invisible-but-present
+// full-viewport element sitting over everything.
+const bootSplash = $('bootSplash');
+if (bootSplash) {
+  bootSplash.classList.add('hide');
+  bootSplash.addEventListener('transitionend', () => bootSplash.remove(), { once: true });
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
