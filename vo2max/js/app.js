@@ -550,8 +550,8 @@ function renderDashboard() {
   $('dashStatGrid').innerHTML = [
     [String(sessions.length), 'Runs logged'],
     [String(workouts.length), 'Workouts logged'],
-    [`${mileageThisWeek}km`, 'Mileage this week'],
-    [`${volumeSince(workouts, 7, todayIso(), allExercises(), bodyweightKg())}kg`, 'Volume this week'],
+    [`${mileageThisWeek} km`, 'Mileage this week'],
+    [`${volumeSince(workouts, 7, todayIso(), allExercises(), bodyweightKg())} kg`, 'Volume this week'],
     [daysSinceRun != null ? String(daysSinceRun) : '—', 'Days since last run'],
     [daysSinceWorkout != null ? String(daysSinceWorkout) : '—', 'Days since last workout'],
   ].map(([value, label]) => `
@@ -1699,8 +1699,8 @@ function renderExerciseSheetStats() {
   const brand = exDetailBrand || null;
   const pr = personalRecords(workouts, exerciseSheetId, allExercises(), bodyweightKg(), brand);
   $('exDetailStatGrid').innerHTML = [
-    [pr ? `${pr.maxWeight}kg` : '—', 'Best weight'],
-    [pr ? `${pr.best1RM}kg` : '—', 'Est. 1RM'],
+    [pr ? `${pr.maxWeight} kg` : '—', 'Best weight'],
+    [pr ? `${pr.best1RM} kg` : '—', 'Est. 1RM'],
     [pr ? String(pr.timesLogged) : '0', 'Times logged'],
   ].map(([value, label]) => `
     <div class="stat-tile">
@@ -1917,7 +1917,7 @@ function renderWorkoutTab() {
   const daysSince = daysSinceLastWorkout(workouts);
   $('workoutStatGrid').innerHTML = [
     [String(workouts.length), 'Workouts logged'],
-    [`${volumeSince(workouts, 7, todayIso(), allExercises(), bodyweightKg())}kg`, 'Volume this week'],
+    [`${volumeSince(workouts, 7, todayIso(), allExercises(), bodyweightKg())} kg`, 'Volume this week'],
     [daysSince != null ? String(daysSince) : '—', 'Days since last workout'],
   ].map(([value, label]) => `
     <div class="stat-tile">
