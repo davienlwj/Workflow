@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  workoutVolume, lastPerformance, personalRecords, exerciseProgress, exerciseVolumeProgress, loggedBrandsForExercise,
+  workoutVolume, lastPerformance, personalRecords, newPRsInWorkout, exerciseProgress, exerciseVolumeProgress, loggedBrandsForExercise,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince, muscleSetBreakdown,
   muscleSetBreakdownDetailed, workoutSummaryByExercise,
 } from '../vo2max/js/workout.js';
@@ -178,6 +178,54 @@ test('exerciseProgress picks the heaviest set per workout date, sorted oldest to
     { date: '2026-08-01', value: 55, reps: 8 },
     { date: '2026-08-10', value: 65, reps: 3 },
   ]);
+});
+
+test('newPRsInWorkout flags an exercise that beat its previous best weight', () => {
+  const older = makeWorkout('2026-08-01', [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8 }] }]);
+  const newest = makeWorkout('2026-08-10', [{ exerciseId: 'bench-press', sets: [{ weight: 65, reps: 5 }] }]);
+  const workouts = [older, newest];
+  const prs = newPRsInWorkout(workouts, newest);
+  assert.deepEqual(prs, [{
+    exerciseId: 'bench-press', name: 'Bench Press', weight: 65, previousWeight: 60,
+  }]);
+});
+
+test('newPRsInWorkout does not count a first-time exercise as a PR (nothing to beat)', () => {
+  const first = makeWorkout('2026-08-10', [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8 }] }]);
+  assert.deepEqual(newPRsInWorkout([first], first), []);
+});
+
+test('newPRsInWorkout excludes an exercise that did not beat its previous best', () => {
+  const older = makeWorkout('2026-08-01', [{ exerciseId: 'bench-press', sets: [{ weight: 65, reps: 5 }] }]);
+  const newest = makeWorkout('2026-08-10', [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8 }] }]);
+  const workouts = [older, newest];
+  assert.deepEqual(newPRsInWorkout(workouts, newest), []);
+});
+
+test('newPRsInWorkout can report multiple exercises PR-ing in the same workout', () => {
+  const older = makeWorkout('2026-08-01', [
+    { exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8 }] },
+    { exerciseId: 'squat', sets: [{ weight: 100, reps: 5 }] },
+  ]);
+  const newest = makeWorkout('2026-08-10', [
+    { exerciseId: 'bench-press', sets: [{ weight: 65, reps: 5 }] },
+    { exerciseId: 'squat', sets: [{ weight: 110, reps: 3 }] },
+  ]);
+  const workouts = [older, newest];
+  const prs = newPRsInWorkout(workouts, newest);
+  assert.equal(prs.length, 2);
+  assert.ok(prs.some((p) => p.exerciseId === 'bench-press' && p.weight === 65));
+  assert.ok(prs.some((p) => p.exerciseId === 'squat' && p.weight === 110));
+});
+
+test('newPRsInWorkout adds the user\'s bodyweight before comparing, for bodyweight exercises', () => {
+  const older = makeWorkout('2026-08-01', [{ exerciseId: 'dip', sets: [{ reps: 10 }] }]); // 80kg bodyweight-only
+  const newest = makeWorkout('2026-08-10', [{ exerciseId: 'dip', sets: [{ weight: 10, reps: 6 }] }]); // 90kg with +10
+  const workouts = [older, newest];
+  const prs = newPRsInWorkout(workouts, newest, undefined, 80);
+  assert.deepEqual(prs, [{
+    exerciseId: 'dip', name: 'Dip', weight: 90, previousWeight: 80,
+  }]);
 });
 
 test('exerciseVolumeProgress sums weight x reps per workout date, sorted oldest to newest', () => {

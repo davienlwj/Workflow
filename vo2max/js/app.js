@@ -24,7 +24,7 @@ import {
 } from './exercises.js';
 import { muscleDiagramHTML } from './muscleDiagram.js';
 import {
-  workoutVolume, lastPerformance, personalRecords, exerciseProgress, exerciseVolumeProgress, loggedBrandsForExercise,
+  workoutVolume, lastPerformance, personalRecords, newPRsInWorkout, exerciseProgress, exerciseVolumeProgress, loggedBrandsForExercise,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince,
   muscleSetBreakdown, muscleSetBreakdownDetailed, workoutSummaryByExercise,
 } from './workout.js';
@@ -133,12 +133,21 @@ document.addEventListener('click', (e) => {
 /* ------------------------------------------------------------ toast, fmt */
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, durationMs = 2200) {
   const el = $('toast');
   el.textContent = msg;
   el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
+  toastTimer = setTimeout(() => { el.hidden = true; }, durationMs);
+}
+
+/** "🎉 New PR: Bench Press 65kg!" (or, for more than one in the same
+ *  workout, "🎉 2 new PRs: Bench Press 65kg, Squat 110kg!") - for the
+ *  instant/manual save path's toast, which doesn't have the summary
+ *  sheet's room for a full pr-banner. See newPRsInWorkout. */
+function newPRToastMessage(newPRs) {
+  if (newPRs.length === 1) return `🎉 New PR: ${newPRs[0].name} ${newPRs[0].weight}kg!`;
+  return `🎉 ${newPRs.length} new PRs: ${newPRs.map((p) => `${p.name} ${p.weight}kg`).join(', ')}!`;
 }
 
 /** Swap a save button into its "saved" state: darker fill, confirming text.
@@ -1543,8 +1552,15 @@ $('routineForm').addEventListener('submit', (e) => {
   toast('Routine saved');
 });
 
-function openWorkoutSummarySheet(workout, durationMs) {
+/** @param {ReturnType<typeof newPRsInWorkout>} [newPRs] shown as a
+ *  celebratory banner above the duration when non-empty. */
+function openWorkoutSummarySheet(workout, durationMs, newPRs = []) {
   lastFinishedWorkout = workout;
+  $('summaryPRBanner').hidden = newPRs.length === 0;
+  $('summaryPRBanner').innerHTML = newPRs.length === 0 ? '' : [
+    `<div class="pr-banner-title">🎉 New Personal Record${newPRs.length > 1 ? 's' : ''}!</div>`,
+    ...newPRs.map((p) => `<div class="pr-banner-item">${escapeHTML(p.name)}: <strong>${p.weight}kg</strong> <span class="pr-banner-delta">(+${Math.round((p.weight - p.previousWeight) * 10) / 10}kg)</span></div>`),
+  ].join('');
   $('summaryDuration').textContent = fmtElapsed(durationMs);
   const rows = workoutSummaryByExercise(workout, allExercises(), bodyweightKg());
   $('summaryExercises').innerHTML = rows.length
@@ -1577,9 +1593,10 @@ function finishLiveWorkout(data) {
   };
   const saved = addWorkout(cleaned);
   workouts = loadWorkouts();
+  const newPRs = newPRsInWorkout(workouts, saved, allExercises(), bodyweightKg());
   discardLiveWorkout();
   renderAll();
-  openWorkoutSummarySheet(saved, durationMs);
+  openWorkoutSummarySheet(saved, durationMs, newPRs);
 }
 
 /** Silently resumes a live session left running in localStorage (e.g. the
@@ -1636,11 +1653,14 @@ $('workoutForm').addEventListener('submit', (e) => {
   if (workoutEditingId) {
     updateWorkout(workoutEditingId, data);
     toast('Workout updated');
+    workouts = loadWorkouts();
   } else {
-    addWorkout(data);
-    toast('Workout saved');
+    const saved = addWorkout(data);
+    workouts = loadWorkouts();
+    const newPRs = newPRsInWorkout(workouts, saved, allExercises(), bodyweightKg());
+    if (newPRs.length > 0) toast(newPRToastMessage(newPRs), 3400);
+    else toast('Workout saved');
   }
-  workouts = loadWorkouts();
   closeWorkoutSheet();
   renderAll();
 });

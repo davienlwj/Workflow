@@ -112,6 +112,33 @@ export function personalRecords(workouts, exerciseId, exercises = EXERCISES, bod
   };
 }
 
+/**
+ * Which exercises logged in `workout` just beat their previous best weight
+ * - i.e. an actual "new PR" moment, not just a first-time entry (an
+ * exercise with no prior PR to beat doesn't count). `workouts` is the full
+ * list, already including `workout` itself.
+ * @param {typeof EXERCISES} [exercises]
+ * @param {number|null} [bodyweightKg]
+ * @returns {{exerciseId: string, name: string, weight: number, previousWeight: number}[]}
+ */
+export function newPRsInWorkout(workouts, workout, exercises = EXERCISES, bodyweightKg = null) {
+  const priorWorkouts = workouts.filter((w) => w.id !== workout.id);
+  const exerciseIds = [...new Set((workout.exercises || []).map((ex) => ex.exerciseId))];
+  const out = [];
+  for (const id of exerciseIds) {
+    const def = exerciseById(id, exercises);
+    if (!def) continue;
+    const previousPR = personalRecords(priorWorkouts, id, exercises, bodyweightKg);
+    const currentPR = personalRecords(workouts, id, exercises, bodyweightKg);
+    if (previousPR && currentPR && currentPR.maxWeight > previousPR.maxWeight) {
+      out.push({
+        exerciseId: id, name: def.name, weight: currentPR.maxWeight, previousWeight: previousPR.maxWeight,
+      });
+    }
+  }
+  return out;
+}
+
 /** One point per workout date this exercise appears in (that day's heaviest
  *  set), for a progress chart. See workoutVolume for the `exercises`/
  *  `bodyweightKg` params, setsForExercise for `brand`. */
