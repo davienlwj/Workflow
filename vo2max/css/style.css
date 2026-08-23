@@ -13,6 +13,11 @@
   --dimmer: #a3a3a3;
   --accent: #0a0a0a;
   --accent-dim: #b5b5b5;
+  /* The one deliberate hue in an otherwise monotone palette - reserved for
+     the app's key actionable/live moments (primary CTA, the live-workout
+     indicator, the PR banner), not the general emphasis color. Fixed across
+     themes: it's a brand color, not a neutral that needs inverting. */
+  --brand: #ff4f18;
   --font-mono: 'Space Mono', ui-monospace, 'SF Mono', 'Menlo', 'Consolas', 'Roboto Mono', monospace;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
@@ -362,7 +367,7 @@ input[type="date"], input[type="number"] { color-scheme: light; }
 button { font-family: var(--font-mono); }
 
 .primary {
-  background: var(--accent);
+  background: var(--brand);
   color: var(--bg);
   border: none;
   border-radius: 10px;
@@ -881,7 +886,7 @@ button { font-family: var(--font-mono); }
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--brand);
   animation: wo-live-pulse 1.6s ease-in-out infinite;
 }
 
@@ -904,8 +909,8 @@ button { font-family: var(--font-mono); }
   display: flex;
   align-items: center;
   gap: 14px;
-  background: var(--accent);
-  border: 1px solid var(--accent);
+  background: var(--brand);
+  border: 1px solid var(--brand);
   border-radius: 16px;
   padding: 14px 18px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
@@ -940,19 +945,21 @@ button { font-family: var(--font-mono); }
 
 .live-mini-set {
   font-size: 13px;
-  color: var(--accent-dim);
+  color: var(--bg);
+  opacity: 0.7;
 }
 
 .live-mini-resume {
   font-size: 13px;
-  color: var(--accent-dim);
+  color: var(--bg);
+  opacity: 0.7;
   flex-shrink: 0;
 }
 
 /* --------------------------------------------------------- workout summary */
 
 .pr-banner {
-  background: var(--accent);
+  background: var(--brand);
   color: var(--bg);
   border-radius: 12px;
   padding: 14px 16px;
