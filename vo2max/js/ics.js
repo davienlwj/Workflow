@@ -4,6 +4,8 @@
  * account or backend — just a file the OS already knows how to import.
  */
 
+import { formatPaceMinKm } from './block.js';
+
 const recoveryLabel = { easy: 'Easy', moderate: 'Moderate', hard: 'Hard' };
 
 function pad(n) {
@@ -69,7 +71,7 @@ function descriptionText(session) {
     if (session.recovery) lines.push(`Recovery quality: ${recoveryLabel[session.recovery] ?? session.recovery}`);
   }
   if (session.durationMin != null) lines.push(`Duration: ${session.durationMin} min`);
-  if (session.avgPace != null) lines.push(`Avg pace: ${session.avgPace} min/km`);
+  if (session.avgPace != null) lines.push(`Avg pace: ${formatPaceMinKm(session.avgPace)} min/km`);
   if (session.distanceKm != null) lines.push(`Distance: ${session.distanceKm} km`);
   if (session.avgHR != null) lines.push(`Average HR: ${session.avgHR} bpm`);
   if (session.maxHR != null) lines.push(`Max HR: ${session.maxHR} bpm`);

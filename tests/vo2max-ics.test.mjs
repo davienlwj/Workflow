@@ -78,7 +78,7 @@ test('sessionToICS builds an easy-run summary and description', () => {
   const unfolded = sessionToICS(easyRunSession).replaceAll('\r\n ', '');
   assert.match(unfolded, /SUMMARY:Easy run: 45min\\, 8\.2km/);
   assert.match(unfolded, /Duration: 45 min/);
-  assert.match(unfolded, /Avg pace: 5\.5 min\/km/);
+  assert.match(unfolded, /Avg pace: 5:30 min\/km/);
   assert.match(unfolded, /Distance: 8\.2 km/);
   assert.match(unfolded, /Average HR: 148 bpm/);
   assert.doesNotMatch(unfolded, /Intervals completed/);

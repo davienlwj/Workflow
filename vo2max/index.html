@@ -272,21 +272,21 @@
           <input id="editDurationMin" type="number" min="0" max="600">
         </label>
         <label class="field">
-          <span>Avg pace (min/km) <em>(optional)</em></span>
-          <input id="editAvgPace" type="number" step="0.1" min="0">
+          <span>Avg pace (min/km)</span>
+          <input id="editAvgPace" type="text" placeholder="e.g. 5:25">
         </label>
       </div>
       <label class="field">
         <span>Distance (km) <em>(auto from duration + pace)</em></span>
-        <input id="editDistanceKm" type="number" step="0.1" min="0">
+        <input id="editDistanceKm" type="number" step="0.01" min="0">
       </label>
       <div class="row">
         <label class="field">
-          <span>Average HR <em>(optional)</em></span>
+          <span>Average HR</span>
           <input id="editRunAvgHR" type="number" min="60" max="230">
         </label>
         <label class="field">
-          <span>Max HR <em>(optional)</em></span>
+          <span>Max HR</span>
           <input id="editRunMaxHR" type="number" min="60" max="230">
         </label>
       </div>
@@ -299,7 +299,7 @@
     </label>
 
     <label class="field">
-      <span>VO2max reading <em>(optional)</em></span>
+      <span>VO2max reading</span>
       <input id="editVO2max" type="number" step="0.1" min="0">
     </label>
 
@@ -352,21 +352,21 @@
           <input id="logDurationMin" type="number" min="0" max="600" placeholder="e.g. 45">
         </label>
         <label class="field">
-          <span>Avg pace (min/km) <em>(optional)</em></span>
-          <input id="logAvgPace" type="number" step="0.1" min="0" placeholder="e.g. 6.5">
+          <span>Avg pace (min/km)</span>
+          <input id="logAvgPace" type="text" placeholder="e.g. 5:25">
         </label>
       </div>
       <label class="field">
         <span>Distance (km) <em>(auto from duration + pace)</em></span>
-        <input id="logDistanceKm" type="number" step="0.1" min="0" placeholder="e.g. 8.2">
+        <input id="logDistanceKm" type="number" step="0.01" min="0" placeholder="e.g. 8.20">
       </label>
       <div class="row">
         <label class="field">
-          <span>Average HR <em>(optional)</em></span>
+          <span>Average HR</span>
           <input id="logRunAvgHR" type="number" min="60" max="230" placeholder="bpm">
         </label>
         <label class="field">
-          <span>Max HR <em>(optional)</em></span>
+          <span>Max HR</span>
           <input id="logRunMaxHR" type="number" min="60" max="230" placeholder="bpm">
         </label>
       </div>

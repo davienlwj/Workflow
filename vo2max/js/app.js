@@ -13,6 +13,7 @@ import {
   todayIso,
   daysSinceLastSession, averageSessionHR, vo2maxSeries,
   mileageBuckets, totalMileage,
+  parsePaceMinKm, formatPaceMinKm,
 } from './block.js';
 import {
   vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG, exerciseVolumeSVG, muscleRadarSVG,
@@ -197,11 +198,10 @@ function numOrNull(v) {
 /** Distance = duration / pace, whenever both are present; otherwise left alone for manual entry. */
 function updateComputedDistance(prefix) {
   const duration = numOrNull($(`${prefix}DurationMin`).value);
-  const pace = numOrNull($(`${prefix}AvgPace`).value);
+  const pace = parsePaceMinKm($(`${prefix}AvgPace`).value);
   if (duration != null && pace != null && pace > 0) {
-    // Rounded to 1 decimal to match the field's step="0.1" (2dp would fail
-    // the browser's native validation and silently block form submission).
-    $(`${prefix}DistanceKm`).value = Math.round((duration / pace) * 10) / 10;
+    // Rounded to 2 decimals to match the field's step="0.01".
+    $(`${prefix}DistanceKm`).value = Math.round((duration / pace) * 100) / 100;
   }
 }
 
@@ -246,7 +246,7 @@ function readSessionForm(prefix) {
     vo2max: vo2maxEl ? numOrNull(vo2maxEl.value) : null,
     notes: $(`${prefix}Notes`).value.trim(),
     durationMin: numOrNull($(`${prefix}DurationMin`).value),
-    avgPace: numOrNull($(`${prefix}AvgPace`).value),
+    avgPace: parsePaceMinKm($(`${prefix}AvgPace`).value),
     distanceKm: numOrNull($(`${prefix}DistanceKm`).value),
     avgHR: numOrNull($(`${prefix}RunAvgHR`).value),
     maxHR: numOrNull($(`${prefix}RunMaxHR`).value),
@@ -318,7 +318,7 @@ function renderHistory() {
       ${legacyHTML}
       ${s.durationMin != null ? `<span class="mono">${s.durationMin}min</span>` : ''}
       ${s.distanceKm != null ? `<span class="mono">${s.distanceKm}km</span>` : ''}
-      ${s.avgPace != null ? `<span class="mono">${s.avgPace}/km</span>` : ''}
+      ${s.avgPace != null ? `<span class="mono">${formatPaceMinKm(s.avgPace)}/km</span>` : ''}
       ${s.avgHR != null ? `<span class="mono">avg ${s.avgHR}</span>` : ''}
       ${s.maxHR != null ? `<span class="mono">max ${s.maxHR}</span>` : ''}
       <span class="mono">RPE ${s.rpe}</span>
@@ -612,7 +612,7 @@ function openEditSheet(session) {
   $('editDate').value = session.date;
   $('editType').value = type;
   $('editDurationMin').value = session.durationMin ?? '';
-  $('editAvgPace').value = session.avgPace ?? '';
+  $('editAvgPace').value = formatPaceMinKm(session.avgPace);
   $('editDistanceKm').value = session.distanceKm ?? '';
   $('editRunAvgHR').value = session.avgHR ?? '';
   $('editRunMaxHR').value = session.maxHR ?? '';

@@ -13,6 +13,29 @@ function daysBetween(fromIso, toIso) {
   return Math.round((toDate(toIso) - toDate(fromIso)) / DAY_MS);
 }
 
+/** Parses the pace field's "m:ss" text (e.g. "5:25") into decimal
+ *  minutes/km - the unit avgPace has always been stored in. A bare number
+ *  (with or without a decimal point) is also accepted as minutes, so an
+ *  old value round-tripped through formatPaceMinKm - or just typed
+ *  without a colon - still parses. Returns null for empty/unparseable input. */
+export function parsePaceMinKm(v) {
+  const s = (v ?? '').trim();
+  if (!s) return null;
+  const m = s.match(/^(\d+):([0-5]?\d)$/);
+  if (m) return Number(m[1]) + Number(m[2]) / 60;
+  const n = Number(s);
+  return Number.isNaN(n) ? null : n;
+}
+
+/** Decimal minutes/km -> "5:25" (m:ss) for display, or '' if null. */
+export function formatPaceMinKm(decimalMinutes) {
+  if (decimalMinutes == null) return '';
+  const totalSeconds = Math.round(decimalMinutes * 60);
+  const min = Math.floor(totalSeconds / 60);
+  const sec = totalSeconds % 60;
+  return `${min}:${String(sec).padStart(2, '0')}`;
+}
+
 export function todayIso(now = new Date()) {
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, '0');

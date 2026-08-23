@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   daysSinceLastSession, averageSessionHR, vo2maxSeries,
   mileageBuckets, totalMileage,
+  parsePaceMinKm, formatPaceMinKm,
 } from '../vo2max/js/block.js';
 
 const settings = {
@@ -10,6 +11,40 @@ const settings = {
   baselineVO2max: 46,
   protocol: { reps: 4, freqPerWeek: 2 },
 };
+
+test('parsePaceMinKm reads "m:ss" pace text into decimal minutes/km', () => {
+  assert.equal(parsePaceMinKm('5:25'), 5 + 25 / 60);
+  assert.equal(parsePaceMinKm('5:00'), 5);
+  assert.equal(parsePaceMinKm('12:05'), 12 + 5 / 60);
+});
+
+test('parsePaceMinKm accepts a single-digit seconds part and a lone minutes value', () => {
+  assert.equal(parsePaceMinKm('5:5'), 5 + 5 / 60);
+  assert.equal(parsePaceMinKm('5'), 5);
+  assert.equal(parsePaceMinKm('5.5'), 5.5);
+});
+
+test('parsePaceMinKm returns null for empty or unparseable input', () => {
+  assert.equal(parsePaceMinKm(''), null);
+  assert.equal(parsePaceMinKm(null), null);
+  assert.equal(parsePaceMinKm(undefined), null);
+  assert.equal(parsePaceMinKm('abc'), null);
+});
+
+test('formatPaceMinKm renders decimal minutes/km as "m:ss"', () => {
+  assert.equal(formatPaceMinKm(5.5), '5:30');
+  assert.equal(formatPaceMinKm(5 + 25 / 60), '5:25');
+  assert.equal(formatPaceMinKm(12), '12:00');
+});
+
+test('formatPaceMinKm returns an empty string for null (no pace logged)', () => {
+  assert.equal(formatPaceMinKm(null), '');
+});
+
+test('parsePaceMinKm and formatPaceMinKm round-trip', () => {
+  assert.equal(formatPaceMinKm(parsePaceMinKm('5:25')), '5:25');
+  assert.equal(parsePaceMinKm(formatPaceMinKm(5.5)), 5.5);
+});
 
 test('daysSinceLastSession looks at the most recent date', () => {
   const sessions = [{ date: '2026-08-01' }, { date: '2026-08-10' }];
