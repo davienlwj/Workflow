@@ -167,15 +167,21 @@ export function mileageBarChartSVG(buckets) {
   const baseY = PAD_T + innerH;
   const yFor = (km) => baseY - (km / maxKm) * innerH;
 
+  // Up to 8 date labels ("6 Jul", "13 Jul", ...) share the chart's width, too
+  // tight to read horizontally without touching their neighbors - angling
+  // them (and anchoring at the end, so each reads bottom-to-top into its
+  // own tick rather than spreading past it) gives each one more effective
+  // width without needing a taller chart.
+  const labelY = (H - 4).toFixed(1);
   const bars = buckets.map((b, i) => {
     const x = PAD_L + i * (barW + gap);
     const y = yFor(b.km);
     const h = baseY - y;
     const cx = (x + barW / 2).toFixed(1);
-    const labelY = Math.max(9, y - 4).toFixed(1);
+    const valueLabelY = Math.max(9, y - 4).toFixed(1);
     return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(h, 0).toFixed(1)}" rx="2" class="chart-bar" />
-      ${b.km > 0 ? `<text x="${cx}" y="${labelY}" class="chart-value-label" text-anchor="middle">${b.km}</text>` : ''}
-      <text x="${cx}" y="${H - 6}" class="chart-axis" text-anchor="middle">${b.label}</text>`;
+      ${b.km > 0 ? `<text x="${cx}" y="${valueLabelY}" class="chart-value-label" text-anchor="middle">${b.km}</text>` : ''}
+      <text x="${cx}" y="${labelY}" class="chart-axis" text-anchor="end" transform="rotate(40 ${cx} ${labelY})">${b.label}</text>`;
   }).join('');
 
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}" class="chart-svg" role="img" aria-label="Mileage">
