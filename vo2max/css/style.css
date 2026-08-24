@@ -874,6 +874,13 @@ button { font-family: var(--font-mono); }
 #routinesSectionTitle { margin-bottom: 16px; }
 #addRoutineTabBtn { margin-top: 8px; }
 
+/* Same 0px-gap issue in the popup version of this list (#routinesSheet,
+   reached via "Start Workout" -> "Select Routine"): "+ Create Routine"
+   sits directly against the list, which sits directly against the
+   Close button, with nothing carrying any spacing between them. */
+#addRoutineBtn { margin-bottom: 8px; }
+#routinesList { margin-bottom: 8px; }
+
 .routine-delete, .routine-edit {
   background: transparent;
   border: 1px solid var(--line);
