@@ -69,13 +69,13 @@ def main():
 
     # "any": since these icons aren't circle-cropped by the OS, the mark can
     # run bigger than the maskable icon while still leaving edge margin.
-    render(mark, 512, 0.55).save(OUT / "icon-512.png")
-    render(mark, 192, 0.55).save(OUT / "icon-192.png")
-    render(mark, 180, 0.55).save(OUT / "apple-touch-icon.png")
+    render(mark, 512, 0.72).save(OUT / "icon-512.png")
+    render(mark, 192, 0.72).save(OUT / "icon-192.png")
+    render(mark, 180, 0.72).save(OUT / "apple-touch-icon.png")
 
     # "maskable": still padded, so the mark stays inside Android's
     # ~80%-diameter safe circle even after an adaptive-icon crop.
-    render(mark, 512, 0.42).save(OUT / "icon-maskable-512.png")
+    render(mark, 512, 0.55).save(OUT / "icon-maskable-512.png")
 
     # Favicon: an SVG wrapper around the 192px "any" artwork (plenty for a
     # browser tab) so it scales to whatever size is requested without
