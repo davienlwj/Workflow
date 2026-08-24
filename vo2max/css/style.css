@@ -499,6 +499,11 @@ button { font-family: var(--font-mono); }
 .chart-dot { fill: var(--bg); stroke: var(--accent); stroke-width: 2; }
 .chart-dot-baseline { fill: var(--ink); stroke: var(--ink); }
 .chart-bar { fill: var(--accent-dim); stroke: var(--accent); stroke-width: 1; }
+
+/* Run tab only: the VO2max trend chart's point marker gets the brand
+   orange, matching the rest of the app's orange accents. */
+#chartWrap .chart-dot { fill: #FF6C2D; stroke: #FF6C2D; }
+#chartWrap .chart-value-label { fill: #FF6C2D; }
 .chart-empty { color: var(--dimmer); font-size: 14px; text-align: center; padding: 40px 0; }
 .chart-radar-fill { fill: var(--accent); fill-opacity: 0.12; stroke: none; }
 .chart-radar-label { font-size: 12px; fill: var(--dim); }

@@ -915,12 +915,12 @@ function renderRunTab() {
   const daysSince = daysSinceLastSession(sessions);
 
   $('statGrid').innerHTML = [
-    [String(sessions.length), 'Sessions logged'],
-    [avgHR != null ? `${avgHR}` : '—', 'Avg session HR'],
-    [daysSince != null ? String(daysSince) : '—', 'Days since last session'],
-  ].map(([value, label]) => `
+    [String(sessions.length), 'Sessions logged', true],
+    [avgHR != null ? `${avgHR}` : '—', 'Avg session HR', true],
+    [daysSince != null ? String(daysSince) : '—', 'Days since last session', false],
+  ].map(([value, label, accent]) => `
     <div class="stat-tile">
-      <div class="stat-value mono">${value}</div>
+      <div class="stat-value mono${accent ? ' stat-value-accent' : ''}">${value}</div>
       <div class="stat-label">${label}</div>
     </div>
   `).join('');
