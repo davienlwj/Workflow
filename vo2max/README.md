@@ -254,7 +254,7 @@ js/intervals.js              intervals.icu API-key auth + activity fetch/mapping
                               (no backend needed - see the README's intervals.icu sync section)
 js/app.js                   rendering and events
 sw.js                        offline cache
-tools/icon-source.jpg        the hand-drawn mark the app icons are built from
+tools/icon-source.png        the orange wordmark logo the app icons are built from
 tools/gen-icons.py           crops/centers it into the icon set (needs Pillow, numpy)
 tools/muscle-chart-source.jpg the anatomy illustration the muscle diagrams are built from
 tools/gen-muscle-diagram.py  recolors it lighter grey and cuts an orange highlight overlay per

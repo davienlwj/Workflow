@@ -824,6 +824,12 @@ button { font-family: var(--font-mono); }
 .routine-row { display: flex; align-items: center; gap: 8px; }
 .routine-row .routine-item { flex: 1; }
 
+/* "Routines" needs a bit more room than the standard section-title gap
+   (10px) gives, and the list sits directly against "+ Create Routine"
+   with no title element between them to carry any spacing at all. */
+#routinesSectionTitle { margin-bottom: 16px; }
+#addRoutineTabBtn { margin-top: 8px; }
+
 .routine-delete {
   background: transparent;
   border: 1px solid var(--line);
@@ -1165,6 +1171,12 @@ button { font-family: var(--font-mono); }
 .exercise-summary-card .muscle-body { width: 46px; }
 
 /* --------------------------------------------------------------- workout */
+
+/* The search input sits directly above this list with no flex/gap wrapper
+   between them (unlike .wo-picker's search field, spaced by its own
+   flex gap), so it needs its own breathing room here - 8px, matching
+   every other "list-adjacent element" gap (.wo-add-set, #addRoutineTabBtn). */
+#exerciseSearchInput { margin-bottom: 8px; }
 
 .exercise-summary-list {
   display: flex;
