@@ -30,16 +30,10 @@ function authHeader(apiKey) {
   return `Basic ${btoa(`API_KEY:${apiKey}`)}`;
 }
 
-/** Every activity on/after `oldestIso` (a YYYY-MM-DD date - intervals.icu's
- *  `oldest` param takes a date, not a unix timestamp), most recent first.
- *  Throws on an invalid Athlete ID/API Key (401/403/404) so callers can
- *  surface that immediately when the user hits Connect. */
-export async function listActivities(athleteId, apiKey, oldestIso) {
-  const params = new URLSearchParams({ oldest: oldestIso });
-  const url = `${API_BASE}/athlete/${encodeURIComponent(athleteId)}/activities?${params}`;
+async function apiGet(path, apiKey) {
   let res;
   try {
-    res = await fetch(url, { headers: { Authorization: authHeader(apiKey) } });
+    res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: authHeader(apiKey) } });
   } catch (err) {
     // fetch() throws (rather than resolving with a non-ok response) when no
     // response came back at all - offline, or the browser refused to even
@@ -57,6 +51,43 @@ export async function listActivities(athleteId, apiKey, oldestIso) {
     throw err;
   }
   return res.json();
+}
+
+/** Every activity on/after `oldestIso` (a YYYY-MM-DD date - intervals.icu's
+ *  `oldest` param takes a date, not a unix timestamp), most recent first.
+ *  Throws on an invalid Athlete ID/API Key (401/403/404) so callers can
+ *  surface that immediately when the user hits Connect. */
+export async function listActivities(athleteId, apiKey, oldestIso) {
+  const params = new URLSearchParams({ oldest: oldestIso });
+  return apiGet(`/athlete/${encodeURIComponent(athleteId)}/activities?${params}`, apiKey);
+}
+
+/** Resting HR, max HR and LTHR from the athlete's intervals.icu profile and
+ *  sport settings, for the one-tap "sync HR settings" action in Settings.
+ *  Field names here are less consistently documented than the activities
+ *  endpoint, so each value checks a couple of plausible variants rather
+ *  than assuming one - still returns whatever it can find even if some
+ *  fields come back null. sport-settings can be either a single object or
+ *  a list of per-sport entries (road/run/etc.); the Run-specific one is
+ *  preferred when there's a choice, since that's what this app trains. */
+export async function fetchHrSettings(athleteId, apiKey) {
+  const id = encodeURIComponent(athleteId);
+  const [profile, sportSettings] = await Promise.all([
+    apiGet(`/athlete/${id}/profile`, apiKey),
+    apiGet(`/athlete/${id}/sport-settings`, apiKey),
+  ]);
+  const settingsList = Array.isArray(sportSettings) ? sportSettings : [sportSettings].filter(Boolean);
+  const runSettings = settingsList.find((s) => (s?.types || []).includes('Run')) || settingsList[0] || {};
+
+  const restingHR = profile?.resting_hr ?? profile?.icu_resting_hr ?? profile?.restingHR ?? null;
+  const maxHR = runSettings?.max_hr ?? runSettings?.maxHr ?? profile?.max_hr ?? profile?.icu_max_hr ?? null;
+  const lthr = runSettings?.lthr ?? runSettings?.threshold_hr ?? null;
+
+  return {
+    restingHR: restingHR != null ? Math.round(restingHR) : null,
+    maxHR: maxHR != null ? Math.round(maxHR) : null,
+    lthr: lthr != null ? Math.round(lthr) : null,
+  };
 }
 
 export function isRunActivity(activity) {

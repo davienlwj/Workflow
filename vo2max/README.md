@@ -187,6 +187,14 @@ couple of minutes:
 Disconnecting stops future imports but leaves already-imported runs in
 your history untouched.
 
+**Sync HR settings now**, in the same section, pulls your Resting HR, Max
+HR and LTHR from intervals.icu straight into the **Heart rate** settings
+above (which drive this app's own zone-table math - see below) - a
+one-tap action you trigger yourself, not something that runs
+automatically alongside the run sync, since HR settings change far less
+often than new runs appear and shouldn't get silently overwritten on
+every app open.
+
 ## Zone math
 
 Both zone tables are computed live from your HR settings, not stored as

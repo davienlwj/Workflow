@@ -239,7 +239,7 @@
     <details class="settings-details">
       <summary class="section-title">intervals.icu sync (via Zepp)</summary>
       <div class="settings-details-body form">
-        <p class="field-hint">Automatically imports your runs from intervals.icu. Connect your Zepp/Amazfit account directly on a free intervals.icu account (intervals.icu → Settings → Amazfit → sign in with Zepp), then paste your intervals.icu API key below. Runs only - no equivalent to per-exercise lift data, so workouts still need to be logged by hand. No backend or paid API needed, just your own free API key - see the app's README.</p>
+        <p class="field-hint">Automatically imports your runs from intervals.icu, and can pull your Resting/Max HR and LTHR into the Heart rate settings below on demand. Connect your Zepp/Amazfit account directly on a free intervals.icu account (intervals.icu → Settings → Amazfit → sign in with Zepp), then paste your intervals.icu API key below. Runs only - no equivalent to per-exercise lift data, so workouts still need to be logged by hand. No backend or paid API needed, just your own free API key - see the app's README.</p>
         <label class="field">
           <span>Athlete ID</span>
           <input id="intervalsAthleteId" type="text" placeholder="e.g. i123456" autocomplete="off" spellcheck="false">
@@ -254,6 +254,7 @@
           <button type="button" id="intervalsDisconnect" class="ghost-btn" hidden>Disconnect</button>
         </div>
         <button type="button" id="intervalsSyncNow" class="ghost-btn block" hidden>Sync runs now</button>
+        <button type="button" id="intervalsSyncHR" class="ghost-btn block" hidden>Sync HR settings now</button>
       </div>
     </details>
 
