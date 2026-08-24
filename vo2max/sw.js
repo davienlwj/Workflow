@@ -1,6 +1,6 @@
 /* HYBR.D - offline shell. Bump CACHE when the app files change. */
 
-const CACHE = 'vo2max-v80';
+const CACHE = 'vo2max-v81';
 
 const SHELL = [
   './',
@@ -20,6 +20,7 @@ const SHELL = [
   './js/zones.js',
   './manifest.webmanifest',
   './icons/icon.svg',
+  './icons/logo-header.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',

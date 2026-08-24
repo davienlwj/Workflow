@@ -125,11 +125,10 @@ body {
 
 .bar-left { display: flex; align-items: center; gap: 10px; }
 
-.brand {
-  font-weight: 700;
-  font-size: 17px;
-  letter-spacing: 0.04em;
-  color: var(--accent);
+.brand-logo {
+  height: 18px;
+  width: auto;
+  display: block;
 }
 
 .header-title {
