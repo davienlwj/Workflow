@@ -508,7 +508,9 @@ button { font-family: var(--font-mono); }
 #mileageChartWrap .chart-bar { fill: #FF6C2D; stroke: #FF6C2D; }
 .chart-empty { color: var(--dimmer); font-size: 14px; text-align: center; padding: 40px 0; }
 .chart-radar-fill { fill: var(--accent); fill-opacity: 0.12; stroke: none; }
-.chart-radar-label { font-size: 12px; fill: var(--dim); }
+/* Muscle balance radar's axis labels get the brand orange - the
+   percentage (.chart-radar-pct, styled separately below) stays as-is. */
+.chart-radar-label { font-size: 12px; fill: #FF6C2D; }
 
 .activity-detail-stats { margin-top: 12px; }
 

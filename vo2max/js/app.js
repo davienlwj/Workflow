@@ -2158,7 +2158,7 @@ function renderWorkoutTab() {
     [daysSince != null ? String(daysSince) : '—', 'Days since last workout'],
   ].map(([value, label]) => `
     <div class="stat-tile">
-      <div class="stat-value mono">${value}</div>
+      <div class="stat-value mono stat-value-accent">${value}</div>
       <div class="stat-label">${label}</div>
     </div>
   `).join('');
