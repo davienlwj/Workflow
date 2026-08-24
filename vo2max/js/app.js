@@ -2244,6 +2244,7 @@ async function syncIntervalsRuns({ silent = false } = {}) {
   const s = settings.intervals;
   if (!s?.enabled || !s?.athleteId || !s?.apiKey) return;
   let imported = null;
+  let failure = null;
   try {
     const oldest = s.lastSyncedAt || isoDateDaysAgo(90);
     const activities = await intervalsListActivities(s.athleteId, s.apiKey, oldest);
@@ -2254,11 +2255,13 @@ async function syncIntervalsRuns({ silent = false } = {}) {
   } catch (err) {
     console.error('intervals.icu sync failed', err);
     intervalsNeedsReconnect = true;
+    failure = err;
   }
   if (imported) renderAll();
   renderIntervalsStatus();
   if (silent) return;
-  if (imported == null) toast('Could not sync intervals.icu - check your Athlete ID and API Key');
+  if (failure?.networkError) toast('Could not reach intervals.icu - check your connection', 3400);
+  else if (imported == null) toast('Could not sync intervals.icu - check your Athlete ID and API Key');
   else if (imported > 0) toast(`Imported ${imported} run${imported === 1 ? '' : 's'} from intervals.icu`);
   else toast('No new runs to import');
 }
@@ -2273,7 +2276,7 @@ function renderIntervalsStatus() {
     $('intervalsStatus').textContent = 'Not connected.';
     $('intervalsConnect').hidden = false;
   } else if (intervalsNeedsReconnect) {
-    $('intervalsStatus').textContent = 'Sync failed - check your Athlete ID and API Key.';
+    $('intervalsStatus').textContent = 'Sync failed - tap Connect to retry.';
     $('intervalsConnect').hidden = false;
   } else {
     $('intervalsStatus').textContent = 'Connected - importing your runs automatically.';
@@ -2305,7 +2308,9 @@ $('intervalsConnect').addEventListener('click', async () => {
     toast(imported > 0 ? `Connected - imported ${imported} run${imported === 1 ? '' : 's'}` : 'Connected - no runs to import yet');
   } catch (err) {
     console.error('intervals.icu connect failed', err);
-    toast('Could not connect - check your Athlete ID and API Key');
+    if (err.networkError) toast('Could not reach intervals.icu - check your connection', 3400);
+    else if (err.status === 401 || err.status === 403) toast('Could not connect - check your Athlete ID and API Key');
+    else toast(`Could not connect - intervals.icu error ${err.status ?? ''}`.trim());
   }
 });
 

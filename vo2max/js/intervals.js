@@ -36,10 +36,26 @@ function authHeader(apiKey) {
  *  surface that immediately when the user hits Connect. */
 export async function listActivities(athleteId, apiKey, oldestIso) {
   const params = new URLSearchParams({ oldest: oldestIso });
-  const res = await fetch(`${API_BASE}/athlete/${encodeURIComponent(athleteId)}/activities?${params}`, {
-    headers: { Authorization: authHeader(apiKey) },
-  });
-  if (!res.ok) throw new Error(`intervals.icu API error ${res.status}`);
+  const url = `${API_BASE}/athlete/${encodeURIComponent(athleteId)}/activities?${params}`;
+  let res;
+  try {
+    res = await fetch(url, { headers: { Authorization: authHeader(apiKey) } });
+  } catch (err) {
+    // fetch() throws (rather than resolving with a non-ok response) when no
+    // response came back at all - offline, or the browser refused to even
+    // send/read the request because the server didn't answer the CORS
+    // preflight with permission for this origin. Tagged distinctly so the
+    // UI can tell "wrong credentials" apart from "couldn't reach the API"
+    // instead of collapsing both into one unhelpful message.
+    const netErr = new Error(`Network request to intervals.icu failed: ${err.message}`);
+    netErr.networkError = true;
+    throw netErr;
+  }
+  if (!res.ok) {
+    const err = new Error(`intervals.icu API error ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
   return res.json();
 }
 
