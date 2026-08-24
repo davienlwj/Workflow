@@ -1706,12 +1706,16 @@ function openRoutineNewExerciseForm() {
   resetRoutineNewExerciseForm();
   $('routineNewExerciseForm').hidden = false;
   $('routinePickerResults').hidden = true;
+  $('routineNewExerciseBtn').hidden = true;
+  $('routineBuilderActions').hidden = true;
   $('routineNewExName').focus();
 }
 
 function closeRoutineNewExerciseForm() {
   $('routineNewExerciseForm').hidden = true;
   $('routinePickerResults').hidden = false;
+  $('routineNewExerciseBtn').hidden = false;
+  $('routineBuilderActions').hidden = false;
 }
 
 $('routineNewExerciseBtn').addEventListener('click', openRoutineNewExerciseForm);

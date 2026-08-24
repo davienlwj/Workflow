@@ -421,6 +421,7 @@ button { font-family: var(--font-mono); }
 }
 
 .actions { display: flex; gap: 10px; justify-content: flex-end; }
+.actions[hidden] { display: none; }
 .actions .primary { flex: 1; }
 .actions-row { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
 .actions-row + .primary.block { margin-top: 18px; }
