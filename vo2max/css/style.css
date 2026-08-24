@@ -1281,6 +1281,9 @@ button { font-family: var(--font-mono); }
   letter-spacing: 0.06em;
 }
 
+.wo-superset-label-left { display: flex; align-items: center; gap: 6px; }
+.wo-superset-label-left .wo-drag-handle { color: var(--accent); }
+
 .wo-superset-unpair {
   background: transparent;
   border: none;
@@ -1317,6 +1320,24 @@ button { font-family: var(--font-mono); }
   font-size: 13px;
   line-height: 1;
   flex-shrink: 0;
+}
+
+.wo-drag-handle {
+  color: var(--dimmer);
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+  padding: 4px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.wo-exercise-block.dragging, .wo-superset-group.dragging {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  border-color: var(--accent);
+  position: relative;
+  z-index: 1;
 }
 
 .wo-last-performance {

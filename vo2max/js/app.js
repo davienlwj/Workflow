@@ -83,6 +83,9 @@ let routineSelectedIds = []; // exercise ids chosen so far in the open routine b
 let editingRoutineId = null; // id of the routine being edited, or null when creating a new one
 let swappingIndex = null; // index in routineSelectedIds currently being replaced via the picker, or null
 let routineDrag = null; // { id, pointerId, longPressTimer, startX, startY, dragging } while reordering
+let woExerciseDrag = null; // { unit, handle, pointerId, longPressTimer, startX, startY, dragging } while
+// reordering exercises within #woExerciseList (live workout, logging a past workout, or editing one -
+// all three render into the same list, so this one implementation covers all of them)
 
 const $ = (id) => document.getElementById(id);
 
@@ -1027,6 +1030,7 @@ function exerciseBlockHTML(exerciseId, sets, supersetId, brand) {
           <div class="wo-exercise-meta">${escapeHTML(exerciseMetaText(ex))}</div>
         </div>
         <div class="wo-exercise-header-actions">
+          <span class="wo-drag-handle" aria-hidden="true">⠿</span>
           ${supersetBtnHTML}
           <button type="button" class="wo-exercise-remove" aria-label="Remove exercise">✕</button>
         </div>
@@ -1051,7 +1055,7 @@ function makeShortId() {
 function supersetLabelHTML() {
   return `
     <div class="wo-superset-label">
-      <span>⚭ Superset</span>
+      <span class="wo-superset-label-left"><span class="wo-drag-handle" aria-hidden="true">⠿</span>⚭ Superset</span>
       <button type="button" class="wo-superset-unpair" aria-label="Remove superset pairing">✕</button>
     </div>
   `;
@@ -1316,6 +1320,74 @@ $('woExerciseList').addEventListener('change', (e) => {
   syncLiveWorkout();
 });
 
+/** Long-press-and-drag reordering of exercises within #woExerciseList - the
+ *  same list element is used for the live workout sheet, logging a past
+ *  workout, and editing a saved one, so this one implementation covers all
+ *  three. A "unit" being dragged is either a lone .wo-exercise-block or,
+ *  when the block is paired, its whole .wo-superset-group (grabbing either
+ *  paired exercise's handle moves the pair together, never just one half).
+ *  Nodes are moved in place with insertBefore rather than re-rendered from
+ *  a data array, since each block holds live, un-persisted input values
+ *  (weights/reps typed in) that a re-render would wipe out; DOM order is
+ *  exactly what readWorkoutForm() reads back on save, so no other syncing
+ *  is needed beyond the syncLiveWorkout() call already used elsewhere in
+ *  this file to persist a running live session. */
+const WO_DRAG_HOLD_MS = 350;
+const WO_DRAG_CANCEL_PX = 10;
+
+function woDragUnitFor(handle) {
+  return handle.closest('.wo-superset-group') || handle.closest('.wo-exercise-block');
+}
+
+function cancelWoExerciseDrag() {
+  if (woExerciseDrag?.longPressTimer) clearTimeout(woExerciseDrag.longPressTimer);
+  if (woExerciseDrag?.dragging) {
+    woExerciseDrag.unit.classList.remove('dragging');
+    syncLiveWorkout();
+  }
+  woExerciseDrag = null;
+}
+
+$('woExerciseList').addEventListener('pointerdown', (e) => {
+  const handle = e.target.closest('.wo-drag-handle');
+  if (!handle) return;
+  const unit = woDragUnitFor(handle);
+  if (!unit || unit.parentNode !== $('woExerciseList')) return;
+  const pointerId = e.pointerId;
+  const longPressTimer = setTimeout(() => {
+    if (!woExerciseDrag || woExerciseDrag.unit !== unit) return;
+    woExerciseDrag.dragging = true;
+    unit.classList.add('dragging');
+    unit.setPointerCapture(pointerId);
+  }, WO_DRAG_HOLD_MS);
+  woExerciseDrag = { unit, handle, pointerId, longPressTimer, startX: e.clientX, startY: e.clientY, dragging: false };
+});
+
+$('woExerciseList').addEventListener('pointermove', (e) => {
+  if (!woExerciseDrag || woExerciseDrag.pointerId !== e.pointerId) return;
+  if (!woExerciseDrag.dragging) {
+    const dx = Math.abs(e.clientX - woExerciseDrag.startX);
+    const dy = Math.abs(e.clientY - woExerciseDrag.startY);
+    if (dx > WO_DRAG_CANCEL_PX || dy > WO_DRAG_CANCEL_PX) cancelWoExerciseDrag();
+    return;
+  }
+  e.preventDefault();
+  const list = $('woExerciseList');
+  const { unit } = woExerciseDrag;
+  const overEl = document.elementFromPoint(e.clientX, e.clientY);
+  const target = overEl?.closest('.wo-superset-group') || overEl?.closest('.wo-exercise-block');
+  if (!target || target === unit || target.parentNode !== list) return;
+  const children = [...list.children];
+  const unitIdx = children.indexOf(unit);
+  const targetIdx = children.indexOf(target);
+  if (unitIdx === -1 || targetIdx === -1) return;
+  if (unitIdx < targetIdx) list.insertBefore(unit, target.nextSibling);
+  else list.insertBefore(unit, target);
+});
+
+$('woExerciseList').addEventListener('pointerup', cancelWoExerciseDrag);
+$('woExerciseList').addEventListener('pointercancel', cancelWoExerciseDrag);
+
 function readWorkoutForm() {
   const exercises = [...$('woExerciseList').querySelectorAll('.wo-exercise-block')].map((block) => ({
     exerciseId: block.dataset.exerciseId,
@@ -1382,6 +1454,7 @@ function openWorkoutEditSheet(workout) {
 }
 
 function closeWorkoutSheet() {
+  cancelWoExerciseDrag();
   workoutEditingId = null;
   $('scrim').hidden = true;
   $('workoutSheet').hidden = true;
