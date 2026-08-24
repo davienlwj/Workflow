@@ -489,6 +489,8 @@ button { font-family: var(--font-mono); }
 .chart-svg { width: 100%; height: auto; display: block; }
 .chart-grid { stroke: var(--line); stroke-width: 1; }
 .chart-axis { fill: var(--dimmer); font-size: 9px; }
+.chart-threshold { stroke: var(--dimmer); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart-threshold-label { fill: var(--dimmer); font-size: 8px; font-weight: 600; }
 .chart-value-label { fill: var(--ink); font-size: 10px; font-weight: 700; }
 .chart-line { stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .chart-dot { fill: var(--bg); stroke: var(--accent); stroke-width: 2; }

@@ -249,11 +249,24 @@ function timeAxisLabel(secs) {
  *  above MAX_POINTS so the path stays light and legible either way.
  * @param {any[]} points oldest to newest, each with a `t` (elapsed seconds)
  * @param {{emptyMessage: string, ariaLabel: string, axisLabel: string,
- *   valueOf: (p) => number|null, fmtValue?: (v:number) => string, invert?: boolean}} opts
+ *   valueOf: (p) => number|null, fmtValue?: (v:number) => string, invert?: boolean,
+ *   thresholds?: {value: number, label: string}[]}} opts
  *   `invert` flips the y-axis (used for pace, so a faster/lower number
  *   reads as a higher line - visually consonant with the HR chart, where
- *   higher always means more effort). */
-function denseLineChartSVG(points, { emptyMessage, ariaLabel, axisLabel, valueOf, fmtValue, invert = false }) {
+ *   higher always means more effort). `thresholds` draws a dashed
+ *   reference line + short label at each value that falls within the
+ *   plotted range (used for HR zone boundaries). The x-axis always spans
+ *   the *full* `points` array, not just the samples this particular metric
+ *   has a value for - so the HR and pace charts of the same run share an
+ *   identical time axis and can be compared point-for-point. */
+function denseLineChartSVG(points, { emptyMessage, ariaLabel, axisLabel, valueOf, fmtValue, invert = false, thresholds = [] }) {
+  if (points.length === 0) {
+    return `<p class="chart-empty">${emptyMessage}</p>`;
+  }
+  const minT = points[0].t;
+  const maxT = points[points.length - 1].t;
+  const tSpan = Math.max(maxT - minT, 1);
+
   const MAX_POINTS = 300;
   let pts = points.filter((p) => valueOf(p) != null).map((p) => ({ t: p.t, value: valueOf(p) }));
   if (pts.length > MAX_POINTS) {
@@ -277,10 +290,6 @@ function denseLineChartSVG(points, { emptyMessage, ariaLabel, axisLabel, valueOf
   const yLow = Math.floor(minV - span * 0.1);
   const yHigh = Math.ceil(maxV + span * 0.1);
 
-  const minT = pts[0].t;
-  const maxT = pts[pts.length - 1].t;
-  const tSpan = Math.max(maxT - minT, 1);
-
   const innerW = W - PAD_L - PAD_R;
   const innerH = H - PAD_T - PAD_B;
   const x = (t) => PAD_L + ((t - minT) / tSpan) * innerW;
@@ -299,6 +308,14 @@ function denseLineChartSVG(points, { emptyMessage, ariaLabel, axisLabel, valueOf
       <text x="${PAD_L - 6}" y="${gy}" class="chart-axis" text-anchor="end" dominant-baseline="middle">${format(v)}</text>`;
   }).join('');
 
+  const thresholdLines = thresholds
+    .filter((t) => t.value >= yLow && t.value <= yHigh)
+    .map((t) => {
+      const gy = y(t.value).toFixed(1);
+      return `<line x1="${PAD_L}" y1="${gy}" x2="${W - PAD_R}" y2="${gy}" class="chart-threshold" />
+        <text x="${W - PAD_R - 2}" y="${(Number(gy) - 2).toFixed(1)}" class="chart-threshold-label" text-anchor="end">${t.label}</text>`;
+    }).join('');
+
   // Five evenly-spaced time ticks (not just start/end) with faint vertical
   // gridlines, so a specific moment in the run can actually be read off the
   // x-axis instead of only eyeballing a position between two endpoints.
@@ -308,24 +325,30 @@ function denseLineChartSVG(points, { emptyMessage, ariaLabel, axisLabel, valueOf
     const gx = x(t).toFixed(1);
     const anchor = i === 0 ? 'start' : i === X_TICKS ? 'end' : 'middle';
     return `<line x1="${gx}" y1="${PAD_T}" x2="${gx}" y2="${PAD_T + innerH}" class="chart-grid" />
-      <text x="${gx}" y="${H - 6}" class="chart-axis" text-anchor="${anchor}">${timeAxisLabel(t)}</text>`;
+      <text x="${gx}" y="${H - 6}" class="chart-axis chart-axis-x" text-anchor="${anchor}">${timeAxisLabel(t)}</text>`;
   }).join('');
 
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}" class="chart-svg" role="img" aria-label="${ariaLabel}">
     <text x="2" y="12" class="chart-axis" text-anchor="start">${axisLabel}</text>
     ${gridLines}
     ${xGridLines}
+    ${thresholdLines}
     <path d="${linePath}" class="chart-line" fill="none" />
   </svg>`;
 }
 
-/** @param {{t: number, hr: number|null}[]} points a run's raw HR stream, oldest to newest */
-export function activityHRLineChartSVG(points) {
+/** @param {{t: number, hr: number|null}[]} points a run's raw HR stream, oldest to newest
+ *  @param {{bpmLow: number}[]} [zones] this app's own HR zone table (RHR or
+ *   LTHR, whichever is primary) - draws a dashed threshold line + short
+ *   "Z2"/"Z3"/... label at each zone's lower bpm bound that the run
+ *   actually reached, so you can see exactly when the line crosses zones. */
+export function activityHRLineChartSVG(points, zones = []) {
   return denseLineChartSVG(points, {
     emptyMessage: 'No heart rate data recorded for this activity.',
     ariaLabel: 'Heart rate over time',
     axisLabel: 'bpm',
     valueOf: (p) => p.hr,
+    thresholds: zones.map((z, i) => ({ value: z.bpmLow, label: `Z${i + 1}` })),
   });
 }
 

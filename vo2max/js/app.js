@@ -767,7 +767,7 @@ async function openActivityDetailSheet(session) {
     const points = await intervalsFetchActivityStreams(session.intervalsActivityId, s.apiKey);
     const table = zoneTable(settings, settings.primaryZoneModel);
     $('activityZoneChartWrap').innerHTML = hrZoneDurationListHTML(hrZoneDurations(points, table));
-    $('activityHRChartWrap').innerHTML = activityHRLineChartSVG(points);
+    $('activityHRChartWrap').innerHTML = activityHRLineChartSVG(points, table);
     $('activityPaceChartWrap').innerHTML = activityPaceLineChartSVG(points);
   } catch (err) {
     console.error('Failed to load activity streams', err);
