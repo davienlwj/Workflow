@@ -24,14 +24,10 @@ import {
   getOrCreateCalendar, upsertEvent as gcalUpsertEvent, deleteEvent as gcalDeleteEvent, CALENDAR_NAME,
 } from './gcal.js';
 import {
-  beginAuthorize as stravaBeginAuthorize,
-  consumeAuthorizeRedirect as stravaConsumeAuthorizeRedirect,
-  exchangeCode as stravaExchangeCode,
-  refreshAccessToken as stravaRefreshAccessToken,
-  listActivities as stravaListActivities,
-  isRunActivity as isStravaRunActivity,
-  activityToSession as stravaActivityToSession,
-} from './strava.js';
+  listActivities as intervalsListActivities,
+  isRunActivity as isIntervalsRunActivity,
+  activityToSession as intervalsActivityToSession,
+} from './intervals.js';
 import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
   exerciseById, searchExercises,
@@ -2213,168 +2209,116 @@ $('gcalSyncNow').addEventListener('click', async () => {
   await syncAllToGoogle();
 });
 
-/* --------------------------------------------------------------- STRAVA */
+/* ----------------------------------------------------------- INTERVALS.ICU */
 
-let stravaAccessToken = null;
-let stravaAccessTokenExpiresAt = 0;
-// Same purpose as gcalNeedsReconnect above - set when a sync attempt
-// couldn't get a usable token, cleared by the next successful one.
-let stravaNeedsReconnect = false;
+// Set on a failed sync (e.g. a revoked/typo'd API key), cleared by the
+// next successful one - same purpose as gcalNeedsReconnect above.
+let intervalsNeedsReconnect = false;
 
-function hasValidStravaToken() {
-  return Boolean(stravaAccessToken) && Date.now() < stravaAccessTokenExpiresAt;
+function isoDateDaysAgo(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
 }
 
-/** Gets a usable access token, refreshing via the proxy if the in-memory
- *  one is missing or expired (true on every fresh page load, since the
- *  access token itself is never persisted - only the long-lived refresh
- *  token is). Strava rotates the refresh token on each use, so the new one
- *  gets re-persisted too. Returns null (never throws) if a token can't be
- *  had right now - callers should treat that as "sync skipped, will retry
- *  on the next save/open, or an explicit reconnect". */
-async function getStravaAccessToken() {
-  if (hasValidStravaToken()) return stravaAccessToken;
-  const { proxyUrl, refreshToken } = settings.strava;
-  if (!proxyUrl || !refreshToken) return null;
-  try {
-    const data = await stravaRefreshAccessToken(proxyUrl, refreshToken);
-    stravaAccessToken = data.access_token;
-    stravaAccessTokenExpiresAt = (data.expires_at || 0) * 1000;
-    if (data.refresh_token && data.refresh_token !== refreshToken) {
-      settings = { ...settings, strava: { ...settings.strava, refreshToken: data.refresh_token } };
-      saveSettings(settings);
-    }
-    return stravaAccessToken;
-  } catch (err) {
-    console.error('Strava token refresh failed', err);
-    return null;
+/** Imports every not-yet-seen run out of `activities` (deduped by
+ *  intervalsActivityId), returning how many were added. */
+function importNewIntervalsRunActivities(activities) {
+  const existingIds = new Set(sessions.map((s) => s.intervalsActivityId).filter(Boolean));
+  let count = 0;
+  for (const activity of activities) {
+    if (!isIntervalsRunActivity(activity) || existingIds.has(activity.id)) continue;
+    addSession(intervalsActivityToSession(activity));
+    count += 1;
   }
+  if (count > 0) sessions = loadSessions();
+  return count;
 }
 
-/** Runs `fn(accessToken)` if Strava sync is enabled and a token can be had.
- *  Fire-and-forget by every caller below: a save always succeeds locally
- *  regardless of whether the Strava pull that follows it does. */
-async function withStrava(fn) {
-  const s = settings.strava;
-  if (!s?.enabled || !s?.clientId || !s?.proxyUrl) return undefined;
+/** Pulls new run activities from intervals.icu into local sessions. The
+ *  first sync (no lastSyncedAt yet) backfills the last 90 days; every sync
+ *  after that only asks for what's new. No OAuth here (see intervals.js) -
+ *  a plain API-key GET, so unlike Strava/Google there's no token to
+ *  refresh or redirect to handle, just "does the request succeed". */
+async function syncIntervalsRuns({ silent = false } = {}) {
+  const s = settings.intervals;
+  if (!s?.enabled || !s?.athleteId || !s?.apiKey) return;
+  let imported = null;
   try {
-    const token = await getStravaAccessToken();
-    if (!token) { stravaNeedsReconnect = true; renderStravaStatus(); return undefined; }
-    const result = await fn(token);
-    stravaNeedsReconnect = false;
-    renderStravaStatus();
-    return result;
-  } catch (err) {
-    console.error('Strava sync failed', err);
-    return undefined;
-  }
-}
-
-/** Pulls new run activities from Strava into local sessions, deduped by
- *  stravaActivityId. The first sync (no lastSyncedAt yet) backfills the
- *  last 90 days; every sync after that only asks for what's new. */
-async function syncStravaRuns({ silent = false } = {}) {
-  const imported = await withStrava(async (token) => {
-    const after = settings.strava.lastSyncedAt || Math.floor(Date.now() / 1000) - 90 * 86400;
-    const activities = await stravaListActivities(token, after);
-    const existingIds = new Set(sessions.map((s) => s.stravaActivityId).filter(Boolean));
-    let count = 0;
-    for (const activity of activities) {
-      if (!isStravaRunActivity(activity) || existingIds.has(activity.id)) continue;
-      addSession(stravaActivityToSession(activity));
-      count += 1;
-    }
-    if (count > 0) sessions = loadSessions();
-    settings = { ...settings, strava: { ...settings.strava, lastSyncedAt: Math.floor(Date.now() / 1000) } };
+    const oldest = s.lastSyncedAt || isoDateDaysAgo(90);
+    const activities = await intervalsListActivities(s.athleteId, s.apiKey, oldest);
+    imported = importNewIntervalsRunActivities(activities);
+    settings = { ...settings, intervals: { ...settings.intervals, lastSyncedAt: todayIso() } };
     saveSettings(settings);
-    return count;
-  });
+    intervalsNeedsReconnect = false;
+  } catch (err) {
+    console.error('intervals.icu sync failed', err);
+    intervalsNeedsReconnect = true;
+  }
   if (imported) renderAll();
+  renderIntervalsStatus();
   if (silent) return;
-  if (imported == null) toast(stravaNeedsReconnect ? 'Reconnect needed to sync Strava' : 'Could not sync Strava');
-  else if (imported > 0) toast(`Imported ${imported} run${imported === 1 ? '' : 's'} from Strava`);
-  else toast('No new Strava runs to import');
+  if (imported == null) toast('Could not sync intervals.icu - check your Athlete ID and API Key');
+  else if (imported > 0) toast(`Imported ${imported} run${imported === 1 ? '' : 's'} from intervals.icu`);
+  else toast('No new runs to import');
 }
 
-function renderStravaStatus() {
-  $('stravaClientId').value = settings.strava.clientId;
-  $('stravaProxyUrl').value = settings.strava.proxyUrl;
-  const { enabled } = settings.strava;
-  $('stravaDisconnect').hidden = !enabled;
-  $('stravaSyncNow').hidden = !enabled;
+function renderIntervalsStatus() {
+  $('intervalsAthleteId').value = settings.intervals.athleteId;
+  $('intervalsApiKey').value = settings.intervals.apiKey;
+  const { enabled } = settings.intervals;
+  $('intervalsDisconnect').hidden = !enabled;
+  $('intervalsSyncNow').hidden = !enabled;
   if (!enabled) {
-    $('stravaStatus').textContent = 'Not connected.';
-    $('stravaConnect').hidden = false;
-  } else if (stravaNeedsReconnect) {
-    $('stravaStatus').textContent = 'Sync paused - tap Connect to resume.';
-    $('stravaConnect').hidden = false;
+    $('intervalsStatus').textContent = 'Not connected.';
+    $('intervalsConnect').hidden = false;
+  } else if (intervalsNeedsReconnect) {
+    $('intervalsStatus').textContent = 'Sync failed - check your Athlete ID and API Key.';
+    $('intervalsConnect').hidden = false;
   } else {
-    $('stravaStatus').textContent = 'Connected - importing your runs automatically.';
-    $('stravaConnect').hidden = true;
+    $('intervalsStatus').textContent = 'Connected - importing your runs automatically.';
+    $('intervalsConnect').hidden = true;
   }
 }
 
-$('stravaClientId').addEventListener('change', () => {
-  settings = { ...settings, strava: { ...settings.strava, clientId: $('stravaClientId').value.trim() } };
+$('intervalsAthleteId').addEventListener('change', () => {
+  settings = { ...settings, intervals: { ...settings.intervals, athleteId: $('intervalsAthleteId').value.trim() } };
   saveSettings(settings);
 });
-$('stravaProxyUrl').addEventListener('change', () => {
-  settings = { ...settings, strava: { ...settings.strava, proxyUrl: $('stravaProxyUrl').value.trim().replace(/\/$/, '') } };
+$('intervalsApiKey').addEventListener('change', () => {
+  settings = { ...settings, intervals: { ...settings.intervals, apiKey: $('intervalsApiKey').value.trim() } };
   saveSettings(settings);
-});
-
-$('stravaConnect').addEventListener('click', () => {
-  const clientId = $('stravaClientId').value.trim();
-  const proxyUrl = $('stravaProxyUrl').value.trim().replace(/\/$/, '');
-  if (!clientId || !proxyUrl) { toast('Fill in both the Client ID and Proxy URL first'); return; }
-  settings = { ...settings, strava: { ...settings.strava, clientId, proxyUrl } };
-  saveSettings(settings);
-  stravaBeginAuthorize(clientId); // navigates away - completeStravaConnectIfRedirected() resumes this on the way back
 });
 
-$('stravaDisconnect').addEventListener('click', () => {
-  if (!confirm('Disconnect Strava? Runs already imported stay in your history - only future auto-import stops.')) return;
-  stravaAccessToken = null;
-  stravaAccessTokenExpiresAt = 0;
-  stravaNeedsReconnect = false;
-  settings = { ...settings, strava: { ...settings.strava, enabled: false, refreshToken: null, athleteId: null } };
+$('intervalsConnect').addEventListener('click', async () => {
+  const athleteId = $('intervalsAthleteId').value.trim();
+  const apiKey = $('intervalsApiKey').value.trim();
+  if (!athleteId || !apiKey) { toast('Fill in both the Athlete ID and API Key first'); return; }
+  try {
+    const activities = await intervalsListActivities(athleteId, apiKey, isoDateDaysAgo(90));
+    settings = { ...settings, intervals: { athleteId, apiKey, enabled: true, lastSyncedAt: todayIso() } };
+    saveSettings(settings);
+    const imported = importNewIntervalsRunActivities(activities);
+    intervalsNeedsReconnect = false;
+    renderAll();
+    renderIntervalsStatus();
+    toast(imported > 0 ? `Connected - imported ${imported} run${imported === 1 ? '' : 's'}` : 'Connected - no runs to import yet');
+  } catch (err) {
+    console.error('intervals.icu connect failed', err);
+    toast('Could not connect - check your Athlete ID and API Key');
+  }
+});
+
+$('intervalsDisconnect').addEventListener('click', () => {
+  if (!confirm('Disconnect intervals.icu? Runs already imported stay in your history - only future auto-import stops.')) return;
+  intervalsNeedsReconnect = false;
+  settings = { ...settings, intervals: { ...settings.intervals, enabled: false } };
   saveSettings(settings);
-  renderStravaStatus();
+  renderIntervalsStatus();
   toast('Disconnected');
 });
 
-$('stravaSyncNow').addEventListener('click', () => { syncStravaRuns(); });
-
-/** Called once at boot. If this page load is Strava sending the user back
- *  from the consent screen, finishes the OAuth exchange and runs an
- *  initial backfill sync; otherwise, if already connected, does a quiet
- *  sync - this is the "automatic" half of the feature, since there's no
- *  backend to push to the browser: opening the app is what checks for
- *  anything new since last time. */
-async function completeStravaConnectIfRedirected() {
-  const code = stravaConsumeAuthorizeRedirect();
-  if (!code) {
-    if (settings.strava.enabled) await syncStravaRuns({ silent: true });
-    return;
-  }
-  try {
-    const data = await stravaExchangeCode(settings.strava.proxyUrl, code);
-    stravaAccessToken = data.access_token;
-    stravaAccessTokenExpiresAt = (data.expires_at || 0) * 1000;
-    settings = {
-      ...settings,
-      strava: { ...settings.strava, refreshToken: data.refresh_token, athleteId: data.athlete?.id ?? null, enabled: true },
-    };
-    saveSettings(settings);
-    renderStravaStatus();
-    toast('Connected - importing your runs now…');
-    await syncStravaRuns({ silent: true });
-    renderAll();
-  } catch (err) {
-    console.error('Strava connect failed', err);
-    toast('Could not connect to Strava');
-  }
-}
+$('intervalsSyncNow').addEventListener('click', () => { syncIntervalsRuns(); });
 
 /* ------------------------------------------------------------- SETTINGS */
 
@@ -2394,7 +2338,7 @@ function renderSettingsForm() {
   $('sLTHR').value = settings.lthr;
   $('sPrimaryModel').value = settings.primaryZoneModel;
   renderGCalStatus();
-  renderStravaStatus();
+  renderIntervalsStatus();
 }
 
 $('sTheme').addEventListener('click', (e) => {
@@ -2411,7 +2355,7 @@ $('settingsForm').addEventListener('submit', (e) => {
   settings = {
     theme: settings.theme,
     googleCalendar: settings.googleCalendar,
-    strava: settings.strava,
+    intervals: settings.intervals,
     profile: {
       name: $('sName').value.trim(),
       dob: $('sDob').value,
@@ -2483,7 +2427,7 @@ resetLogForm();
 renderAll();
 switchView('dashboard');
 resumeLiveWorkoutIfAny();
-completeStravaConnectIfRedirected();
+if (settings.intervals.enabled) syncIntervalsRuns({ silent: true });
 
 // The boot splash (index.html) has done its job now that the real UI is
 // rendered - fade it out, then drop it from the DOM once the transition

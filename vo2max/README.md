@@ -98,7 +98,7 @@ Dashboard as the place they come together.
   changed it. Export/import a JSON backup (workouts included), or reset to
   defaults. A **Google Calendar sync** section (see below) automatically
   pushes every run and workout to its own dedicated calendar once connected,
-  and a **Strava sync** section automatically imports your runs from Strava
+  and an **intervals.icu sync** section automatically imports your runs
   (e.g. synced there from a Zepp-paired watch) — see below for both.
   Below that, an expandable **Zones & protocol reference**
   section: both the LTHR-based and RHR-based (Karvonen) zone tables, the
@@ -148,53 +148,44 @@ again before syncing resumes — **Sync all now** in Settings re-syncs
 anything that was saved while disconnected. Disconnecting stops future
 syncing but leaves everything already pushed to your calendar untouched.
 
-## Strava sync (for Zepp watches)
+## intervals.icu sync (for Zepp watches)
 
-There's no public API for pulling data directly out of the Zepp app, but
-Zepp *can* auto-push your workouts to Strava (Profile → Add accounts →
-Strava, inside the Zepp app), and Strava has a real public API — so that's
-the bridge this app uses: connect the same Strava account here, and every
-new **run** on it gets imported automatically, checked each time the app is
-opened. Lifts aren't covered — Strava's data model has no equivalent to
-this app's per-exercise, per-set strength data, so workouts still need to
-be logged by hand regardless.
+There's no public API for pulling data directly out of the Zepp app, and
+(as of mid-2026) Strava now charges developers a monthly subscription just
+to use its API — not worth it for a personal app. The workaround:
+[intervals.icu](https://intervals.icu) is a free training-analysis platform
+with its own direct Amazfit/Zepp integration — you sign into your Zepp
+account right on intervals.icu, no Strava involved at all, and it syncs
+automatically via webhook (faster than a Strava relay would be, and it
+picks up wellness data like sleep and HRV too, not just workouts).
 
-Unlike Google, Strava's sign-in has no way to hand the browser a token
-directly — the exchange requires a secret that can never be shipped to a
-static site. So this one feature needs a tiny piece of backend: a
-[Cloudflare Worker](https://workers.cloudflare.com/) (free tier is plenty)
-that holds that secret and does nothing else. Setup is two parts, ~10
-minutes total:
+**Zepp account, connected directly on intervals.icu** (intervals.icu →
+Settings → Amazfit → sign in with Zepp) **→ this app reading intervals.icu**
+with your own free personal API key.
 
-**Part 1 — Strava API app:**
+Every new **run** synced this way gets imported automatically, checked
+each time the app is opened. Lifts aren't covered — intervals.icu has no
+equivalent to this app's per-exercise, per-set strength data, so workouts
+still need to be logged by hand regardless.
 
-1. Go to [strava.com/settings/api](https://www.strava.com/settings/api) and
-   create an API application. **Authorization Callback Domain** should be
-   the domain the app is served from, e.g. `davienlwj.github.io` (no
-   `https://`, no path).
-2. Note the **Client ID** and **Client Secret** it gives you.
+Unlike Strava or Google, intervals.icu needs no OAuth flow and no
+backend — just a personal API key you generate yourself, so setup is a
+couple of minutes:
 
-**Part 2 — deploy the proxy** (this repo's `vo2max/strava-proxy/` folder):
+1. Create a free account at [intervals.icu](https://intervals.icu) if you
+   don't have one, then connect your Zepp account directly: **Settings →
+   Amazfit** → sign in with your Zepp login → tick the activity types you
+   want synced (Runs, at least).
+2. On the same Settings page, under **Developer Settings**, generate an
+   **API Key** (and note your **Athlete ID**, shown just above it, e.g.
+   `i123456`).
+3. In the app: **Settings → intervals.icu sync**, paste both the Athlete ID
+   and API Key, then tap **Connect**. Your run history from the last 90
+   days imports right away; every app open after that checks for anything
+   new since the last sync. **Sync now** re-checks on demand.
 
-1. [Sign up for Cloudflare](https://dash.cloudflare.com/sign-up) (free) and
-   install the CLI: `npm install -g wrangler`.
-2. Edit `vo2max/strava-proxy/wrangler.toml`: set `STRAVA_CLIENT_ID` to the
-   Client ID from Part 1, and `ALLOWED_ORIGIN` to your app's origin (e.g.
-   `https://davienlwj.github.io`).
-3. From `vo2max/strava-proxy/`, run `wrangler login`, then
-   `wrangler secret put STRAVA_CLIENT_SECRET` and paste the Client Secret
-   from Part 1 when prompted (this keeps it out of source entirely).
-4. `wrangler deploy` — copy the `*.workers.dev` URL it prints out.
-
-**Part 3 — connect from the app:**
-
-In Settings → Strava sync, paste the Client ID and the Worker URL from
-above, then tap **Connect** and approve access. Your run history from the
-last 90 days imports automatically right after connecting; every app open
-after that checks for anything new since the last sync.
-
-Like Google Calendar sync, disconnecting stops future imports but leaves
-already-imported runs in your history untouched.
+Disconnecting stops future imports but leaves already-imported runs in
+your history untouched.
 
 ## Zone math
 
@@ -227,10 +218,8 @@ js/chart.js                 dependency-free SVG charts: VO2max trend, mileage ba
 js/ics.js                   builds a per-session .ics file for calendar export, and the shared
                               summary/description text + event resources used by gcal.js
 js/gcal.js                  Google Identity Services auth + Calendar API calls for automatic sync
-js/strava.js                 Strava OAuth (via strava-proxy/) + activity fetch/mapping for run import
-strava-proxy/                the one piece of backend this app needs - a Cloudflare Worker holding
-                              Strava's OAuth client secret, deployed separately (see the README's
-                              Strava sync section)
+js/intervals.js              intervals.icu API-key auth + activity fetch/mapping for run import
+                              (no backend needed - see the README's intervals.icu sync section)
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/icon-source.jpg        the hand-drawn mark the app icons are built from

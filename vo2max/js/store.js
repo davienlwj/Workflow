@@ -33,15 +33,12 @@ export const DEFAULT_SETTINGS = {
     calendarId: '', // id of the app-created "HYBR. Workouts" calendar, cached after first connect
     enabled: false, // true once connected at least once - auto-sync only runs while this is true
   },
-  strava: {
-    clientId: '', // Strava app's Client ID (not secret, pasted by the user)
-    proxyUrl: '', // the user's deployed strava-proxy Worker URL (see strava-proxy/)
-    refreshToken: null, // long-lived - Strava's flow has no silent-reauth equivalent to
-    // Google's, so unlike googleCalendar this has to be persisted to keep syncing
-    // across page loads without asking the user to reconnect every time
-    athleteId: null,
+  intervals: {
+    athleteId: '', // e.g. "i123456", from the user's intervals.icu account settings
+    apiKey: '', // personal API key, from the same settings page - no OAuth, no backend needed
     enabled: false, // true once connected at least once - auto-sync only runs while this is true
-    lastSyncedAt: null, // unix seconds - incremental syncs only fetch activities after this
+    lastSyncedAt: null, // YYYY-MM-DD - intervals.icu's `oldest` param takes a date, not a
+    // timestamp; incremental syncs only fetch activities on/after this
   },
 };
 
@@ -60,7 +57,7 @@ export function loadSettings() {
       ...parsed,
       profile: { ...DEFAULT_SETTINGS.profile, ...(parsed.profile || {}) },
       googleCalendar: { ...DEFAULT_SETTINGS.googleCalendar, ...(parsed.googleCalendar || {}) },
-      strava: { ...DEFAULT_SETTINGS.strava, ...(parsed.strava || {}) },
+      intervals: { ...DEFAULT_SETTINGS.intervals, ...(parsed.intervals || {}) },
     };
   } catch {
     return clone(DEFAULT_SETTINGS);
