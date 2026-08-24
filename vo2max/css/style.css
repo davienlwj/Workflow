@@ -425,6 +425,11 @@ button { font-family: var(--font-mono); }
 .actions-row { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
 .actions-row + .primary.block { margin-top: 18px; }
 
+/* The exercise detail sheet's Close/Edit/Delete row sits directly against
+   the Volume chart above it with no gap at all - 8px, matching the other
+   "list/chart-adjacent element" gaps fixed elsewhere on the Lift tab. */
+#exDetailActions { margin-top: 8px; }
+
 /* ------------------------------------------------------------ card, stats */
 
 .card {
