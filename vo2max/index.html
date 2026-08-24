@@ -596,6 +596,8 @@
       <textarea id="woNotes" rows="3"></textarea>
     </label>
 
+    <button type="button" id="woSaveRoutine" class="ghost-btn block" hidden>Save as Routine</button>
+
     <div class="actions">
       <button type="button" id="woDelete" class="danger-btn" hidden>Delete</button>
       <button type="button" id="woCancel" class="ghost-btn">Cancel</button>
@@ -761,6 +763,10 @@
     <label class="field">
       <span>Equipment</span>
       <select id="exEditEquipment"></select>
+    </label>
+    <label class="field" id="exEditBrandField" hidden>
+      <span>Preferred brand</span>
+      <select id="exEditBrand"></select>
     </label>
     <label class="field">
       <span>Body part(s) <em>(tap all that apply)</em></span>

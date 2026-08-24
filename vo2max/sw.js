@@ -1,6 +1,6 @@
 /* HYBR.D - offline shell. Bump CACHE when the app files change. */
 
-const CACHE = 'vo2max-v100';
+const CACHE = 'vo2max-v101';
 
 const SHELL = [
   './',

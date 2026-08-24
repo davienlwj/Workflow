@@ -34,6 +34,15 @@
   --accent-dim: #4a4a4a;
 }
 
+/* Mobile browsers (Android Chrome especially) paint a translucent blue
+   overlay on anything pressed/held unless this is reset - barely
+   noticeable on a quick tap, but glaring on the ~350ms long-press this
+   app uses to start a drag-to-reorder gesture (routine and workout
+   exercise lists). Reset everywhere rather than only on the drag
+   handles, since the highlight can land on the whole pressed element,
+   not just the glyph inside it. */
+* { -webkit-tap-highlight-color: transparent; }
+
 * { box-sizing: border-box; }
 
 /* Only html scrolls (the standard scrolling element). Giving body its own
@@ -271,6 +280,8 @@ main.has-live-bar {
   max-width: 100%;
   overflow: hidden;
 }
+
+.field[hidden] { display: none; }
 
 .field em { color: var(--dimmer); font-style: normal; }
 
@@ -867,6 +878,7 @@ button { font-family: var(--font-mono); }
      scroll/zoom the sheet underneath the same gesture. */
   touch-action: none;
   user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .routine-selected-item.dragging {
@@ -1331,6 +1343,7 @@ button { font-family: var(--font-mono); }
   cursor: grab;
   touch-action: none;
   user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .wo-exercise-block.dragging, .wo-superset-group.dragging {
