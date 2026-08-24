@@ -1,4 +1,4 @@
-# HYBR.
+# HYBR.D
 
 A personal training log for the Norwegian 4x4 VO2max protocol. No account, no
 server — everything is stored in `localStorage` on your device, and the app
@@ -110,7 +110,7 @@ Dashboard as the place they come together.
 ## Google Calendar sync
 
 Every run and workout you save is automatically pushed to a dedicated
-**"HYBR. Workouts"** calendar in your Google account (created for you on
+**"HYBR.D Workouts"** calendar in your Google account (created for you on
 first connect), and kept up to date — editing or deleting a session/workout
 updates or removes its calendar event too. This is a static site with no
 backend, so it talks to the Calendar API directly from your browser using
@@ -127,7 +127,7 @@ minute setup):
 2. **APIs & Services → Library** — search for **Google Calendar API** and
    enable it.
 3. **APIs & Services → OAuth consent screen** — choose **External**, fill in
-   an app name (e.g. "HYBR. Workouts"), your email as both support and
+   an app name (e.g. "HYBR.D Workouts"), your email as both support and
    developer contact. Leave the app in **Testing** status and add your own
    Google account under **Test users** — no verification/review needed for
    personal use.

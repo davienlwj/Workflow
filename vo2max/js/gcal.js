@@ -8,13 +8,13 @@
  * Scoped to calendar.app.created, the narrowest scope Google offers: the
  * app can only ever see/edit/delete calendars *it* created, never the
  * user's existing calendars or events. On first connect it creates one
- * dedicated "HYBR. Workouts" calendar and syncs every run/workout into
+ * dedicated "HYBR.D Workouts" calendar and syncs every run/workout into
  * that, going forward automatically on every save.
  */
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.app.created';
-export const CALENDAR_NAME = 'HYBR. Workouts';
+export const CALENDAR_NAME = 'HYBR.D Workouts';
 const API_BASE = 'https://www.googleapis.com/calendar/v3';
 
 let gisLoadPromise = null;

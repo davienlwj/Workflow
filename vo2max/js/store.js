@@ -30,7 +30,7 @@ export const DEFAULT_SETTINGS = {
   primaryZoneModel: 'lthr', // 'lthr' | 'rhr'
   googleCalendar: {
     clientId: '', // pasted by the user from their own Google Cloud OAuth client
-    calendarId: '', // id of the app-created "HYBR. Workouts" calendar, cached after first connect
+    calendarId: '', // id of the app-created "HYBR.D Workouts" calendar, cached after first connect
     enabled: false, // true once connected at least once - auto-sync only runs while this is true
   },
   intervals: {
