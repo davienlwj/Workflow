@@ -9,7 +9,7 @@ tools/muscle-chart-source.jpg (a front+back anatomy illustration):
 3. For each muscle group, finds its region(s) in the source by
    connected-component labeling seeded at a handful of hand-picked
    points (MUSCLE_SEEDS below — one point per anatomical sub-shape in
-   the source illustration), then writes a transparent red overlay PNG
+   the source illustration), then writes a transparent orange overlay PNG
    for just that region. The app stacks the base body image with
    whichever overlay(s) an exercise's muscles call for.
 
@@ -29,7 +29,7 @@ OUT = HERE.parent / "icons" / "muscles"
 
 DARK_THRESHOLD = 150   # pixels darker than this are "muscle fill" for labeling/recoloring
 BG_THRESHOLD = 235      # pixels lighter than this are background -> made transparent
-RED = (198, 40, 40)     # highlight color for a worked muscle
+HIGHLIGHT = (255, 108, 45)     # highlight color for a worked muscle (brand orange, #FF6C2D)
 
 # (x0, x1, y0, y1) crop box for each view, in source-image pixel coordinates.
 VIEWS = {
@@ -100,7 +100,7 @@ def main():
                 mask |= labels_full == label_id
             crop_mask = mask[y0:y1, x0:x1]
             overlay = np.zeros((*crop_mask.shape, 4), dtype=np.uint8)
-            overlay[crop_mask] = (*RED, 255)
+            overlay[crop_mask] = (*HIGHLIGHT, 255)
             Image.fromarray(overlay, "RGBA").save(OUT / f"{muscle}-{view}.png", optimize=True, compress_level=9)
             print(f"{view}: {muscle} mask covers {crop_mask.sum()}px")
 

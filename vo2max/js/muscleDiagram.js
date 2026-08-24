@@ -1,7 +1,7 @@
 /*
  * Front/back body diagram, built from image assets in icons/muscles/
  * (see tools/gen-muscle-diagram.py): a recolored anatomy illustration as
- * the base "unworked" body, with a transparent red overlay stacked on top
+ * the base "unworked" body, with a transparent orange overlay stacked on top
  * per worked muscle region. Each view only renders if at least one active
  * muscle has an overlay for it.
  */

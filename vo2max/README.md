@@ -257,7 +257,7 @@ sw.js                        offline cache
 tools/icon-source.jpg        the hand-drawn mark the app icons are built from
 tools/gen-icons.py           crops/centers it into the icon set (needs Pillow, numpy)
 tools/muscle-chart-source.jpg the anatomy illustration the muscle diagrams are built from
-tools/gen-muscle-diagram.py  recolors it lighter grey and cuts a red highlight overlay per
+tools/gen-muscle-diagram.py  recolors it lighter grey and cuts an orange highlight overlay per
                               muscle group (needs Pillow, numpy, scipy) -> icons/muscles/
 ../tests/vo2max-*.test.mjs   zone, progress-stats, workout, exercise, muscle-diagram, icons, chart and ics-export test suites
 ```
