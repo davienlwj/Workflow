@@ -18,7 +18,7 @@ import {
 import {
   vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG, exerciseVolumeSVG, muscleRadarSVG,
   restingHRTrendSVG, sleepBarChartSVG,
-  activityHRLineChartSVG, activityPaceLineChartSVG, hrZoneDurationBarChartSVG,
+  activityHRLineChartSVG, activityPaceLineChartSVG, hrZoneDurationListHTML,
 } from './chart.js';
 import { sessionToICS, sessionToGCalEvent, workoutToGCalEvent } from './ics.js';
 import {
@@ -742,10 +742,20 @@ $('sleepDetailClose').addEventListener('click', () => {
  *  run, read from intervals.icu's raw stream data. Zone durations are
  *  computed locally against this app's own zone table (whichever model is
  *  primary in Settings) rather than trusting intervals.icu's own zone
- *  config, which the user may never have set up to match. */
+ *  config, which the user may never have set up to match. The summary stat
+ *  row above the charts comes straight from the session itself (already
+ *  known, no fetch needed) - these are the activity's own reported
+ *  distance/duration/avg pace/avg+max HR, which are more reliable than
+ *  anything re-derived from the noisy raw sample stream. */
 async function openActivityDetailSheet(session) {
   const s = settings.intervals;
   if (!s?.enabled || !session.intervalsActivityId) return;
+  $('activityDetailStats').innerHTML = `
+    <div class="stat-tile"><div class="stat-value mono">${session.distanceKm ?? '–'}km</div><div class="stat-label">Distance</div></div>
+    <div class="stat-tile"><div class="stat-value mono">${session.durationMin ?? '–'}min</div><div class="stat-label">Duration</div></div>
+    <div class="stat-tile"><div class="stat-value mono">${session.avgPace != null ? `${formatPaceMinKm(session.avgPace)}/km` : '–'}</div><div class="stat-label">Avg Pace</div></div>
+    <div class="stat-tile"><div class="stat-value mono">${session.avgHR ?? '–'} / ${session.maxHR ?? '–'}</div><div class="stat-label">Avg / Max HR</div></div>
+  `;
   $('scrim').hidden = false;
   $('activityDetailSheet').hidden = false;
   $('activityDetailSheet').scrollTop = 0;
@@ -756,7 +766,7 @@ async function openActivityDetailSheet(session) {
   try {
     const points = await intervalsFetchActivityStreams(session.intervalsActivityId, s.apiKey);
     const table = zoneTable(settings, settings.primaryZoneModel);
-    $('activityZoneChartWrap').innerHTML = hrZoneDurationBarChartSVG(hrZoneDurations(points, table));
+    $('activityZoneChartWrap').innerHTML = hrZoneDurationListHTML(hrZoneDurations(points, table));
     $('activityHRChartWrap').innerHTML = activityHRLineChartSVG(points);
     $('activityPaceChartWrap').innerHTML = activityPaceLineChartSVG(points);
   } catch (err) {

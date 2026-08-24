@@ -497,6 +497,54 @@ button { font-family: var(--font-mono); }
 .chart-empty { color: var(--dimmer); font-size: 14px; text-align: center; padding: 40px 0; }
 .chart-radar-fill { fill: var(--accent); fill-opacity: 0.12; stroke: none; }
 .chart-radar-label { font-size: 12px; fill: var(--dim); }
+
+.activity-detail-stats { margin-top: 12px; }
+
+.hr-zone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hr-zone-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hr-zone-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.hr-zone-row-name {
+  font-size: 12px;
+  color: var(--ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hr-zone-row-time { font-size: 12px; color: var(--ink); flex-shrink: 0; }
+
+.hr-zone-row-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+  width: 100%;
+}
+
+.hr-zone-row-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.hr-zone-row-pct { font-size: 11px; color: var(--dimmer); }
 .chart-radar-pct { font-size: 11px; fill: var(--dimmer); font-weight: 700; }
 .chart-radar-label-group { cursor: pointer; }
 .chart-radar-label-group.active .chart-radar-label { fill: var(--ink); font-weight: 700; }

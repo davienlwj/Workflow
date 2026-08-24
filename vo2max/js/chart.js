@@ -299,15 +299,23 @@ function denseLineChartSVG(points, { emptyMessage, ariaLabel, axisLabel, valueOf
       <text x="${PAD_L - 6}" y="${gy}" class="chart-axis" text-anchor="end" dominant-baseline="middle">${format(v)}</text>`;
   }).join('');
 
-  const firstLabel = `<text x="${PAD_L}" y="${H - 6}" class="chart-axis" text-anchor="start">${timeAxisLabel(minT)}</text>`;
-  const lastLabel = `<text x="${W - PAD_R}" y="${H - 6}" class="chart-axis" text-anchor="end">${timeAxisLabel(maxT)}</text>`;
+  // Five evenly-spaced time ticks (not just start/end) with faint vertical
+  // gridlines, so a specific moment in the run can actually be read off the
+  // x-axis instead of only eyeballing a position between two endpoints.
+  const X_TICKS = 4;
+  const xTicks = Array.from({ length: X_TICKS + 1 }, (_, i) => minT + (tSpan * i) / X_TICKS);
+  const xGridLines = xTicks.map((t, i) => {
+    const gx = x(t).toFixed(1);
+    const anchor = i === 0 ? 'start' : i === X_TICKS ? 'end' : 'middle';
+    return `<line x1="${gx}" y1="${PAD_T}" x2="${gx}" y2="${PAD_T + innerH}" class="chart-grid" />
+      <text x="${gx}" y="${H - 6}" class="chart-axis" text-anchor="${anchor}">${timeAxisLabel(t)}</text>`;
+  }).join('');
 
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}" class="chart-svg" role="img" aria-label="${ariaLabel}">
     <text x="2" y="12" class="chart-axis" text-anchor="start">${axisLabel}</text>
     ${gridLines}
+    ${xGridLines}
     <path d="${linePath}" class="chart-line" fill="none" />
-    ${firstLabel}
-    ${lastLabel}
   </svg>`;
 }
 
@@ -335,14 +343,29 @@ export function activityPaceLineChartSVG(points) {
 
 /** @param {{name: string, secs: number}[]} zones this app's own HR zone
  *  table (RHR or LTHR, whichever is primary) with seconds-in-zone computed
- *  from a run's raw HR stream - see hrZoneDurations in zones.js. */
-export function hrZoneDurationBarChartSVG(zones) {
-  return barChartSVG(zones.map((z) => ({ label: z.name, minutes: Math.round((z.secs / 60) * 10) / 10 })), {
-    emptyMessage: 'No heart rate data recorded for this activity.',
-    ariaLabel: 'Time in heart rate zone',
-    valueOf: (b) => b.minutes,
-    isEmpty: (bs) => bs.every((b) => b.minutes === 0),
-  });
+ *  from a run's raw HR stream - see hrZoneDurations in zones.js. Rendered
+ *  as an HTML list (name, proportional bar, exact m:ss and % of the run)
+ *  rather than an SVG bar chart with rotated tick labels - full zone names
+ *  ("Efficient fat burning", "Anaerobic endurance") are too long to fit as
+ *  rotated labels without overlapping the bars themselves, and a list also
+ *  gives an exact duration instead of a rounded chart value. */
+export function hrZoneDurationListHTML(zones) {
+  const totalSecs = zones.reduce((sum, z) => sum + z.secs, 0);
+  if (totalSecs === 0) {
+    return '<p class="chart-empty">No heart rate data recorded for this activity.</p>';
+  }
+  const rows = zones.map((z) => {
+    const pct = Math.round((z.secs / totalSecs) * 100);
+    return `<div class="hr-zone-row">
+      <div class="hr-zone-row-head">
+        <span class="hr-zone-row-name">${z.name}</span>
+        <span class="hr-zone-row-time mono">${formatPaceMinKm(z.secs / 60)}</span>
+      </div>
+      <div class="hr-zone-row-track"><div class="hr-zone-row-fill" style="width:${pct}%"></div></div>
+      <span class="hr-zone-row-pct mono">${pct}% of run</span>
+    </div>`;
+  }).join('');
+  return `<div class="hr-zone-list" role="img" aria-label="Time in heart rate zone">${rows}</div>`;
 }
 
 const RADAR_SIZE = 380;
