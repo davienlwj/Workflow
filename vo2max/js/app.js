@@ -38,7 +38,7 @@ import {
   exerciseById, searchExercises,
 } from './exercises.js';
 import { muscleDiagramHTML } from './muscleDiagram.js';
-import { renderWorkoutShareCard } from './shareCard.js';
+import { renderWorkoutShareCard, renderMuscleBalanceCard, renderPRsCard } from './shareCard.js';
 import {
   workoutVolume, lastPerformance, personalRecords, newPRsInWorkout, exerciseProgress, exerciseVolumeProgress, loggedBrandsForExercise,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince,
@@ -77,8 +77,17 @@ let liveSession = null; // { startedAt } while a live "today's workout" session 
 let workoutSheetMode = 'instant'; // 'instant' | 'live' - which mode #workoutSheet is currently rendering
 let liveTimerInterval = null;
 let lastFinishedWorkout = null; // set by openWorkoutSummarySheet, read by "Save as Routine"
-let lastFinishedDurationMs = 0; // set by openWorkoutSummarySheet, read by "Share image"
-let lastFinishedNewPRs = []; // set by openWorkoutSummarySheet, read by "Share image"
+let lastFinishedDurationMs = 0; // set by openWorkoutSummarySheet, read by "Save PNG"
+let lastFinishedNewPRs = []; // set by openWorkoutSummarySheet, shown in its own inline PR banner
+// #shareCardSheet's current subject - null while it's closed. `workoutsForPRs`
+// is the full workouts list PRs should be computed against: for an
+// already-saved workout that's just `workouts` (it's already in there); for
+// a still-running live session it's `workouts` plus a synthetic in-progress
+// record, so "new PR" framing reflects today's not-yet-saved sets too.
+let shareCardContext = null; // { workout, workoutsForPRs, durationMs, newPRs }
+let shareCardOption = 'summary'; // 'summary' | 'muscle' | 'prs' - which tab is showing
+let shareCardBlobs = {}; // rendered-PNG cache for the currently open sheet, keyed by option
+let shareCardObjectUrl = null; // the preview <img>'s current blob: URL, revoked on tab switch/close
 let routineSelectedIds = []; // exercise ids chosen so far in the open routine builder
 let editingRoutineId = null; // id of the routine being edited, or null when creating a new one
 let swappingIndex = null; // index in routineSelectedIds currently being replaced via the picker, or null
@@ -870,6 +879,7 @@ $('scrim').addEventListener('click', () => {
   closeStartChoiceSheet();
   closeRoutinesSheet();
   closeRoutineBuilderSheet();
+  closeShareCardSheet();
   $('workoutSummarySheet').hidden = true;
   $('restingHRDetailSheet').hidden = true;
   $('sleepDetailSheet').hidden = true;
@@ -1427,6 +1437,7 @@ function openWorkoutSheet(dateIso) {
   $('woPicker').hidden = true;
   $('woDelete').hidden = true;
   $('woSaveRoutine').hidden = true;
+  $('woSharePNG').hidden = true;
   $('woSave').textContent = 'Save workout';
   $('scrim').hidden = false;
   $('workoutSheet').hidden = false;
@@ -1449,6 +1460,7 @@ function openWorkoutEditSheet(workout) {
   $('woPicker').hidden = true;
   $('woDelete').hidden = false;
   $('woSaveRoutine').hidden = false;
+  $('woSharePNG').hidden = false;
   $('woSave').textContent = 'Update workout';
   $('scrim').hidden = false;
   $('workoutSheet').hidden = false;
@@ -1572,6 +1584,7 @@ function openLiveWorkoutSheet(exerciseIds = []) {
   $('woPicker').hidden = true;
   $('woDelete').hidden = true;
   $('woSaveRoutine').hidden = true;
+  $('woSharePNG').hidden = false;
   saveLiveWorkoutState();
   startLiveTimer();
   hideLiveMiniBar();
@@ -2007,39 +2020,158 @@ $('summarySaveRoutine').addEventListener('click', () => {
   openRoutineBuilderSheet(ids);
 });
 
-/** Renders the same stats as the summary sheet into a transparent PNG,
- *  then hands it to the OS share sheet (so Instagram Stories shows up as
- *  a direct target, same as Strava's own post-activity share) - falling
- *  back to a plain file download wherever navigator.share doesn't support
- *  image files (desktop browsers, mainly). */
-$('summaryShare').addEventListener('click', async () => {
+/** Builds and caches (per #shareCardSheet visit) the PNG blob for one of
+ *  the three share-card designs, from whatever workout #shareCardSheet is
+ *  currently open for (see shareCardContext). */
+async function buildShareCardBlob(option) {
+  if (shareCardBlobs[option]) return shareCardBlobs[option];
+  const { workout, workoutsForPRs, durationMs, newPRs } = shareCardContext;
+  let blob;
+  if (option === 'summary') {
+    blob = await renderWorkoutShareCard({
+      workoutName: workout.name || null,
+      dateLabel: fmtDateLong(workout.date),
+      durationMs,
+      totalVolume: workoutVolume(workout, allExercises(), bodyweightKg()),
+      exerciseRows: workoutSummaryByExercise(workout, allExercises(), bodyweightKg()),
+      newPRs,
+    });
+  } else if (option === 'muscle') {
+    const detailed = muscleSetBreakdownDetailed([workout], 'all', workout.date, allExercises());
+    const activeMuscles = detailed.filter((m) => m.sets > 0).map((m) => m.muscle);
+    const groups = muscleSetBreakdown([workout], 'all', workout.date, allExercises()).filter((g) => g.sets > 0);
+    const totalGroupSets = groups.reduce((sum, g) => sum + g.sets, 0);
+    const groupRows = groups
+      .map((g) => ({ label: RADAR_GROUP_LABEL[g.muscle], pct: totalGroupSets ? Math.round((g.sets / totalGroupSets) * 100) : 0 }))
+      .sort((a, b) => b.pct - a.pct);
+    blob = await renderMuscleBalanceCard({
+      workoutName: workout.name || null,
+      dateLabel: fmtDateLong(workout.date),
+      activeMuscles,
+      groupRows,
+    });
+  } else {
+    const exerciseIds = [...new Set((workout.exercises || []).map((ex) => ex.exerciseId))];
+    const newPRIds = new Set(newPRs.map((p) => p.exerciseId));
+    const prs = exerciseIds.map((id) => {
+      const def = findExercise(id);
+      const pr = personalRecords(workoutsForPRs, id, allExercises(), bodyweightKg());
+      return def && pr ? {
+        name: def.name, maxWeight: pr.maxWeight, best1RM: pr.best1RM, isNew: newPRIds.has(id),
+      } : null;
+    }).filter(Boolean);
+    blob = await renderPRsCard({ workoutName: workout.name || null, dateLabel: fmtDateLong(workout.date), prs });
+  }
+  shareCardBlobs[option] = blob;
+  return blob;
+}
+
+/** Renders `option`'s card into #shareCardSheet's preview <img>, generating
+ *  (and caching) it first if this is the first visit to that tab. */
+async function renderShareCardPreview(option) {
+  shareCardOption = option;
+  $('shareCardTabs').querySelectorAll('.scope').forEach((b) => {
+    b.setAttribute('aria-selected', String(b.dataset.option === option));
+  });
+  $('shareCardPreviewImg').hidden = true;
+  $('shareCardPreviewLoading').hidden = false;
+  try {
+    const blob = await buildShareCardBlob(option);
+    if (shareCardOption !== option) return; // superseded by a later tab tap while this was generating
+    if (shareCardObjectUrl) URL.revokeObjectURL(shareCardObjectUrl);
+    shareCardObjectUrl = URL.createObjectURL(blob);
+    $('shareCardPreviewImg').src = shareCardObjectUrl;
+    $('shareCardPreviewImg').hidden = false;
+  } catch (err) {
+    console.error('Failed to render share card preview', err);
+    toast('Could not generate that image');
+  } finally {
+    $('shareCardPreviewLoading').hidden = true;
+  }
+}
+
+/** Opens #shareCardSheet for `workout` (either an already-saved one, or a
+ *  synthetic in-progress record built from the live sheet's current form
+ *  state - either way its `id`/`date`/`exercises` shape is all any of the
+ *  three renderers need).
+ * @param {object} workout
+ * @param {object[]} workoutsForPRs full workouts list to compute PRs
+ *   against - see shareCardContext's own comment.
+ * @param {number|null} durationMs */
+function openShareCardSheetFor(workout, workoutsForPRs, durationMs) {
+  shareCardContext = {
+    workout,
+    workoutsForPRs,
+    durationMs,
+    newPRs: newPRsInWorkout(workoutsForPRs, workout, allExercises(), bodyweightKg()),
+  };
+  shareCardBlobs = {};
+  $('scrim').hidden = false;
+  $('shareCardSheet').hidden = false;
+  $('shareCardSheet').scrollTop = 0;
+  renderShareCardPreview('summary');
+}
+
+function closeShareCardSheet() {
+  $('scrim').hidden = true;
+  $('shareCardSheet').hidden = true;
+  if (shareCardObjectUrl) { URL.revokeObjectURL(shareCardObjectUrl); shareCardObjectUrl = null; }
+  shareCardContext = null;
+  shareCardBlobs = {};
+}
+
+$('summaryShare').addEventListener('click', () => {
   if (!lastFinishedWorkout) return;
-  const btn = $('summaryShare');
+  openShareCardSheetFor(lastFinishedWorkout, workouts, lastFinishedDurationMs);
+});
+
+$('woSharePNG').addEventListener('click', () => {
+  if (workoutEditingId) {
+    const workout = workouts.find((w) => w.id === workoutEditingId);
+    if (!workout) return;
+    openShareCardSheetFor(workout, workouts, workout.durationMs ?? null);
+  } else if (liveSession) {
+    const data = readWorkoutForm();
+    if (data.exercises.length === 0) { toast('Add at least one exercise first'); return; }
+    const durationMs = Date.now() - new Date(liveSession.startedAt).getTime();
+    // Not persisted (the session isn't saved yet) - a throwaway id/record
+    // just so the PR/muscle-breakdown helpers, which all expect a workout
+    // shape, can include today's not-yet-saved sets in their totals.
+    const inProgress = { id: '__live_preview__', ...data };
+    openShareCardSheetFor(inProgress, [...workouts, inProgress], durationMs);
+  }
+});
+
+$('shareCardTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.scope');
+  if (!btn || !shareCardContext) return;
+  renderShareCardPreview(btn.dataset.option);
+});
+
+$('shareCardCancel').addEventListener('click', closeShareCardSheet);
+
+/** Shares (or, where navigator.share can't take image files - desktop
+ *  browsers, mainly - downloads) whichever card is currently previewed. */
+$('shareCardSave').addEventListener('click', async () => {
+  if (!shareCardContext) return;
+  const btn = $('shareCardSave');
   const originalLabel = btn.textContent;
   btn.disabled = true;
-  btn.textContent = 'Generating…';
+  btn.textContent = 'Saving…';
   try {
-    const exerciseRows = workoutSummaryByExercise(lastFinishedWorkout, allExercises(), bodyweightKg());
-    const totalVolume = workoutVolume(lastFinishedWorkout, allExercises(), bodyweightKg());
-    const blob = await renderWorkoutShareCard({
-      workoutName: lastFinishedWorkout.name || null,
-      dateLabel: fmtDateLong(lastFinishedWorkout.date),
-      durationMs: lastFinishedDurationMs,
-      totalVolume,
-      exerciseRows,
-      newPRs: lastFinishedNewPRs,
-    });
-    const file = new File([blob], `hybrd-workout-${lastFinishedWorkout.date}.png`, { type: 'image/png' });
+    const blob = await buildShareCardBlob(shareCardOption);
+    const suffix = { summary: 'summary', muscle: 'muscles', prs: 'prs' }[shareCardOption];
+    const file = new File([blob], `hybrd-workout-${shareCardContext.workout.date}-${suffix}.png`, { type: 'image/png' });
     if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'Workout complete' });
+      await navigator.share({ files: [file], title: 'Workout' });
     } else {
       downloadFile(file.name, blob, 'image/png');
       toast('Image saved - share it from your Photos/Downloads');
     }
   } catch (err) {
     if (err?.name !== 'AbortError') { // the user cancelling the native share sheet isn't a failure
-      console.error('Failed to create share image', err);
-      toast('Could not create the share image');
+      console.error('Failed to save share image', err);
+      toast('Could not save the image');
     }
   } finally {
     btn.disabled = false;
@@ -2051,6 +2183,7 @@ function finishLiveWorkout(data) {
   const durationMs = Date.now() - new Date(liveSession.startedAt).getTime();
   const cleaned = {
     ...data,
+    durationMs, // persisted so a share-PNG card generated later still knows it
     exercises: data.exercises.map((ex) => ({
       ...ex,
       sets: ex.sets.map(({ done, ...rest }) => rest),
@@ -2085,6 +2218,7 @@ function resumeLiveWorkoutIfAny() {
   $('woPicker').hidden = true;
   $('woDelete').hidden = true;
   $('woSaveRoutine').hidden = true;
+  $('woSharePNG').hidden = false;
   startLiveTimer();
   showLiveMiniBar();
 }

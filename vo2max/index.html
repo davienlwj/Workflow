@@ -596,6 +596,7 @@
       <textarea id="woNotes" rows="3"></textarea>
     </label>
 
+    <button type="button" id="woSharePNG" class="ghost-btn block" hidden>Save PNG</button>
     <button type="button" id="woSaveRoutine" class="ghost-btn block" hidden>Save as Routine</button>
 
     <div class="actions">
@@ -681,10 +682,29 @@
   <div id="summaryPRBanner" class="pr-banner" hidden></div>
   <div id="summaryDuration" class="summary-duration mono"></div>
   <div id="summaryExercises" class="summary-exercises"></div>
-  <button type="button" id="summaryShare" class="ghost-btn block">Share image</button>
+  <button type="button" id="summaryShare" class="ghost-btn block">Save PNG</button>
   <div class="actions">
     <button type="button" id="summarySaveRoutine" class="ghost-btn block">Save as Routine</button>
     <button type="button" id="summaryDone" class="primary block">Done</button>
+  </div>
+</section>
+
+<!-- Save-PNG sheet (popup, preview + pick one of 3 share-card designs before saving/sharing) -->
+<section id="shareCardSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Save PNG">
+  <div class="grabber"></div>
+  <h2 class="view-title">Save PNG</h2>
+  <div id="shareCardTabs" class="scopes" role="tablist" aria-label="Which image to save">
+    <button type="button" class="scope" role="tab" data-option="summary" aria-selected="true">Summary</button>
+    <button type="button" class="scope" role="tab" data-option="muscle" aria-selected="false">Muscles</button>
+    <button type="button" class="scope" role="tab" data-option="prs" aria-selected="false">PRs</button>
+  </div>
+  <div class="share-card-preview-wrap">
+    <img id="shareCardPreviewImg" class="share-card-preview-img" alt="Share card preview" hidden>
+    <div id="shareCardPreviewLoading" class="share-card-preview-loading">Generating…</div>
+  </div>
+  <div class="actions">
+    <button type="button" id="shareCardCancel" class="ghost-btn">Close</button>
+    <button type="button" id="shareCardSave" class="primary">Save / Share</button>
   </div>
 </section>
 

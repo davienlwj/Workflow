@@ -236,20 +236,38 @@ the defaults in this app.
 
 ## Share your workout
 
-Finishing a workout adds a **Share image** button to the summary sheet,
-next to Save as Routine/Done. It renders the same stats already on that
-sheet - workout name, date, duration, total volume, exercise/set counts,
-any new PRs, and a per-exercise breakdown - as a 1080×1920 PNG with a
-**transparent background**, drawn entirely client-side on a `<canvas>` (no
-backend, no third-party image service). Only a translucent stat panel is
-painted; everything outside it stays transparent, so posting the PNG as
-an Instagram Story sticker drops it straight onto whatever photo is
-already there, the same way Strava's own post-activity share card works.
+A **Save PNG** button opens a preview sheet offering three shareable
+1080×1920 PNGs, each drawn entirely client-side on a `<canvas>` (no
+backend, no third-party image service) with a **transparent background**
+- only a translucent stat panel is painted, so posting one as an
+Instagram Story sticker drops it straight onto whatever photo is already
+there, the same way Strava's own post-activity share card works:
 
-Tapping the button hands the image straight to your device's native share
-sheet (`navigator.share`) when available, so Instagram shows up as a
-direct target - on a desktop browser (or anywhere Web Share doesn't
-support image files) it just downloads the PNG instead.
+- **Summary** - workout name, date, duration, total volume, exercise/set
+  counts, any new PRs, and a per-exercise breakdown.
+- **Muscles** - the same front/back body-diagram artwork used elsewhere
+  in the app, highlighting every muscle group this workout's exercises
+  targeted, with a percentage-share breakdown below.
+- **PRs** - every exercise this workout touched, its all-time best
+  weight and estimated 1RM, with a "NEW" badge on whichever one this
+  workout actually just beat.
+
+Switching tabs re-renders the preview `<img>` in place (each option's PNG
+is cached the first time it's generated so re-visiting a tab is instant);
+**Save / Share** hands whichever one is currently shown to your device's
+native share sheet (`navigator.share`) when available, so Instagram shows
+up as a direct target - on a desktop browser (or anywhere Web Share
+doesn't support image files) it just downloads the PNG instead.
+
+**Save PNG** appears in three places, all opening the same preview sheet:
+the finish-workout summary (next to Save as Routine/Done); the workout
+sheet mid-live-session (so you don't have to wait until you're done and
+possibly rushed); and the workout sheet when reopening an already-saved
+workout from the calendar/history later, so you can come back and post it
+whenever you actually have time. A workout logged via the live timer has
+its duration persisted (`workout.durationMs`) specifically so it's still
+available for that last case; one logged directly for a past date has no
+duration to show and the Summary card just omits that stat.
 
 ## Layout
 
@@ -269,8 +287,8 @@ js/ics.js                   builds a per-session .ics file for calendar export, 
 js/gcal.js                  Google Identity Services auth + Calendar API calls for automatic sync
 js/intervals.js              intervals.icu API-key auth + activity fetch/mapping for run import
                               (no backend needed - see the README's intervals.icu sync section)
-js/shareCard.js               renders the post-workout summary as a shareable transparent PNG
-                              (canvas-drawn, no backend) - see "Share your workout" below
+js/shareCard.js               renders the three Save-PNG cards (summary/muscles/PRs) as shareable
+                              transparent PNGs (canvas-drawn, no backend) - see "Share your workout" below
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/icon-source.png        the orange wordmark logo the app icons are built from
