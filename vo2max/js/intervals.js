@@ -23,11 +23,11 @@
 const API_BASE = 'https://intervals.icu/api/v1';
 const RUN_TYPES = new Set(['Run', 'TrailRun', 'VirtualRun']);
 
-// intervals.icu's documented auth scheme: a literal "ApiKey" prefix, then
-// the literal string "API_KEY" as if it were a username, colon-separated
-// from the athlete's actual key - not base64, not Bearer.
+// intervals.icu uses standard HTTP Basic Auth with the literal string
+// "API_KEY" as the username and the athlete's real key as the password -
+// equivalent to `curl -u API_KEY:<key>`, base64-encoded per RFC 7617.
 function authHeader(apiKey) {
-  return `ApiKey API_KEY:${apiKey}`;
+  return `Basic ${btoa(`API_KEY:${apiKey}`)}`;
 }
 
 /** Every activity on/after `oldestIso` (a YYYY-MM-DD date - intervals.icu's
