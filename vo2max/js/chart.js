@@ -4,6 +4,7 @@
  */
 
 import { RADAR_GROUP_LABEL } from './exercises.js';
+import { formatPaceMinKm } from './block.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const W = 320;
@@ -232,6 +233,115 @@ export function sleepBarChartSVG(nights) {
     valueOf: (b) => b.hours,
     isEmpty: (bs) => bs.every((b) => b.hours === 0),
     labelEvery: Math.max(1, Math.ceil(nights.length / 6)),
+  });
+}
+
+function timeAxisLabel(secs) {
+  const m = Math.floor(secs / 60);
+  const s = Math.round(secs % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/** Shared renderer for a single run's raw sample stream (HR or pace over
+ *  elapsed time) - unlike exerciseLineChartSVG's sparse one-dot-per-day
+ *  trends, a stream can be thousands of samples, so this draws a smooth
+ *  path with no per-point dots/labels, and downsamples (bucket-averaging)
+ *  above MAX_POINTS so the path stays light and legible either way.
+ * @param {any[]} points oldest to newest, each with a `t` (elapsed seconds)
+ * @param {{emptyMessage: string, ariaLabel: string, axisLabel: string,
+ *   valueOf: (p) => number|null, fmtValue?: (v:number) => string, invert?: boolean}} opts
+ *   `invert` flips the y-axis (used for pace, so a faster/lower number
+ *   reads as a higher line - visually consonant with the HR chart, where
+ *   higher always means more effort). */
+function denseLineChartSVG(points, { emptyMessage, ariaLabel, axisLabel, valueOf, fmtValue, invert = false }) {
+  const MAX_POINTS = 300;
+  let pts = points.filter((p) => valueOf(p) != null).map((p) => ({ t: p.t, value: valueOf(p) }));
+  if (pts.length > MAX_POINTS) {
+    const bucketSize = Math.ceil(pts.length / MAX_POINTS);
+    const bucketed = [];
+    for (let i = 0; i < pts.length; i += bucketSize) {
+      const slice = pts.slice(i, i + bucketSize);
+      const avg = slice.reduce((sum, p) => sum + p.value, 0) / slice.length;
+      bucketed.push({ t: slice[slice.length - 1].t, value: avg });
+    }
+    pts = bucketed;
+  }
+  if (pts.length === 0) {
+    return `<p class="chart-empty">${emptyMessage}</p>`;
+  }
+
+  const values = pts.map((p) => p.value);
+  const minV = Math.min(...values);
+  const maxV = Math.max(...values);
+  const span = Math.max(maxV - minV, 2);
+  const yLow = Math.floor(minV - span * 0.1);
+  const yHigh = Math.ceil(maxV + span * 0.1);
+
+  const minT = pts[0].t;
+  const maxT = pts[pts.length - 1].t;
+  const tSpan = Math.max(maxT - minT, 1);
+
+  const innerW = W - PAD_L - PAD_R;
+  const innerH = H - PAD_T - PAD_B;
+  const x = (t) => PAD_L + ((t - minT) / tSpan) * innerW;
+  const y = (v) => {
+    const frac = (v - yLow) / (yHigh - yLow);
+    return invert ? PAD_T + frac * innerH : PAD_T + innerH - frac * innerH;
+  };
+
+  const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(p.t).toFixed(1)} ${y(p.value).toFixed(1)}`).join(' ');
+
+  const format = fmtValue || ((v) => v.toFixed((yHigh - yLow) < 6 ? 1 : 0));
+  const gridLines = Array.from({ length: 4 }, (_, i) => {
+    const v = yLow + ((yHigh - yLow) * i) / 3;
+    const gy = y(v).toFixed(1);
+    return `<line x1="${PAD_L}" y1="${gy}" x2="${W - PAD_R}" y2="${gy}" class="chart-grid" />
+      <text x="${PAD_L - 6}" y="${gy}" class="chart-axis" text-anchor="end" dominant-baseline="middle">${format(v)}</text>`;
+  }).join('');
+
+  const firstLabel = `<text x="${PAD_L}" y="${H - 6}" class="chart-axis" text-anchor="start">${timeAxisLabel(minT)}</text>`;
+  const lastLabel = `<text x="${W - PAD_R}" y="${H - 6}" class="chart-axis" text-anchor="end">${timeAxisLabel(maxT)}</text>`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}" class="chart-svg" role="img" aria-label="${ariaLabel}">
+    <text x="2" y="12" class="chart-axis" text-anchor="start">${axisLabel}</text>
+    ${gridLines}
+    <path d="${linePath}" class="chart-line" fill="none" />
+    ${firstLabel}
+    ${lastLabel}
+  </svg>`;
+}
+
+/** @param {{t: number, hr: number|null}[]} points a run's raw HR stream, oldest to newest */
+export function activityHRLineChartSVG(points) {
+  return denseLineChartSVG(points, {
+    emptyMessage: 'No heart rate data recorded for this activity.',
+    ariaLabel: 'Heart rate over time',
+    axisLabel: 'bpm',
+    valueOf: (p) => p.hr,
+  });
+}
+
+/** @param {{t: number, paceMinKm: number|null}[]} points a run's raw pace stream, oldest to newest */
+export function activityPaceLineChartSVG(points) {
+  return denseLineChartSVG(points, {
+    emptyMessage: 'No pace data recorded for this activity.',
+    ariaLabel: 'Pace over time',
+    axisLabel: 'min/km',
+    valueOf: (p) => p.paceMinKm,
+    fmtValue: (v) => formatPaceMinKm(v),
+    invert: true,
+  });
+}
+
+/** @param {{name: string, secs: number}[]} zones this app's own HR zone
+ *  table (RHR or LTHR, whichever is primary) with seconds-in-zone computed
+ *  from a run's raw HR stream - see hrZoneDurations in zones.js. */
+export function hrZoneDurationBarChartSVG(zones) {
+  return barChartSVG(zones.map((z) => ({ label: z.name, minutes: Math.round((z.secs / 60) * 10) / 10 })), {
+    emptyMessage: 'No heart rate data recorded for this activity.',
+    ariaLabel: 'Time in heart rate zone',
+    valueOf: (b) => b.minutes,
+    isEmpty: (bs) => bs.every((b) => b.minutes === 0),
   });
 }
 

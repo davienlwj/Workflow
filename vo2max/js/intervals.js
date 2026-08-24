@@ -113,6 +113,46 @@ function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
+/** One elapsed-seconds/heart-rate/pace point per recorded sample of a run,
+ *  for the per-activity charts (HR-over-time, pace-over-time, and the time-
+ *  in-zone bars computed locally from these HR samples). Pace prefers the
+ *  velocity_smooth stream (m/s -> min/km); if that's missing it's derived
+ *  from consecutive distance/time deltas instead. Returns an empty array
+ *  (not an error) when the activity has no recorded streams at all - e.g. a
+ *  manually-entered activity with only summary stats, no GPS/HR trace. */
+export async function fetchActivityStreams(activityId, apiKey) {
+  const params = new URLSearchParams({ types: 'time,heartrate,velocity_smooth,distance' });
+  const raw = await apiGet(`/activity/${encodeURIComponent(activityId)}/streams.json?${params}`, apiKey);
+  const byType = {};
+  for (const stream of raw || []) {
+    if (Array.isArray(stream?.data)) byType[stream.type] = stream.data;
+  }
+  const time = byType.time;
+  if (!Array.isArray(time) || time.length === 0) return [];
+  const hr = byType.heartrate;
+  const velocity = byType.velocity_smooth;
+  const distance = byType.distance;
+
+  const points = [];
+  for (let i = 0; i < time.length; i++) {
+    const t = time[i];
+    let paceMinKm = null;
+    if (Array.isArray(velocity) && velocity[i] > 0) {
+      paceMinKm = 1000 / (velocity[i] * 60);
+    } else if (Array.isArray(distance) && i > 0 && distance[i] > distance[i - 1] && t > time[i - 1]) {
+      const dKm = (distance[i] - distance[i - 1]) / 1000;
+      const dMin = (t - time[i - 1]) / 60;
+      paceMinKm = dKm > 0 ? dMin / dKm : null;
+    }
+    points.push({
+      t,
+      hr: Array.isArray(hr) && hr[i] != null ? Math.round(hr[i]) : null,
+      paceMinKm: paceMinKm != null && Number.isFinite(paceMinKm) ? round2(paceMinKm) : null,
+    });
+  }
+  return points;
+}
+
 /** Maps an intervals.icu run activity to this app's session shape (see
  *  readSessionForm in app.js for what a manually-logged run looks like).
  *  Only distance/duration/pace/HR translate directly - RPE and session

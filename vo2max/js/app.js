@@ -8,7 +8,7 @@ import {
   loadCustomBrands, addCustomBrand,
   exportAll, importAll,
 } from './store.js';
-import { lthrZoneTable, rhrZoneTable } from './zones.js';
+import { lthrZoneTable, rhrZoneTable, zoneTable, hrZoneDurations } from './zones.js';
 import {
   todayIso,
   daysSinceLastSession, averageSessionHR, vo2maxSeries,
@@ -18,6 +18,7 @@ import {
 import {
   vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG, exerciseVolumeSVG, muscleRadarSVG,
   restingHRTrendSVG, sleepBarChartSVG,
+  activityHRLineChartSVG, activityPaceLineChartSVG, hrZoneDurationBarChartSVG,
 } from './chart.js';
 import { sessionToICS, sessionToGCalEvent, workoutToGCalEvent } from './ics.js';
 import {
@@ -30,6 +31,7 @@ import {
   activityToSession as intervalsActivityToSession,
   fetchRecentWellness as intervalsFetchRecentWellness,
   fetchWellnessHistory as intervalsFetchWellnessHistory,
+  fetchActivityStreams as intervalsFetchActivityStreams,
 } from './intervals.js';
 import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
@@ -736,6 +738,45 @@ $('sleepDetailClose').addEventListener('click', () => {
   $('sleepDetailSheet').hidden = true;
 });
 
+/** HR zone durations, HR-over-time and pace-over-time for one auto-synced
+ *  run, read from intervals.icu's raw stream data. Zone durations are
+ *  computed locally against this app's own zone table (whichever model is
+ *  primary in Settings) rather than trusting intervals.icu's own zone
+ *  config, which the user may never have set up to match. */
+async function openActivityDetailSheet(session) {
+  const s = settings.intervals;
+  if (!s?.enabled || !session.intervalsActivityId) return;
+  $('scrim').hidden = false;
+  $('activityDetailSheet').hidden = false;
+  $('activityDetailSheet').scrollTop = 0;
+  const loading = '<p class="chart-empty">Loading…</p>';
+  $('activityZoneChartWrap').innerHTML = loading;
+  $('activityHRChartWrap').innerHTML = loading;
+  $('activityPaceChartWrap').innerHTML = loading;
+  try {
+    const points = await intervalsFetchActivityStreams(session.intervalsActivityId, s.apiKey);
+    const table = zoneTable(settings, settings.primaryZoneModel);
+    $('activityZoneChartWrap').innerHTML = hrZoneDurationBarChartSVG(hrZoneDurations(points, table));
+    $('activityHRChartWrap').innerHTML = activityHRLineChartSVG(points);
+    $('activityPaceChartWrap').innerHTML = activityPaceLineChartSVG(points);
+  } catch (err) {
+    console.error('Failed to load activity streams', err);
+    const failMsg = '<p class="chart-empty">Could not load activity detail from intervals.icu.</p>';
+    $('activityZoneChartWrap').innerHTML = failMsg;
+    $('activityHRChartWrap').innerHTML = failMsg;
+    $('activityPaceChartWrap').innerHTML = failMsg;
+  }
+}
+
+$('editViewActivityDetail').addEventListener('click', () => {
+  const session = sessions.find((s) => s.id === editingId);
+  if (session) openActivityDetailSheet(session);
+});
+$('activityDetailClose').addEventListener('click', () => {
+  $('scrim').hidden = true;
+  $('activityDetailSheet').hidden = true;
+});
+
 const RECENT_ACTIVITY_LIMIT = 6;
 
 function renderRecentActivity() {
@@ -794,6 +835,7 @@ function openEditSheet(session) {
   $('editRPEOut').textContent = String(session.rpe);
   $('editVO2max').value = session.vo2max ?? '';
   $('editNotes').value = session.notes ?? '';
+  $('editViewActivityDetail').hidden = !session.intervalsActivityId;
   $('scrim').hidden = false;
   $('editSheet').hidden = false;
   $('editSheet').scrollTop = 0;
@@ -817,6 +859,7 @@ $('scrim').addEventListener('click', () => {
   $('workoutSummarySheet').hidden = true;
   $('restingHRDetailSheet').hidden = true;
   $('sleepDetailSheet').hidden = true;
+  $('activityDetailSheet').hidden = true;
 });
 $('editCancel').addEventListener('click', closeEditSheet);
 

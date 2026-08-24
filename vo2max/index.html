@@ -407,6 +407,7 @@
     </label>
 
     <button type="button" id="editAddToCalendar" class="ghost-btn block">Add to Calendar</button>
+    <button type="button" id="editViewActivityDetail" class="ghost-btn block" hidden>View HR zones &amp; graphs</button>
 
     <div class="actions">
       <button type="button" id="editDelete" class="danger-btn">Delete</button>
@@ -707,6 +708,19 @@
   </div>
   <div id="sleepChartWrap" class="chart-wrap"></div>
   <button type="button" id="sleepDetailClose" class="ghost-btn block">Close</button>
+</section>
+
+<!-- Activity detail sheet (popup, opened from an auto-synced run's edit sheet) -->
+<section id="activityDetailSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Activity detail">
+  <div class="grabber"></div>
+  <h2 class="view-title">Activity detail</h2>
+  <p class="chart-label">Time in Zone</p>
+  <div id="activityZoneChartWrap" class="chart-wrap"></div>
+  <p class="chart-label">Heart Rate</p>
+  <div id="activityHRChartWrap" class="chart-wrap"></div>
+  <p class="chart-label">Pace</p>
+  <div id="activityPaceChartWrap" class="chart-wrap"></div>
+  <button type="button" id="activityDetailClose" class="ghost-btn block">Close</button>
 </section>
 
 <!-- Exercise progress sheet (popup, opened from an exercise card) -->

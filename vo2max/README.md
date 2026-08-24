@@ -207,6 +207,14 @@ tile to open a detail view: **Resting HR** as a line chart over Week/
 Month/Year/All, **Sleep** as a bar chart of nightly duration over Week/
 Month.
 
+**Per-run detail.** Open any auto-synced run from Run history and tap
+**View HR zones & graphs** to pull that specific activity's raw HR/pace
+trace from intervals.icu: a bar chart of time spent in each HR zone (using
+this app's own zone table from Settings, not intervals.icu's), a heart
+rate line graph over the run's elapsed time, and a pace line graph over the
+same. Manually-logged runs don't have this button - there's no raw stream
+data behind them to chart.
+
 ## Zone math
 
 Both zone tables are computed live from your HR settings, not stored as

@@ -60,3 +60,20 @@ export function zoneForHR(hr, table) {
   if (hr == null || Number.isNaN(hr)) return null;
   return table.find((z) => hr >= z.bpmLow && hr <= z.bpmHigh) || null;
 }
+
+/** Seconds spent in each of a zone table's zones, computed from a raw HR
+ *  stream (elapsed seconds `t` + `hr` per sample, sorted oldest to newest).
+ *  Each point's HR classifies the seconds since the previous point - the
+ *  first point contributes no duration, since there's no "since" yet. A gap
+ *  longer than 30s (a paused or dropped recording) is excluded rather than
+ *  attributed to whichever zone the next sample happened to land in. */
+export function hrZoneDurations(points, table) {
+  const secsByKey = Object.fromEntries(table.map((z) => [z.key, 0]));
+  for (let i = 1; i < points.length; i++) {
+    const dt = points[i].t - points[i - 1].t;
+    if (dt <= 0 || dt > 30) continue;
+    const zone = zoneForHR(points[i].hr, table);
+    if (zone) secsByKey[zone.key] += dt;
+  }
+  return table.map((z) => ({ key: z.key, name: z.name, secs: secsByKey[z.key] }));
+}
