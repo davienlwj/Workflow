@@ -268,7 +268,7 @@ export function muscleSetBreakdownDetailed(workouts, range, now = todayIso(), ex
 }
 
 /**
- * The above, rolled up into RADAR_GROUPS's 9 general regions via
+ * The above, rolled up into RADAR_GROUPS's 10 general regions via
  * RADAR_GROUP_FOR, for the muscle-balance radar chart - a chart with 22
  * spokes isn't readable, so this deliberately trades granularity for a
  * chart that is. Returns one entry per RADAR_GROUPS id, zero included, in

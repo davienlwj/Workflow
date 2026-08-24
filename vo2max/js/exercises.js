@@ -49,8 +49,8 @@ export const BRANDS = ['Hammer Strength', 'Life Fitness', 'Precor', 'Technogym',
 
 // The muscle-balance radar chart reads MUSCLES' 22 groups as too granular
 // to plot as a chart (see muscleSetBreakdown in workout.js) - it collapses
-// them into these 9 general regions instead.
-export const RADAR_GROUPS = ['chest', 'back', 'shoulders', 'arms', 'quads', 'hamstrings', 'glutes', 'abs', 'core'];
+// them into these 10 general regions instead.
+export const RADAR_GROUPS = ['chest', 'back', 'shoulders', 'arms', 'quads', 'hamstrings', 'glutes', 'calves', 'abs', 'core'];
 
 export const RADAR_GROUP_LABEL = {
   chest: 'Chest',
@@ -60,6 +60,7 @@ export const RADAR_GROUP_LABEL = {
   quads: 'Quads',
   hamstrings: 'Hamstrings',
   glutes: 'Glutes',
+  calves: 'Calves',
   abs: 'Abs',
   core: 'Core',
 };
@@ -87,7 +88,7 @@ export const RADAR_GROUP_FOR = {
   adductors: 'quads',
   hamstrings: 'hamstrings',
   glutes: 'glutes',
-  calves: 'quads',
+  calves: 'calves',
 };
 
 export const EXERCISES = [
