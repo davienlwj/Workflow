@@ -735,18 +735,12 @@ button { font-family: var(--font-mono); }
 
 .cal-cell.has-activity { color: var(--ink); border-color: var(--dim); font-weight: 700; }
 
-/* Diagonal hatching, not just a border, so today reads at a glance even
+/* A solid fill, not just a border, so today reads at a glance even
    among a grid of otherwise-identical cells. */
 .cal-cell.today {
-  border-color: var(--dim);
-  color: #FF6C2D;
-  background-image: repeating-linear-gradient(
-    45deg,
-    var(--line) 0,
-    var(--line) 2px,
-    transparent 2px,
-    transparent 7px
-  );
+  border-color: #FF6C2D;
+  background: #FF6C2D;
+  color: #ffffff;
 }
 
 .cal-cell.selected {
@@ -754,18 +748,6 @@ button { font-family: var(--font-mono); }
   border-color: var(--accent);
   color: var(--bg);
   font-weight: 700;
-}
-
-/* Re-applied after .selected's background shorthand clears it, in a
-   lighter stripe color so the hatch still shows on the accent fill. */
-.cal-cell.today.selected {
-  background-image: repeating-linear-gradient(
-    45deg,
-    var(--accent) 0,
-    var(--accent) 2px,
-    transparent 2px,
-    transparent 7px
-  );
 }
 
 /* Running-figure / dumbbell pictograms: calendar cells, the day panel's
@@ -776,6 +758,7 @@ button { font-family: var(--font-mono); }
 .cal-icons { display: flex; gap: 3px; }
 .cal-icons .glyph-icon { width: 11px; height: 11px; color: #FF6C2D; }
 .cal-cell.selected .glyph-icon { color: var(--bg); }
+.cal-cell.today .glyph-icon { color: #ffffff; }
 
 .cal-legend {
   display: flex;
