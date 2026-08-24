@@ -67,12 +67,13 @@ export function isRunActivity(activity) {
   return RUN_TYPES.has(activity.type);
 }
 
-/** Most recent resting HR and sleep duration from intervals.icu's daily
- *  wellness log, looking back up to `lookbackDays` (a watch doesn't always
- *  sync same-day, so this covers a small gap rather than only checking
- *  today). Each field independently falls back to the most recent day
- *  that actually has it, and comes back null if it never shows up in the
- *  window at all. */
+/** Resting HR and sleep from intervals.icu's daily wellness log, looking
+ *  back up to `lookbackDays` (a week, by default) for whichever day most
+ *  recently has each value - a watch doesn't always sync same-day, so
+ *  this covers a small gap rather than only checking today. Each field
+ *  falls back independently, and comes back null only when neither shows
+ *  up anywhere in the window, so the caller can show that as an explicit
+ *  "not tracked" remark instead of a bogus 0. */
 export async function fetchRecentWellness(athleteId, apiKey, lookbackDays = 7) {
   const newest = new Date();
   const oldest = new Date();
@@ -85,10 +86,27 @@ export async function fetchRecentWellness(athleteId, apiKey, lookbackDays = 7) {
   const sorted = [...(entries || [])].sort((a, b) => (b.id || '').localeCompare(a.id || ''));
   const restingHR = sorted.find((e) => e.restingHR != null)?.restingHR ?? null;
   const sleepSecs = sorted.find((e) => e.sleepSecs != null)?.sleepSecs ?? null;
+
   return {
     restingHR: restingHR != null ? Math.round(restingHR) : null,
     sleepHours: sleepSecs != null ? Math.round((sleepSecs / 3600) * 10) / 10 : null,
   };
+}
+
+/** Every day's resting HR and sleep in the given range (oldest/newest as
+ *  YYYY-MM-DD), oldest first - the full history behind the Dashboard
+ *  tiles' single latest-known values, for their tap-through detail charts. */
+export async function fetchWellnessHistory(athleteId, apiKey, oldestIso, newestIso) {
+  const params = new URLSearchParams({ oldest: oldestIso, newest: newestIso });
+  const entries = await apiGet(`/athlete/${encodeURIComponent(athleteId)}/wellness?${params}`, apiKey);
+  return (entries || [])
+    .filter((e) => e.id)
+    .map((e) => ({
+      date: e.id,
+      restingHR: e.restingHR != null ? Math.round(e.restingHR) : null,
+      sleepHours: e.sleepSecs != null ? Math.round((e.sleepSecs / 3600) * 10) / 10 : null,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function round2(n) {

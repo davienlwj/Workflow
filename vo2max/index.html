@@ -683,6 +683,32 @@
   </div>
 </section>
 
+<!-- Resting HR detail sheet (popup, opened by tapping the Dashboard's Resting HR tile) -->
+<section id="restingHRDetailSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Resting HR trend">
+  <div class="grabber"></div>
+  <h2 class="view-title">Resting HR</h2>
+  <div id="restingHRScope" class="scopes" role="tablist" aria-label="Resting HR range">
+    <button type="button" class="scope" role="tab" data-scope="week" aria-selected="false">Week</button>
+    <button type="button" class="scope" role="tab" data-scope="month" aria-selected="true">Month</button>
+    <button type="button" class="scope" role="tab" data-scope="year" aria-selected="false">Year</button>
+    <button type="button" class="scope" role="tab" data-scope="all" aria-selected="false">All</button>
+  </div>
+  <div id="restingHRChartWrap" class="chart-wrap"></div>
+  <button type="button" id="restingHRDetailClose" class="ghost-btn block">Close</button>
+</section>
+
+<!-- Sleep detail sheet (popup, opened by tapping the Dashboard's sleep tile) -->
+<section id="sleepDetailSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Sleep duration">
+  <div class="grabber"></div>
+  <h2 class="view-title">Sleep</h2>
+  <div id="sleepScope" class="scopes" role="tablist" aria-label="Sleep range">
+    <button type="button" class="scope" role="tab" data-scope="week" aria-selected="true">Week</button>
+    <button type="button" class="scope" role="tab" data-scope="month" aria-selected="false">Month</button>
+  </div>
+  <div id="sleepChartWrap" class="chart-wrap"></div>
+  <button type="button" id="sleepDetailClose" class="ghost-btn block">Close</button>
+</section>
+
 <!-- Exercise progress sheet (popup, opened from an exercise card) -->
 <section id="exerciseSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Exercise progress">
   <div class="grabber"></div>

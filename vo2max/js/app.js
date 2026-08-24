@@ -17,6 +17,7 @@ import {
 } from './block.js';
 import {
   vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG, exerciseVolumeSVG, muscleRadarSVG,
+  restingHRTrendSVG, sleepBarChartSVG,
 } from './chart.js';
 import { sessionToICS, sessionToGCalEvent, workoutToGCalEvent } from './ics.js';
 import {
@@ -28,6 +29,7 @@ import {
   isRunActivity as isIntervalsRunActivity,
   activityToSession as intervalsActivityToSession,
   fetchRecentWellness as intervalsFetchRecentWellness,
+  fetchWellnessHistory as intervalsFetchWellnessHistory,
 } from './intervals.js';
 import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
@@ -325,7 +327,17 @@ $('logCancel').addEventListener('click', closeLogSheet);
 
 $('logForm').addEventListener('submit', (e) => {
   e.preventDefault();
-  const saved = addSession(readSessionForm('log'));
+  const form = readSessionForm('log');
+  // Warn (rather than silently double-logging) if intervals.icu already
+  // auto-synced a run for this same date - the user gets to decide it's
+  // really a second run that day (e.g. two-a-days) instead of finding a
+  // surprise duplicate later.
+  const autoSyncedSameDay = sessions.find((s) => s.date === form.date && s.intervalsActivityId);
+  if (autoSyncedSameDay
+    && !confirm(`A run from intervals.icu was already auto-synced for ${fmtDateLong(form.date)}. Log this one too?`)) {
+    return;
+  }
+  const saved = addSession(form);
   sessions = loadSessions();
   syncSessionToGoogle(saved);
   closeLogSheet();
@@ -610,21 +622,119 @@ function renderDashboard() {
     [daysSinceRun != null ? String(daysSinceRun) : '—', 'Days since last run'],
     [daysSinceWorkout != null ? String(daysSinceWorkout) : '—', 'Days since last workout'],
   ];
-  // Only shown once connected and something has actually come back from a
-  // sync - no empty placeholder tiles for a feature that isn't set up.
-  const wellness = settings.intervals.enabled ? settings.intervals.wellness : null;
-  if (wellness?.restingHR != null) tiles.push([`${wellness.restingHR} bpm`, 'Resting HR']);
-  if (wellness?.sleepHours != null) tiles.push([`${wellness.sleepHours} h`, 'Sleep']);
-
-  $('dashStatGrid').innerHTML = tiles.map(([value, label]) => `
+  const plainTilesHTML = tiles.map(([value, label]) => `
     <div class="stat-tile">
       <div class="stat-value mono">${value}</div>
       <div class="stat-label">${label}</div>
     </div>
   `).join('');
 
+  // Only shown once connected - no empty placeholder tiles for a feature
+  // that isn't set up. Resting HR still hides entirely until there's an
+  // actual value; Sleep shows a "Not tracked" remark instead of hiding,
+  // since a connected-but-no-sleep-data state is worth surfacing rather
+  // than looking identical to not being connected at all. Both are real
+  // buttons (tap through to a detail chart), unlike the plain tiles above.
+  const wellness = settings.intervals.enabled ? settings.intervals.wellness : null;
+  let wellnessTilesHTML = '';
+  if (wellness) {
+    if (wellness.restingHR != null) {
+      wellnessTilesHTML += `
+        <button type="button" class="stat-tile stat-tile-tappable" data-tile="restingHR">
+          <div class="stat-value mono">${wellness.restingHR} bpm</div>
+          <div class="stat-label">Resting HR</div>
+        </button>
+      `;
+    }
+    wellnessTilesHTML += `
+      <button type="button" class="stat-tile stat-tile-tappable" data-tile="sleep">
+        <div class="stat-value mono">${wellness.sleepHours != null ? `${wellness.sleepHours} h` : 'Not tracked'}</div>
+        <div class="stat-label">Today's Sleep</div>
+      </button>
+    `;
+  }
+
+  $('dashStatGrid').innerHTML = plainTilesHTML + wellnessTilesHTML;
+
   renderRecentActivity();
 }
+
+// Populated when either detail sheet below opens - one fetch of a generous
+// window covers both metrics and every scope tab, sliced locally rather
+// than re-fetched per tab (same "fetch once, slice for the scope" pattern
+// the local-data charts elsewhere in the app already use).
+let wellnessHistory = [];
+let restingHRScope = 'month';
+let sleepScope = 'week';
+
+function sliceWellnessByDays(history, days) {
+  if (days == null) return history;
+  const cutoff = isoDateDaysAgo(days);
+  return history.filter((p) => p.date >= cutoff);
+}
+
+function renderRestingHRChart() {
+  const days = { week: 7, month: 30, year: 365, all: null }[restingHRScope];
+  const points = sliceWellnessByDays(wellnessHistory, days)
+    .filter((p) => p.restingHR != null)
+    .map((p) => ({ date: p.date, value: p.restingHR }));
+  $('restingHRChartWrap').innerHTML = restingHRTrendSVG(points);
+}
+
+function renderSleepChart() {
+  const days = { week: 7, month: 30 }[sleepScope];
+  const nights = sliceWellnessByDays(wellnessHistory, days)
+    .filter((p) => p.sleepHours != null)
+    .map((p) => ({ label: fmtDateShort(p.date), hours: p.sleepHours }));
+  $('sleepChartWrap').innerHTML = sleepBarChartSVG(nights);
+}
+
+async function openWellnessDetailSheet(kind) {
+  const s = settings.intervals;
+  if (!s?.enabled) return;
+  const sheetId = kind === 'restingHR' ? 'restingHRDetailSheet' : 'sleepDetailSheet';
+  const chartWrapId = kind === 'restingHR' ? 'restingHRChartWrap' : 'sleepChartWrap';
+  $('scrim').hidden = false;
+  $(sheetId).hidden = false;
+  $(sheetId).scrollTop = 0;
+  $(chartWrapId).innerHTML = '<p class="chart-empty">Loading…</p>';
+  try {
+    wellnessHistory = await intervalsFetchWellnessHistory(s.athleteId, s.apiKey, isoDateDaysAgo(400), todayIso());
+    if (kind === 'restingHR') renderRestingHRChart(); else renderSleepChart();
+  } catch (err) {
+    console.error('Failed to load wellness history', err);
+    $(chartWrapId).innerHTML = '<p class="chart-empty">Could not load history from intervals.icu.</p>';
+  }
+}
+
+$('dashStatGrid').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-tile]');
+  if (!btn) return;
+  openWellnessDetailSheet(btn.dataset.tile);
+});
+
+$('restingHRScope').addEventListener('click', (e) => {
+  const btn = e.target.closest('.scope');
+  if (!btn) return;
+  restingHRScope = btn.dataset.scope;
+  $('restingHRScope').querySelectorAll('.scope').forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
+  renderRestingHRChart();
+});
+$('sleepScope').addEventListener('click', (e) => {
+  const btn = e.target.closest('.scope');
+  if (!btn) return;
+  sleepScope = btn.dataset.scope;
+  $('sleepScope').querySelectorAll('.scope').forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
+  renderSleepChart();
+});
+$('restingHRDetailClose').addEventListener('click', () => {
+  $('scrim').hidden = true;
+  $('restingHRDetailSheet').hidden = true;
+});
+$('sleepDetailClose').addEventListener('click', () => {
+  $('scrim').hidden = true;
+  $('sleepDetailSheet').hidden = true;
+});
 
 const RECENT_ACTIVITY_LIMIT = 6;
 
@@ -705,6 +815,8 @@ $('scrim').addEventListener('click', () => {
   closeRoutinesSheet();
   closeRoutineBuilderSheet();
   $('workoutSummarySheet').hidden = true;
+  $('restingHRDetailSheet').hidden = true;
+  $('sleepDetailSheet').hidden = true;
 });
 $('editCancel').addEventListener('click', closeEditSheet);
 
@@ -2230,13 +2342,20 @@ function isoDateDaysAgo(days) {
 }
 
 /** Imports every not-yet-seen run out of `activities` (deduped by
- *  intervalsActivityId), returning how many were added. */
+ *  intervalsActivityId), returning how many were added. A date that
+ *  already has a manually-logged run (no intervalsActivityId of its own)
+ *  is skipped entirely, never touched - a run the user typed in by hand
+ *  is never silently duplicated, overwritten, or replaced by an imported
+ *  one, even if intervals.icu also has an activity for that same day. */
 function importNewIntervalsRunActivities(activities) {
   const existingIds = new Set(sessions.map((s) => s.intervalsActivityId).filter(Boolean));
+  const manualDates = new Set(sessions.filter((s) => !s.intervalsActivityId).map((s) => s.date));
   let count = 0;
   for (const activity of activities) {
     if (!isIntervalsRunActivity(activity) || existingIds.has(activity.id)) continue;
-    addSession(intervalsActivityToSession(activity));
+    const mapped = intervalsActivityToSession(activity);
+    if (manualDates.has(mapped.date)) continue;
+    addSession(mapped);
     count += 1;
   }
   if (count > 0) sessions = loadSessions();

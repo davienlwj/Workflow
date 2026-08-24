@@ -188,12 +188,24 @@ couple of minutes:
 Disconnecting stops future imports but leaves already-imported runs in
 your history untouched.
 
+**No duplicates, and manual entries are never overwritten.** A date you've
+already logged a run for by hand is skipped entirely by auto-sync - it
+never gets touched, replaced, or deleted, even if intervals.icu also has an
+activity for that same day. Going the other way, if you manually log a run
+on a date that already has an auto-synced entry, the app asks first
+("A run from intervals.icu was already auto-synced for ... Log this one
+too?") so a genuine second run (e.g. a two-a-day) is still easy to add, but
+you never end up with a surprise duplicate.
+
 Connecting also adds **Resting HR** and **Sleep** tiles to the Dashboard,
 reading intervals.icu's daily wellness log (looking back up to a week for
 whichever value most recently showed up, since a watch doesn't always sync
 same-day) - refreshed automatically on every app open alongside the run
 sync, no separate action needed. Tiles only appear once there's actually a
-value to show; nothing changes on the Dashboard before that.
+value to show; nothing changes on the Dashboard before that. Tap either
+tile to open a detail view: **Resting HR** as a line chart over Week/
+Month/Year/All, **Sleep** as a bar chart of nightly duration over Week/
+Month.
 
 ## Zone math
 
