@@ -27,7 +27,6 @@ import {
   listActivities as intervalsListActivities,
   isRunActivity as isIntervalsRunActivity,
   activityToSession as intervalsActivityToSession,
-  fetchHrSettings as intervalsFetchHrSettings,
 } from './intervals.js';
 import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
@@ -2273,7 +2272,6 @@ function renderIntervalsStatus() {
   const { enabled } = settings.intervals;
   $('intervalsDisconnect').hidden = !enabled;
   $('intervalsSyncNow').hidden = !enabled;
-  $('intervalsSyncHR').hidden = !enabled;
   if (!enabled) {
     $('intervalsStatus').textContent = 'Not connected.';
     $('intervalsConnect').hidden = false;
@@ -2326,36 +2324,6 @@ $('intervalsDisconnect').addEventListener('click', () => {
 });
 
 $('intervalsSyncNow').addEventListener('click', () => { syncIntervalsRuns(); });
-
-// A deliberate, explicit action rather than something that runs
-// automatically alongside the run sync - HR settings change far less
-// often than new runs appear, and silently overwriting values the user
-// may have hand-tuned on every app open would be a bad surprise.
-$('intervalsSyncHR').addEventListener('click', async () => {
-  const s = settings.intervals;
-  if (!s?.enabled) return;
-  try {
-    const { restingHR, maxHR, lthr } = await intervalsFetchHrSettings(s.athleteId, s.apiKey);
-    if (restingHR == null && maxHR == null && lthr == null) {
-      toast('No HR settings found on intervals.icu');
-      return;
-    }
-    settings = {
-      ...settings,
-      restingHR: restingHR ?? settings.restingHR,
-      maxHR: maxHR ?? settings.maxHR,
-      lthr: lthr ?? settings.lthr,
-    };
-    saveSettings(settings);
-    renderSettingsForm();
-    renderZones();
-    toast('Heart rate settings synced from intervals.icu');
-  } catch (err) {
-    console.error('intervals.icu HR settings sync failed', err);
-    if (err.networkError) toast('Could not reach intervals.icu - check your connection', 3400);
-    else toast('Could not sync HR settings from intervals.icu');
-  }
-});
 
 /* ------------------------------------------------------------- SETTINGS */
 
