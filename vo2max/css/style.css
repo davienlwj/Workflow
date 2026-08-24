@@ -1,0 +1,1469 @@
+/* HYBIRD — cardiac-monitor light theme (inverted from the original dark
+   palette, value-for-value, so every contrast ratio is preserved).
+   Monotone: no hue anywhere, only shades of black/white/gray. Emphasis and
+   state read through lightness, weight and fill vs. outline, not color. */
+
+:root {
+  --bg: #f5f5f5;
+  --panel: #ebebeb;
+  --panel-2: #e3e3e3;
+  --line: #d4d4d4;
+  --ink: #131313;
+  --dim: #666666;
+  --dimmer: #a3a3a3;
+  --accent: #0a0a0a;
+  --accent-dim: #b5b5b5;
+  --font-mono: 'Space Mono', ui-monospace, 'SF Mono', 'Menlo', 'Consolas', 'Roboto Mono', monospace;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+}
+
+/* Dark mode: every value above, inverted channel-for-channel (255 - x) -
+   this is in fact the palette the light theme itself was inverted from
+   (see the note at the top of this file), so contrast ratios match
+   exactly and nothing needed hand-picking. */
+:root[data-theme="dark"] {
+  --bg: #0a0a0a;
+  --panel: #141414;
+  --panel-2: #1c1c1c;
+  --line: #2b2b2b;
+  --ink: #ececec;
+  --dim: #999999;
+  --dimmer: #5c5c5c;
+  --accent: #f5f5f5;
+  --accent-dim: #4a4a4a;
+}
+
+* { box-sizing: border-box; }
+
+/* Only html scrolls (the standard scrolling element). Giving body its own
+   height/overflow too would make it a second, independent scroll
+   container — window.scrollTo() (used when switching tabs) only resets
+   html's scroll position, so a body-level scroll container would silently
+   survive a tab switch and land the next view mid-scroll. */
+html {
+  height: 100%;
+  /* dvh tracks the actual visible viewport as iOS Safari's toolbar shows
+     and hides; 100% is a fallback for browsers without dvh support and is
+     overridden by the line below wherever dvh is understood. Without this,
+     a page too short to scroll (an empty tab) keeps Safari's toolbar
+     expanded while a longer one lets it collapse, so a plain height:100%
+     resolves to a different pixel value per tab — and since the bottom
+     nav is fixed to the viewport, it visibly jumps between tabs. */
+  height: 100dvh;
+  background: var(--bg);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-x: none;
+}
+
+/* Hide the scrollbar track, without disabling scroll itself. */
+html, .sheet {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html::-webkit-scrollbar, .sheet::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------ boot splash */
+
+/* Black + centered wordmark, independent of the light/dark theme variables
+   above - the point is a fixed black background regardless of which theme
+   the user lands on, and it's gone before their theme preference would be
+   visually relevant anyway. Visible immediately since it's plain HTML/CSS
+   (no JS needed to show it, only to hide it) - it covers the very first
+   paint on a cold load, before app.js has run at all. app.js adds the
+   "hide" class once renderAll() finishes, fading it out rather than
+   snapping away, then removes the element outright after the transition. */
+#bootSplash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  opacity: 1;
+  transition: opacity 0.15s ease-out;
+}
+#bootSplash.hide { opacity: 0; pointer-events: none; }
+#bootSplash span {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+/* ---------------------------------------------------------------- header */
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(12px + var(--safe-t)) 16px 12px;
+  background: linear-gradient(var(--bg) 70%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+
+.bar-left { display: flex; align-items: center; gap: 10px; }
+
+.brand-logo {
+  height: 18px;
+  width: auto;
+  display: block;
+}
+
+.header-title {
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.menu-toggle {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.menu-toggle-bar {
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--ink);
+}
+
+.menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 16px;
+  margin-top: 6px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  min-width: 168px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.menu-dropdown[hidden] { display: none; }
+
+.menu-item {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 11px 12px;
+  font-size: 14px;
+  text-align: left;
+  color: var(--dim);
+}
+
+.menu-item[aria-selected="true"] {
+  background: var(--panel-2);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------------ main */
+
+main {
+  padding: 16px 16px calc(24px + var(--safe-b));
+  max-width: 560px;
+  margin: 0 auto;
+  /* Backstop alongside html's overflow-x: hidden — Safari doesn't always
+     honor a horizontal-scroll lock declared only on the document root
+     when a descendant (e.g. a native form control rendering wider than
+     asked) tries to overflow it. */
+  overflow-x: hidden;
+}
+
+/* Only grows while the live-session mini-bar is actually on screen, so it
+   doesn't steal vertical space the rest of the time. */
+main.has-live-bar {
+  padding-bottom: calc(100px + var(--safe-b));
+}
+
+.view-title {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+  margin: 4px 0 16px;
+  font-weight: 600;
+}
+
+.section-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+  margin: 24px 0 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 24px 0 10px;
+}
+.section-title-row .section-title { margin: 0; }
+
+.exercise-filter-select {
+  width: auto;
+  height: auto;
+  padding: 6px 8px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.empty {
+  color: var(--dimmer);
+  font-size: 15px;
+  padding: 24px 0;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ form */
+
+.form { display: flex; flex-direction: column; gap: 14px; }
+.form[hidden] { display: none; }
+
+.row { display: flex; gap: 10px; max-width: 100%; }
+.row .field { flex: 1; min-width: 0; }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--dim);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.field em { color: var(--dimmer); font-style: normal; }
+
+.field-toggle {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.field-toggle input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--dim);
+  margin: -4px 0 0;
+}
+
+input, select, textarea {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  padding: 10px 12px;
+  font-size: 17px;
+  line-height: 1.2;
+  font-family: var(--font-mono);
+  width: 100%;
+}
+
+/* Explicit height on every text-like field (not textarea, which grows, or
+   range, which is its own shape) so a row of mixed input types — a date
+   next to a plain number, say — lines up exactly instead of each one
+   sizing itself from its own content. */
+input:not([type="range"]), select {
+  height: 44px;
+}
+
+/* iOS Safari renders a date input's own value (not the label, not other
+   input types) at the system Dynamic Type text size rather than this
+   font-size, which is why date fields alone could balloon well past their
+   siblings' height. -webkit-date-and-time-value is WebKit's own hook for
+   that inner value and does respect font-size; height+line-height on the
+   input are a backstop for engines that ignore it. */
+input[type="date"] {
+  height: 44px;
+  line-height: 44px;
+  padding-top: 0;
+  padding-bottom: 0;
+  /* iOS can also render this control's value wider than font-size and
+     height alone account for, pushing the box itself past width:100% of
+     its row — max-width plus clipping keeps that overflow inside the box
+     instead of stretching it past the screen edge. */
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  /* iOS Safari sizes a native date control's box from its own locale-format
+     content and ignores an authored width while -webkit-appearance stays
+     "auto" (the default for date inputs) — width:100% above is silently
+     dropped, which is what let the box itself, not just its text, run past
+     the edge of narrow rows. appearance:none hands sizing back to normal
+     CSS box layout; the tap-to-open-picker behavior is unaffected. */
+  -webkit-appearance: none;
+  appearance: none;
+}
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+  font-size: 17px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+textarea { resize: vertical; }
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent-dim);
+}
+
+input[type="range"] {
+  padding: 0;
+  background: transparent;
+  accent-color: var(--accent);
+}
+
+.range-anchors {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--dimmer);
+  margin-top: -2px;
+}
+
+input[type="date"], input[type="number"] { color-scheme: light; }
+:root[data-theme="dark"] input[type="date"], :root[data-theme="dark"] input[type="number"] { color-scheme: dark; }
+
+button { font-family: var(--font-mono); }
+
+.primary {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 10px;
+  padding: 13px 18px;
+  font-weight: 700;
+  font-size: 16px;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+/* A save button in its saved state: darker fill instead of the bright
+   "ready to submit" white, so the button itself confirms the save without
+   a separate toast. Reverts the moment the form it belongs to changes. */
+.primary.saved {
+  background: var(--accent-dim);
+  color: var(--ink);
+}
+
+.primary.block, .ghost-btn.block, .danger-btn.block { width: 100%; }
+
+/* The Run/Workout tabs' "+ Log ..." button sits directly under a stat-grid;
+   give it the same 24px clearance the next section-title has below it, so
+   the gap above and below the button matches. */
+.stat-grid + .primary.block { margin-top: 24px; }
+
+.ghost-btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-size: 15px;
+}
+
+.danger-btn {
+  background: transparent;
+  border: 1px solid var(--dim);
+  color: var(--ink);
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-size: 15px;
+}
+
+.actions { display: flex; gap: 10px; justify-content: flex-end; }
+.actions .primary { flex: 1; }
+.actions-row { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.actions-row + .primary.block { margin-top: 18px; }
+
+/* ------------------------------------------------------------ card, stats */
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stat-tile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.stat-tile .stat-value {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.1;
+}
+
+.stat-tile .stat-label {
+  font-size: 13px;
+  color: var(--dim);
+  margin-top: 4px;
+}
+
+/* Dashboard-only: the four "this week"/"logged" tiles get the brand orange
+   instead of the default monochrome accent, to match the logo. */
+.stat-value-accent { color: #FF6C2D; }
+
+.stat-tile-tappable {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* ----------------------------------------------------------------- chart */
+
+.chart-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  margin: 12px 0 4px;
+}
+
+.chart-wrap {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 6px;
+}
+
+.chart-svg { width: 100%; height: auto; display: block; }
+.chart-grid { stroke: var(--line); stroke-width: 1; }
+.chart-axis { fill: var(--dimmer); font-size: 9px; }
+.chart-threshold { stroke: var(--dimmer); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart-threshold-label { fill: var(--dimmer); font-size: 8px; font-weight: 600; }
+.chart-value-label { fill: var(--ink); font-size: 10px; font-weight: 700; }
+.chart-line { stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-dot { fill: var(--bg); stroke: var(--accent); stroke-width: 2; }
+.chart-dot-baseline { fill: var(--ink); stroke: var(--ink); }
+.chart-bar { fill: var(--accent-dim); stroke: var(--accent); stroke-width: 1; }
+
+/* Run tab only: the VO2max trend chart's point marker and the mileage
+   bar chart's bars get the brand orange, matching the rest of the app's
+   orange accents. */
+#chartWrap .chart-dot { fill: #FF6C2D; stroke: #FF6C2D; }
+#chartWrap .chart-value-label, #mileageChartWrap .chart-value-label { fill: #FF6C2D; }
+#mileageChartWrap .chart-bar { fill: #FF6C2D; stroke: #FF6C2D; }
+.chart-empty { color: var(--dimmer); font-size: 14px; text-align: center; padding: 40px 0; }
+.chart-radar-fill { fill: var(--accent); fill-opacity: 0.12; stroke: none; }
+/* Muscle balance radar's axis labels, data shape (fill/outline) and point
+   markers get the brand orange - the percentage under each label
+   (.chart-radar-pct, styled separately below) stays as-is, and #muscleChartWrap
+   keeps this off every other chart that shares .chart-line/.chart-dot. */
+.chart-radar-label { font-size: 12px; fill: #FF6C2D; }
+#muscleChartWrap .chart-radar-fill { fill: #FF6C2D; fill-opacity: 0.18; }
+#muscleChartWrap .chart-line { stroke: #FF6C2D; }
+#muscleChartWrap .chart-dot { fill: #FF6C2D; stroke: #FF6C2D; }
+
+.activity-detail-stats { margin-top: 12px; }
+
+.hr-zone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hr-zone-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hr-zone-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.hr-zone-row-name {
+  font-size: 12px;
+  color: var(--ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hr-zone-row-time { font-size: 12px; color: var(--ink); flex-shrink: 0; }
+
+.hr-zone-row-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+  width: 100%;
+}
+
+.hr-zone-row-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.hr-zone-row-pct { font-size: 11px; color: var(--dimmer); }
+.chart-radar-pct { font-size: 11px; fill: var(--dimmer); font-weight: 700; }
+.chart-radar-label-group { cursor: pointer; }
+.chart-radar-label-group.active .chart-radar-label { fill: var(--ink); font-weight: 700; }
+.chart-radar-label-group.active .chart-radar-pct { fill: var(--ink); }
+
+/* Granular breakdown shown below the radar chart when a label is tapped. */
+.muscle-group-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+.muscle-group-detail[hidden] { display: none; }
+
+.muscle-group-detail-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.muscle-group-detail-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 34px;
+  align-items: center;
+  gap: 8px;
+}
+
+.muscle-group-detail-name { font-size: 13px; color: var(--ink); }
+
+.muscle-group-detail-bar {
+  background: var(--panel-2);
+  border-radius: 999px;
+  height: 6px;
+  overflow: hidden;
+}
+.muscle-group-detail-bar-fill { background: var(--accent); height: 100%; }
+
+.muscle-group-detail-pct { font-size: 12px; color: var(--dim); text-align: right; }
+
+/* -------------------------------------------------------------- scopes */
+
+.scopes { display: flex; gap: 8px; margin: 8px 0 10px; }
+
+.scope {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--dim);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.scope[aria-selected="true"] {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+/* -------------------------------------------------------------- calendar */
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4px 0 10px;
+}
+
+.cal-month { font-size: 16px; font-weight: 700; }
+
+.cal-nav {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  width: 36px;
+  height: 36px;
+  font-size: 19px;
+  line-height: 1;
+}
+
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dim);
+  margin-bottom: 4px;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.cal-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--dim);
+  padding: 0;
+  cursor: pointer;
+}
+
+.cal-cell.pad { background: transparent; border-color: transparent; visibility: hidden; }
+
+.cal-cell.has-activity { color: var(--ink); border-color: var(--dim); font-weight: 700; }
+
+/* Diagonal hatching, not just a border, so today reads at a glance even
+   among a grid of otherwise-identical cells. */
+.cal-cell.today {
+  border-color: var(--dim);
+  color: #FF6C2D;
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--line) 0,
+    var(--line) 2px,
+    transparent 2px,
+    transparent 7px
+  );
+}
+
+.cal-cell.selected {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+/* Re-applied after .selected's background shorthand clears it, in a
+   lighter stripe color so the hatch still shows on the accent fill. */
+.cal-cell.today.selected {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--accent) 0,
+    var(--accent) 2px,
+    transparent 2px,
+    transparent 7px
+  );
+}
+
+/* Running-figure / dumbbell pictograms: calendar cells, the day panel's
+   section labels, and the dashboard's recent-activity feed. currentColor'd,
+   so they pick up whatever text color their container is set to. */
+.glyph-icon { width: 14px; height: 14px; flex-shrink: 0; color: var(--ink); }
+
+.cal-icons { display: flex; gap: 3px; }
+.cal-icons .glyph-icon { width: 11px; height: 11px; color: #FF6C2D; }
+.cal-cell.selected .glyph-icon { color: var(--bg); }
+
+.cal-legend {
+  display: flex;
+  gap: 16px;
+  margin: -4px 0 12px;
+}
+
+.cal-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #FF6C2D;
+}
+.cal-legend-item .glyph-icon { width: 12px; height: 12px; color: #FF6C2D; }
+/* The dumbbell glyph's "ink" sits in a narrower band of its 24x24 viewBox
+   than the runner's, so it reads smaller at the same box size - bump it up
+   to match the run icon's visual weight. */
+.cal-legend-item .glyph-workout { width: 16px; height: 16px; }
+
+.cal-day-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.cal-day-panel-date {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dim);
+}
+
+.cal-day-section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--dimmer);
+  margin: 6px 0 -2px;
+}
+
+.cal-day-item {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  text-align: left;
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cal-day-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.cal-day-actions .ghost-btn { flex: 1; }
+
+/* --------------------------------------------------------------- history */
+
+.history-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.history-item {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+}
+
+.history-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.history-date { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-weight: 700; font-size: 15px; }
+.history-meta { font-size: 13px; color: var(--dim); display: flex; gap: 10px; flex-wrap: wrap; }
+.history-notes { font-size: 13px; color: var(--dimmer); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.routine-row { display: flex; align-items: center; gap: 8px; }
+.routine-row .routine-item { flex: 1; }
+
+.routine-delete {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--dim);
+  width: 34px;
+  height: 34px;
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.routine-selected-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.routine-selected-item {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.routine-selected-remove {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--dim);
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.wo-picker-result.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+.wo-picker-result.selected .wo-picker-result-meta { color: var(--bg); }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  border: 1px solid var(--line);
+}
+
+.pill-type { color: var(--dim); border-color: var(--line); }
+
+/* Dashboard-only: Recent Activity's per-item run/workout icon and type
+   pill get the brand orange, matching the calendar/legend/top stats. */
+#recentActivityList .glyph-icon { color: #FF6C2D; }
+#recentActivityList .pill-type { color: #FF6C2D; border-color: #FF6C2D; }
+
+/* Run tab only: All Sessions' type pill gets the same treatment. */
+#historyList .pill-type { color: #FF6C2D; border-color: #FF6C2D; }
+
+/* ------------------------------------------------------------- zone table */
+
+.zone-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.zone-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.zone-row.is-target {
+  border-color: var(--accent);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.06), transparent);
+}
+
+.zone-name { font-size: 14px; }
+.zone-pct { font-size: 12px; color: var(--dimmer); }
+.zone-bpm { font-weight: 700; font-size: 16px; text-align: right; min-width: 84px; }
+
+.badge {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bg);
+  background: var(--accent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-weight: 700;
+}
+
+
+/* ----------------------------------------------------------------- sheet */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 20;
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 21;
+  background: var(--panel-2);
+  border-top: 1px solid var(--line);
+  border-radius: 16px 16px 0 0;
+  padding: 10px 16px calc(20px + var(--safe-b));
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.grabber {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  margin: 4px auto 14px;
+}
+
+/* ------------------------------------------------------------ live workout */
+
+.wo-live-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.wo-live-timer[hidden] { display: none; }
+
+.wo-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: wo-live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes wo-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+#woLiveTimerText {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.live-mini-bar {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + var(--safe-b));
+  z-index: 19;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 16px;
+  padding: 14px 18px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  text-align: left;
+  color: var(--bg);
+}
+
+.live-mini-bar[hidden] { display: none; }
+
+.live-mini-timer {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--bg);
+  flex-shrink: 0;
+}
+
+.live-mini-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.live-mini-exercise {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--bg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.live-mini-set {
+  font-size: 13px;
+  color: var(--accent-dim);
+}
+
+.live-mini-resume {
+  font-size: 13px;
+  color: var(--accent-dim);
+  flex-shrink: 0;
+}
+
+/* --------------------------------------------------------- workout summary */
+
+.pr-banner {
+  background: var(--accent);
+  color: var(--bg);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.pr-banner-title { font-weight: 700; font-size: 15px; }
+.pr-banner-item { font-size: 13px; margin-top: 4px; }
+.pr-banner-delta { opacity: 0.7; }
+
+.summary-duration {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 700;
+  margin: 4px 0 18px;
+}
+
+.summary-exercises {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.summary-exercise-row {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.summary-exercise-name { font-weight: 700; font-size: 14px; }
+.summary-exercise-stats { font-size: 12px; color: var(--dim); margin-top: 2px; }
+
+/* ----------------------------------------------------------------- toast */
+
+.toast {
+  position: fixed;
+  bottom: calc(84px + var(--safe-b));
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  z-index: 30;
+}
+
+/* ------------------------------------------------------ settings <details> */
+
+.settings-details {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  margin: 18px 0 0;
+  overflow: hidden;
+}
+
+/* Inside #settingsForm (a flex column with its own gap), the form's gap
+   already spaces the accordion sections out - this margin would double up. */
+.form > .settings-details { margin-top: 0; }
+
+.settings-details summary {
+  cursor: pointer;
+  padding: 14px 16px;
+  margin: 0;
+  list-style: none;
+}
+
+.settings-details summary::-webkit-details-marker { display: none; }
+
+.settings-details summary::after {
+  content: '+';
+  font-size: 16px;
+  color: #FF6C2D;
+}
+
+.settings-details[open] summary::after { content: '−'; }
+
+.settings-details[open] summary { border-bottom: 1px solid var(--line); }
+
+.settings-details-body { padding: 4px 16px 16px; }
+.settings-details-body .section-title:first-child { margin-top: 4px; }
+
+/* -------------------------------------------------------- muscle diagram */
+
+.muscle-diagram { display: flex; gap: 8px; }
+
+.muscle-body {
+  position: relative;
+  width: 34px;
+  flex-shrink: 0;
+}
+
+.muscle-base, .muscle-overlay {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.muscle-overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.exercise-detail-diagram .muscle-body { width: 62px; }
+.exercise-detail-diagram { display: flex; justify-content: center; gap: 16px; margin: 12px 0; }
+
+.exercise-summary-card .muscle-body { width: 46px; }
+
+/* --------------------------------------------------------------- workout */
+
+.exercise-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.exercise-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.exercise-summary-info { flex: 1; min-width: 0; }
+.exercise-summary-name-row { display: flex; align-items: center; gap: 8px; }
+.exercise-summary-name { font-weight: 700; font-size: 15px; }
+.exercise-summary-meta { font-size: 12px; color: var(--dim); margin-top: 2px; }
+.exercise-summary-pr { font-size: 13px; color: var(--ink); margin-top: 4px; }
+
+.exercise-detail-title-row { display: flex; align-items: center; gap: 8px; }
+
+.wo-exercise-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wo-exercise-block {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.wo-superset-group {
+  border: 1px dashed var(--accent);
+  border-radius: 14px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wo-superset-group .wo-exercise-block {
+  border-color: transparent;
+  padding: 8px 6px;
+}
+
+.wo-superset-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.wo-superset-unpair {
+  background: transparent;
+  border: none;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px;
+}
+
+.wo-exercise-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.wo-exercise-name { font-weight: 700; font-size: 15px; }
+.wo-exercise-meta { font-size: 12px; color: var(--dim); margin-top: 2px; }
+
+.wo-exercise-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.wo-exercise-remove, .wo-set-remove, .wo-superset-btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--dim);
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.wo-last-performance {
+  font-size: 12px;
+  color: var(--dim);
+  margin: 8px 0;
+}
+
+.wo-bodyweight-hint {
+  font-size: 12px;
+  color: var(--dim);
+  margin: -4px 0 8px;
+}
+
+.wo-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.wo-brand-select {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.wo-set-row-heading {
+  display: grid;
+  grid-template-columns: 26px 22px 1fr 1fr 26px;
+  gap: 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.wo-set-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wo-set-row {
+  display: grid;
+  grid-template-columns: 26px 22px 1fr 1fr 26px;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Live sessions add a tick-mark column between reps and remove. */
+#workoutSheet.live-mode .wo-set-row-heading,
+#workoutSheet.live-mode .wo-set-row {
+  grid-template-columns: 26px 22px 1fr 1fr 26px 26px;
+}
+
+.wo-set-done {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.wo-set-done[data-done="true"] {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.wo-set-type {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Any non-normal set type fills in solid so it's spottable at a glance
+   down a list of sets, rather than just readable one row at a time. */
+.wo-set-row[data-type="warmup"] .wo-set-type,
+.wo-set-row[data-type="drop"] .wo-set-type,
+.wo-set-row[data-type="failure"] .wo-set-type {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.wo-set-index {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--dim);
+  text-align: center;
+}
+
+.wo-set-row input { padding: 8px 6px; font-size: 14px; text-align: center; }
+
+/* The kg/reps placeholder is last session's value, not a hint about what
+   to type - a dashed underline marks it as a real (if unconfirmed) number
+   rather than ordinary greyed-out placeholder text. */
+.wo-set-row input::placeholder { text-decoration: underline dashed; text-underline-offset: 2px; }
+
+.wo-add-set { margin-top: 8px; padding: 8px; font-size: 13px; }
+
+.wo-picker {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wo-picker[hidden] { display: none; }
+
+.wo-picker-hint {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.wo-picker-hint[hidden] { display: none; }
+
+.wo-picker-search {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: var(--font-mono);
+}
+
+.wo-picker-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.chip {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--dim);
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.wo-picker-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.wo-picker-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--bg);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.wo-picker-result-meta { font-size: 12px; color: var(--dimmer); flex-shrink: 0; }
+.wo-picker-results[hidden] { display: none; }
+
+.wo-new-exercise {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.wo-new-exercise[hidden] { display: none; }

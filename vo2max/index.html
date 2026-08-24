@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>HYBR.D</title>
+<meta name="description" content="Running and strength training tracker — log runs and workouts, watch the trend, offline.">
+
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#000000">
+
+<!-- Add to Home Screen on iOS -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="HYBR.D">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+
+<!-- Space Mono, used for all text; falls back to the system monospace stack if offline on first load -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+
+<!-- Boot splash: covers the app until app.js finishes its first render, so
+     a cold load (or a home-screen launch, before the OS-generated splash
+     hands off to the page) shows this instead of unstyled/blank content.
+     Removed by app.js once renderAll() has run - see js/app.js. -->
+<div id="bootSplash" aria-hidden="true"><span>HYBR.D</span></div>
+
+<header class="bar">
+  <div class="bar-left">
+    <img src="./icons/logo-header.png" alt="HYBR.D" class="brand-logo">
+    <span id="headerTitle" class="header-title mono">Dashboard</span>
+  </div>
+  <button type="button" id="menuToggle" class="menu-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="menuDropdown">
+    <span class="menu-toggle-bar"></span>
+    <span class="menu-toggle-bar"></span>
+    <span class="menu-toggle-bar"></span>
+  </button>
+
+  <nav id="menuDropdown" class="menu-dropdown" hidden role="menu" aria-label="Sections">
+    <button type="button" class="menu-item" data-view="dashboard" role="menuitem" aria-selected="true">Dashboard</button>
+    <button type="button" class="menu-item" data-view="run" role="menuitem" aria-selected="false">Run</button>
+    <button type="button" class="menu-item" data-view="workout" role="menuitem" aria-selected="false">Lift</button>
+    <button type="button" class="menu-item" data-view="settings" role="menuitem" aria-selected="false">Settings</button>
+  </nav>
+</header>
+
+<main id="main">
+
+  <!-- DASHBOARD -->
+  <section id="view-dashboard" class="view">
+    <h1 class="view-title">Dashboard</h1>
+
+    <div class="cal-header">
+      <button type="button" id="calPrev" class="cal-nav" aria-label="Previous month">‹</button>
+      <span id="calMonthLabel" class="cal-month mono"></span>
+      <button type="button" id="calNext" class="cal-nav" aria-label="Next month">›</button>
+    </div>
+    <div id="calWeekdays" class="cal-weekdays"></div>
+    <div id="calGrid" class="cal-grid"></div>
+    <div id="calLegend" class="cal-legend"></div>
+
+    <div id="dashStatGrid" class="stat-grid"></div>
+
+    <h2 class="section-title">Recent activity</h2>
+    <ul id="recentActivityList" class="history-list"></ul>
+    <p id="recentActivityEmpty" class="empty" hidden>Nothing logged yet — tap a date above to log a run or workout.</p>
+  </section>
+
+  <!-- RUN -->
+  <section id="view-run" class="view" hidden>
+    <h1 class="view-title">Run</h1>
+
+    <div id="statGrid" class="stat-grid"></div>
+
+    <button type="button" id="startRunBtn" class="primary block">+ Log run</button>
+
+    <h2 class="section-title">VO<sub>2</sub>max trend</h2>
+    <div id="chartWrap" class="chart-wrap"></div>
+
+    <h2 class="section-title">Total mileage <span id="mileageTotal" class="mono"></span></h2>
+    <div id="mileageScope" class="scopes" role="tablist" aria-label="Mileage range">
+      <button type="button" class="scope" role="tab" data-scope="week" aria-selected="true">Week</button>
+      <button type="button" class="scope" role="tab" data-scope="month" aria-selected="false">Month</button>
+      <button type="button" class="scope" role="tab" data-scope="year" aria-selected="false">Year</button>
+    </div>
+    <div id="mileageChartWrap" class="chart-wrap"></div>
+
+    <h2 class="section-title">All sessions</h2>
+    <ul id="historyList" class="history-list"></ul>
+    <p id="historyEmpty" class="empty" hidden>No sessions logged yet.</p>
+  </section>
+
+  <!-- WORKOUT -->
+  <section id="view-workout" class="view" hidden>
+    <h1 class="view-title">Lift</h1>
+
+    <div id="workoutStatGrid" class="stat-grid"></div>
+
+    <button type="button" id="startWorkoutBtn" class="primary block">Start Workout</button>
+
+    <h2 class="section-title">Muscle balance</h2>
+    <div id="muscleScope" class="scopes" role="tablist" aria-label="Muscle balance range">
+      <button type="button" class="scope" role="tab" data-scope="week" aria-selected="true">Week</button>
+      <button type="button" class="scope" role="tab" data-scope="month" aria-selected="false">Month</button>
+      <button type="button" class="scope" role="tab" data-scope="year" aria-selected="false">Year</button>
+      <button type="button" class="scope" role="tab" data-scope="all" aria-selected="false">All</button>
+    </div>
+    <div id="muscleChartWrap" class="chart-wrap"></div>
+    <div id="muscleGroupDetail" class="muscle-group-detail" hidden></div>
+
+    <h2 class="section-title">History</h2>
+    <ul id="workoutHistoryList" class="history-list"></ul>
+    <p id="workoutHistoryEmpty" class="empty" hidden>No workouts logged yet.</p>
+
+    <h2 class="section-title">Routines</h2>
+    <ul id="routinesTabList" class="history-list"></ul>
+    <p id="routinesTabEmpty" class="empty" hidden>No routines yet — create one to quickly start a workout with your usual exercises.</p>
+    <button type="button" id="addRoutineTabBtn" class="ghost-btn block">+ Create Routine</button>
+
+    <div class="section-title-row">
+      <h2 class="section-title">Exercises</h2>
+      <select id="exerciseFilterMuscle" class="exercise-filter-select"></select>
+    </div>
+    <input id="exerciseSearchInput" type="text" class="wo-picker-search" placeholder="Search exercises…">
+    <div id="exerciseSummaryList" class="exercise-summary-list"></div>
+    <p id="exerciseSummaryEmpty" class="empty" hidden>No workouts logged yet — the exercises you log will show up here with their progress.</p>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="view-settings" class="view" hidden>
+    <h1 class="view-title">Settings</h1>
+
+    <h2 class="section-title">Appearance</h2>
+    <div id="sTheme" class="scopes" role="tablist" aria-label="Theme">
+      <button type="button" class="scope" role="tab" data-theme="light" aria-selected="true">Light</button>
+      <button type="button" class="scope" role="tab" data-theme="dark" aria-selected="false">Dark</button>
+    </div>
+
+    <form id="settingsForm" class="form">
+      <details class="settings-details">
+        <summary class="section-title">Profile</summary>
+        <div class="settings-details-body form">
+          <label class="field">
+            <span>Name</span>
+            <input id="sName" type="text" placeholder="Your name">
+          </label>
+          <label class="field">
+            <span>Date of birth <em>(optional)</em></span>
+            <input id="sDob" type="date">
+          </label>
+          <div class="row">
+            <label class="field">
+              <span>Height (cm)</span>
+              <input id="sHeightCm" type="number" step="0.1" min="0" max="300">
+            </label>
+            <label class="field">
+              <span>Weight (kg)</span>
+              <input id="sWeightKg" type="number" step="0.1" min="0" max="400">
+            </label>
+          </div>
+          <p class="field-hint">Your weight is added to the load for bodyweight exercises (e.g. dips, pull-ups) — bodyweight-only sets use it as-is, and weighted sets add it to whatever extra weight you enter.</p>
+        </div>
+      </details>
+
+      <details class="settings-details">
+        <summary class="section-title">Baseline</summary>
+        <div class="settings-details-body form">
+          <div class="row">
+            <label class="field">
+              <span>Baseline VO2max</span>
+              <input id="sBaselineVO2max" type="number" step="0.1" min="0">
+            </label>
+            <label class="field">
+              <span>Recorded on</span>
+              <input id="sBaselineDate" type="date">
+            </label>
+          </div>
+          <label class="field">
+            <span>Device</span>
+            <input id="sDevice" type="text" placeholder="Watch / app used to measure">
+          </label>
+        </div>
+      </details>
+
+      <details class="settings-details">
+        <summary class="section-title">Heart rate</summary>
+        <div class="settings-details-body form">
+          <div class="row">
+            <label class="field">
+              <span>Resting HR</span>
+              <input id="sRestingHR" type="number" min="20" max="120">
+            </label>
+            <label class="field">
+              <span>Max HR</span>
+              <input id="sMaxHR" type="number" min="100" max="230">
+            </label>
+            <label class="field">
+              <span>LTHR</span>
+              <input id="sLTHR" type="number" min="80" max="220">
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Primary zone model</span>
+            <select id="sPrimaryModel">
+              <option value="lthr">LTHR-based</option>
+              <option value="rhr">RHR-based (Karvonen)</option>
+            </select>
+          </label>
+        </div>
+      </details>
+
+    </form>
+
+    <details class="settings-details">
+      <summary class="section-title">Google Calendar sync</summary>
+      <div class="settings-details-body form">
+        <p class="field-hint">Automatically pushes every run and workout to a dedicated "HYBR.D Workouts" calendar in your Google account, kept in sync on every save. Requires a one-time Google Cloud OAuth Client ID (free, ~5 min) - see the app's README for the setup steps.</p>
+        <label class="field">
+          <span>OAuth Client ID</span>
+          <input id="gcalClientId" type="text" placeholder="xxxxxxxxxx.apps.googleusercontent.com" autocomplete="off" spellcheck="false">
+        </label>
+        <p id="gcalStatus" class="field-hint">Not connected.</p>
+        <div class="actions">
+          <button type="button" id="gcalConnect" class="ghost-btn">Connect</button>
+          <button type="button" id="gcalDisconnect" class="ghost-btn" hidden>Disconnect</button>
+        </div>
+        <button type="button" id="gcalSyncNow" class="ghost-btn block" hidden>Sync all now</button>
+      </div>
+    </details>
+
+    <details class="settings-details">
+      <summary class="section-title">intervals.icu sync (via Zepp)</summary>
+      <div class="settings-details-body form">
+        <p class="field-hint">Automatically imports your runs from intervals.icu, and shows your most recent Resting HR and Sleep as Dashboard stat tiles. Connect your Zepp/Amazfit account directly on a free intervals.icu account (intervals.icu → Settings → Amazfit → sign in with Zepp), then paste your intervals.icu API key below. Runs only - no equivalent to per-exercise lift data, so workouts still need to be logged by hand. No backend or paid API needed, just your own free API key - see the app's README.</p>
+        <label class="field">
+          <span>Athlete ID</span>
+          <input id="intervalsAthleteId" type="text" placeholder="e.g. i123456" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>API Key</span>
+          <input id="intervalsApiKey" type="text" placeholder="from intervals.icu → Settings → Developer" autocomplete="off" spellcheck="false">
+        </label>
+        <p id="intervalsStatus" class="field-hint">Not connected.</p>
+        <div class="actions">
+          <button type="button" id="intervalsConnect" class="ghost-btn">Connect</button>
+          <button type="button" id="intervalsDisconnect" class="ghost-btn" hidden>Disconnect</button>
+        </div>
+        <button type="button" id="intervalsSyncNow" class="ghost-btn block" hidden>Sync runs now</button>
+      </div>
+    </details>
+
+    <details class="settings-details">
+      <summary class="section-title">Zones reference</summary>
+      <div class="settings-details-body">
+        <h2 class="section-title">LTHR-based zones <span id="lthrPrimaryBadge" class="badge" hidden>primary</span></h2>
+        <div id="lthrZoneTable" class="zone-table"></div>
+
+        <h2 class="section-title">RHR-based zones (Karvonen) <span id="rhrPrimaryBadge" class="badge" hidden>primary</span></h2>
+        <div id="rhrZoneTable" class="zone-table"></div>
+      </div>
+    </details>
+
+    <div class="actions-row">
+      <button type="button" id="sExport" class="ghost-btn">Export data</button>
+      <button type="button" id="sImport" class="ghost-btn">Import data</button>
+      <button type="button" id="sReset" class="danger-btn">Reset to defaults</button>
+    </div>
+    <button type="submit" id="settingsSaveBtn" class="primary block" form="settingsForm">Save settings</button>
+    <input id="sFile" type="file" accept="application/json" hidden>
+  </section>
+
+</main>
+
+<!-- Edit session sheet -->
+<div id="scrim" class="scrim" hidden></div>
+
+<!-- Persistent bar shown while a live workout is running and its sheet is minimized -->
+<button type="button" id="liveMiniBar" class="live-mini-bar" hidden>
+  <span id="liveMiniTimer" class="live-mini-timer mono">00:00</span>
+  <span class="live-mini-info">
+    <span id="liveMiniExercise" class="live-mini-exercise">—</span>
+    <span id="liveMiniSet" class="live-mini-set">—</span>
+  </span>
+  <span class="live-mini-resume">Resume ▲</span>
+</button>
+
+<section id="editSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Edit session">
+  <div class="grabber"></div>
+  <form id="editForm" class="form">
+    <label class="field">
+      <span>Date</span>
+      <input id="editDate" type="date" required>
+    </label>
+
+    <label class="field">
+      <span>Session type</span>
+      <select id="editType">
+        <option value="interval">Interval (Norwegian 4x4)</option>
+        <option value="easy-run">Easy run</option>
+        <option value="long-run">Long run</option>
+      </select>
+    </label>
+
+    <label class="field field-toggle">
+      <span>Warm up</span>
+      <input id="editWarmupToggle" type="checkbox">
+    </label>
+    <div id="editWarmupFields" class="form" hidden>
+      <div class="row">
+        <label class="field">
+          <span>Avg pace (min/km)</span>
+          <input id="editWarmupAvgPace" type="text" placeholder="e.g. 6:30">
+        </label>
+        <label class="field">
+          <span>Distance (km)</span>
+          <input id="editWarmupDistanceKm" type="number" step="0.01" min="0">
+        </label>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>Average HR</span>
+          <input id="editWarmupAvgHR" type="number" min="60" max="230">
+        </label>
+        <label class="field">
+          <span>Max HR</span>
+          <input id="editWarmupMaxHR" type="number" min="60" max="230">
+        </label>
+      </div>
+    </div>
+
+    <div id="editRunFields" class="form">
+      <div class="row">
+        <label class="field">
+          <span>Duration (min)</span>
+          <input id="editDurationMin" type="number" min="0" max="600">
+        </label>
+        <label class="field">
+          <span>Avg pace (min/km)</span>
+          <input id="editAvgPace" type="text" placeholder="e.g. 5:25">
+        </label>
+      </div>
+      <label class="field">
+        <span>Distance (km) <em>(auto from duration + pace)</em></span>
+        <input id="editDistanceKm" type="number" step="0.01" min="0">
+      </label>
+      <div class="row">
+        <label class="field">
+          <span>Average HR</span>
+          <input id="editRunAvgHR" type="number" min="60" max="230">
+        </label>
+        <label class="field">
+          <span>Max HR</span>
+          <input id="editRunMaxHR" type="number" min="60" max="230">
+        </label>
+      </div>
+    </div>
+
+    <label class="field field-toggle">
+      <span>Cool down</span>
+      <input id="editCooldownToggle" type="checkbox">
+    </label>
+    <div id="editCooldownFields" class="form" hidden>
+      <div class="row">
+        <label class="field">
+          <span>Avg pace (min/km)</span>
+          <input id="editCooldownAvgPace" type="text" placeholder="e.g. 6:45">
+        </label>
+        <label class="field">
+          <span>Distance (km)</span>
+          <input id="editCooldownDistanceKm" type="number" step="0.01" min="0">
+        </label>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>Average HR</span>
+          <input id="editCooldownAvgHR" type="number" min="60" max="230">
+        </label>
+        <label class="field">
+          <span>Max HR</span>
+          <input id="editCooldownMaxHR" type="number" min="60" max="230">
+        </label>
+      </div>
+    </div>
+
+    <label class="field">
+      <span>Session RPE <output id="editRPEOut" class="mono"></output>/10</span>
+      <input id="editRPE" type="range" min="1" max="10" step="1">
+      <span class="range-anchors"><span>Easy</span><span>Max effort</span></span>
+    </label>
+
+    <label class="field">
+      <span>VO2max reading</span>
+      <input id="editVO2max" type="number" step="0.1" min="0">
+    </label>
+
+    <label class="field">
+      <span>Notes</span>
+      <textarea id="editNotes" rows="3"></textarea>
+    </label>
+
+    <button type="button" id="editAddToCalendar" class="ghost-btn block">Add to Calendar</button>
+    <button type="button" id="editViewActivityDetail" class="ghost-btn block" hidden>View HR zones &amp; graphs</button>
+
+    <div class="actions">
+      <button type="button" id="editDelete" class="danger-btn">Delete</button>
+      <button type="button" id="editCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" id="editSave" class="primary">Save</button>
+    </div>
+  </form>
+</section>
+
+<!-- Calendar day sheet (popup, opened by tapping a date on the Dashboard calendar) -->
+<section id="calDaySheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Day activity">
+  <div class="grabber"></div>
+  <div id="calDayPanel" class="cal-day-panel"></div>
+  <div class="actions">
+    <button type="button" id="calDaySheetClose" class="ghost-btn block">Close</button>
+  </div>
+</section>
+
+<!-- Log session sheet (popup, opened from a calendar day) -->
+<section id="logSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Log session">
+  <div class="grabber"></div>
+  <form id="logForm" class="form" autocomplete="off">
+    <label class="field">
+      <span>Date</span>
+      <input id="logDate" type="date" required>
+    </label>
+
+    <label class="field">
+      <span>Session type</span>
+      <select id="logType">
+        <option value="interval">Interval (Norwegian 4x4)</option>
+        <option value="easy-run">Easy run</option>
+        <option value="long-run">Long run</option>
+      </select>
+    </label>
+
+    <label class="field field-toggle">
+      <span>Warm up</span>
+      <input id="logWarmupToggle" type="checkbox">
+    </label>
+    <div id="logWarmupFields" class="form" hidden>
+      <div class="row">
+        <label class="field">
+          <span>Avg pace (min/km)</span>
+          <input id="logWarmupAvgPace" type="text" placeholder="e.g. 6:30">
+        </label>
+        <label class="field">
+          <span>Distance (km)</span>
+          <input id="logWarmupDistanceKm" type="number" step="0.01" min="0" placeholder="e.g. 1.00">
+        </label>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>Average HR</span>
+          <input id="logWarmupAvgHR" type="number" min="60" max="230" placeholder="bpm">
+        </label>
+        <label class="field">
+          <span>Max HR</span>
+          <input id="logWarmupMaxHR" type="number" min="60" max="230" placeholder="bpm">
+        </label>
+      </div>
+    </div>
+
+    <div id="logRunFields" class="form">
+      <div class="row">
+        <label class="field">
+          <span>Duration (min)</span>
+          <input id="logDurationMin" type="number" min="0" max="600" placeholder="e.g. 45">
+        </label>
+        <label class="field">
+          <span>Avg pace (min/km)</span>
+          <input id="logAvgPace" type="text" placeholder="e.g. 5:25">
+        </label>
+      </div>
+      <label class="field">
+        <span>Distance (km) <em>(auto from duration + pace)</em></span>
+        <input id="logDistanceKm" type="number" step="0.01" min="0" placeholder="e.g. 8.20">
+      </label>
+      <div class="row">
+        <label class="field">
+          <span>Average HR</span>
+          <input id="logRunAvgHR" type="number" min="60" max="230" placeholder="bpm">
+        </label>
+        <label class="field">
+          <span>Max HR</span>
+          <input id="logRunMaxHR" type="number" min="60" max="230" placeholder="bpm">
+        </label>
+      </div>
+    </div>
+
+    <label class="field field-toggle">
+      <span>Cool down</span>
+      <input id="logCooldownToggle" type="checkbox">
+    </label>
+    <div id="logCooldownFields" class="form" hidden>
+      <div class="row">
+        <label class="field">
+          <span>Avg pace (min/km)</span>
+          <input id="logCooldownAvgPace" type="text" placeholder="e.g. 6:45">
+        </label>
+        <label class="field">
+          <span>Distance (km)</span>
+          <input id="logCooldownDistanceKm" type="number" step="0.01" min="0" placeholder="e.g. 1.00">
+        </label>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>Average HR</span>
+          <input id="logCooldownAvgHR" type="number" min="60" max="230" placeholder="bpm">
+        </label>
+        <label class="field">
+          <span>Max HR</span>
+          <input id="logCooldownMaxHR" type="number" min="60" max="230" placeholder="bpm">
+        </label>
+      </div>
+    </div>
+
+    <label class="field">
+      <span>Session RPE <output id="logRPEOut" class="mono"></output>/10</span>
+      <input id="logRPE" type="range" min="1" max="10" step="1" value="6">
+      <span class="range-anchors"><span>Easy</span><span>Max effort</span></span>
+    </label>
+
+    <label class="field">
+      <span>Notes</span>
+      <textarea id="logNotes" rows="3" placeholder="How it felt, conditions, anything worth remembering"></textarea>
+    </label>
+
+    <div class="actions">
+      <button type="button" id="logCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" id="logSaveBtn" class="primary">Save session</button>
+    </div>
+  </form>
+</section>
+
+<!-- Log/edit workout sheet (popup, shared by "+ Log workout" and tapping a past workout) -->
+<section id="workoutSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Log workout">
+  <div class="grabber"></div>
+  <div id="woLiveTimer" class="wo-live-timer" hidden>
+    <span class="wo-live-dot"></span>
+    <span id="woLiveTimerText" class="mono">00:00</span>
+  </div>
+  <form id="workoutForm" class="form" autocomplete="off">
+    <label class="field">
+      <span>Date</span>
+      <input id="woDate" type="date" required>
+    </label>
+    <label class="field">
+      <span>Workout name <em>(optional)</em></span>
+      <input id="woName" type="text" placeholder="e.g. Push Day">
+    </label>
+
+    <div id="woExerciseList" class="wo-exercise-list"></div>
+
+    <div id="woPicker" class="wo-picker" hidden>
+      <p id="woPickerHint" class="wo-picker-hint" hidden></p>
+      <input id="woPickerSearch" type="text" class="wo-picker-search" placeholder="Search exercises…">
+      <div id="woPickerChips" class="wo-picker-chips"></div>
+      <button type="button" id="woNewExerciseBtn" class="ghost-btn block">+ Create new exercise</button>
+
+      <div id="woNewExerciseForm" class="wo-new-exercise" hidden>
+        <label class="field">
+          <span>Exercise name</span>
+          <input id="newExName" type="text" placeholder="e.g. Cable Hip Abduction">
+        </label>
+        <label class="field">
+          <span>Equipment</span>
+          <select id="newExEquipment"></select>
+        </label>
+        <label class="field">
+          <span>Body part(s) <em>(tap all that apply)</em></span>
+          <div id="newExMuscles" class="wo-picker-chips"></div>
+        </label>
+        <div class="actions">
+          <button type="button" id="newExCancel" class="ghost-btn">Cancel</button>
+          <button type="button" id="newExSave" class="primary">Save exercise</button>
+        </div>
+      </div>
+
+      <div id="woPickerResults" class="wo-picker-results"></div>
+    </div>
+    <button type="button" id="woAddExercise" class="ghost-btn block">+ Add exercise</button>
+
+    <label class="field">
+      <span>Notes</span>
+      <textarea id="woNotes" rows="3"></textarea>
+    </label>
+
+    <div class="actions">
+      <button type="button" id="woDelete" class="danger-btn" hidden>Delete</button>
+      <button type="button" id="woCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" id="woSave" class="primary">Save workout</button>
+    </div>
+  </form>
+</section>
+
+<!-- Start-workout choice sheet (popup, shown by "Start Workout" before a fresh live session begins) -->
+<section id="startChoiceSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Start workout">
+  <div class="grabber"></div>
+  <h2 class="view-title">Start Workout</h2>
+  <div class="actions-row">
+    <button type="button" id="startChoiceRoutine" class="primary block">Select Routine</button>
+    <button type="button" id="startChoiceNew" class="ghost-btn block">Start New Workout</button>
+  </div>
+</section>
+
+<!-- Routines sheet (popup, browse/start/delete saved routines) -->
+<section id="routinesSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Routines">
+  <div class="grabber"></div>
+  <h2 class="view-title">Routines</h2>
+  <button type="button" id="addRoutineBtn" class="ghost-btn block">+ Create Routine</button>
+  <ul id="routinesList" class="history-list"></ul>
+  <p id="routinesEmpty" class="empty" hidden>No routines yet — create one to quickly start a workout with your usual exercises.</p>
+  <div class="actions">
+    <button type="button" id="routinesClose" class="ghost-btn block">Close</button>
+  </div>
+</section>
+
+<!-- Routine builder sheet (popup, name + pick exercises, opened from Routines or "Save as Routine") -->
+<section id="routineBuilderSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="New routine">
+  <div class="grabber"></div>
+  <h2 class="view-title">New Routine</h2>
+  <form id="routineForm" class="form">
+    <label class="field">
+      <span>Routine name</span>
+      <input id="routineName" type="text" placeholder="e.g. Push Day">
+    </label>
+
+    <div id="routineSelectedList" class="routine-selected-list"></div>
+    <p id="routineSelectedEmpty" class="empty" hidden>No exercises picked yet — search below to add some.</p>
+
+    <input id="routinePickerSearch" type="text" class="wo-picker-search" placeholder="Search exercises…">
+    <div id="routinePickerChips" class="wo-picker-chips"></div>
+    <button type="button" id="routineNewExerciseBtn" class="ghost-btn block">+ Create new exercise</button>
+
+    <div id="routineNewExerciseForm" class="wo-new-exercise" hidden>
+      <label class="field">
+        <span>Exercise name</span>
+        <input id="routineNewExName" type="text" placeholder="e.g. Cable Hip Abduction">
+      </label>
+      <label class="field">
+        <span>Equipment</span>
+        <select id="routineNewExEquipment"></select>
+      </label>
+      <label class="field">
+        <span>Body part(s) <em>(tap all that apply)</em></span>
+        <div id="routineNewExMuscles" class="wo-picker-chips"></div>
+      </label>
+      <div class="actions">
+        <button type="button" id="routineNewExCancel" class="ghost-btn">Cancel</button>
+        <button type="button" id="routineNewExSave" class="primary">Save exercise</button>
+      </div>
+    </div>
+
+    <div id="routinePickerResults" class="wo-picker-results"></div>
+
+    <div class="actions">
+      <button type="button" id="routineCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" id="routineSave" class="primary">Save routine</button>
+    </div>
+  </form>
+</section>
+
+<!-- Workout summary sheet (popup, shown right after finishing a live workout) -->
+<section id="workoutSummarySheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Workout summary">
+  <div class="grabber"></div>
+  <h2 class="view-title">Workout complete</h2>
+  <div id="summaryPRBanner" class="pr-banner" hidden></div>
+  <div id="summaryDuration" class="summary-duration mono"></div>
+  <div id="summaryExercises" class="summary-exercises"></div>
+  <div class="actions">
+    <button type="button" id="summarySaveRoutine" class="ghost-btn block">Save as Routine</button>
+    <button type="button" id="summaryDone" class="primary block">Done</button>
+  </div>
+</section>
+
+<!-- Resting HR detail sheet (popup, opened by tapping the Dashboard's Resting HR tile) -->
+<section id="restingHRDetailSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Resting HR trend">
+  <div class="grabber"></div>
+  <h2 class="view-title">Resting HR</h2>
+  <div id="restingHRScope" class="scopes" role="tablist" aria-label="Resting HR range">
+    <button type="button" class="scope" role="tab" data-scope="week" aria-selected="false">Week</button>
+    <button type="button" class="scope" role="tab" data-scope="month" aria-selected="true">Month</button>
+    <button type="button" class="scope" role="tab" data-scope="year" aria-selected="false">Year</button>
+    <button type="button" class="scope" role="tab" data-scope="all" aria-selected="false">All</button>
+  </div>
+  <div id="restingHRChartWrap" class="chart-wrap"></div>
+  <button type="button" id="restingHRDetailClose" class="ghost-btn block">Close</button>
+</section>
+
+<!-- Sleep detail sheet (popup, opened by tapping the Dashboard's sleep tile) -->
+<section id="sleepDetailSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Sleep duration">
+  <div class="grabber"></div>
+  <h2 class="view-title">Sleep</h2>
+  <div id="sleepScope" class="scopes" role="tablist" aria-label="Sleep range">
+    <button type="button" class="scope" role="tab" data-scope="week" aria-selected="true">Week</button>
+    <button type="button" class="scope" role="tab" data-scope="month" aria-selected="false">Month</button>
+  </div>
+  <div id="sleepChartWrap" class="chart-wrap"></div>
+  <button type="button" id="sleepDetailClose" class="ghost-btn block">Close</button>
+</section>
+
+<!-- Activity detail sheet (popup, opened from an auto-synced run's edit sheet) -->
+<section id="activityDetailSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Activity detail">
+  <div class="grabber"></div>
+  <h2 class="view-title">Activity detail</h2>
+  <div id="activityDetailStats" class="stat-grid activity-detail-stats"></div>
+  <p class="chart-label">Time in Zone (min:sec)</p>
+  <div id="activityZoneChartWrap" class="chart-wrap"></div>
+  <p class="chart-label">Heart Rate</p>
+  <div id="activityHRChartWrap" class="chart-wrap"></div>
+  <p class="chart-label">Pace</p>
+  <div id="activityPaceChartWrap" class="chart-wrap"></div>
+  <button type="button" id="activityDetailClose" class="ghost-btn block">Close</button>
+</section>
+
+<!-- Exercise progress sheet (popup, opened from an exercise card) -->
+<section id="exerciseSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Exercise progress">
+  <div class="grabber"></div>
+  <div class="exercise-detail-title-row">
+    <h2 id="exDetailName" class="view-title"></h2>
+    <span id="exDetailCustomBadge" class="badge" hidden>Custom</span>
+  </div>
+  <p id="exDetailMeta" class="exercise-summary-meta"></p>
+
+  <div id="exDetailViewMode">
+    <div id="exDetailDiagram" class="exercise-detail-diagram"></div>
+    <div id="exDetailStatGrid" class="stat-grid"></div>
+    <div class="section-title-row">
+      <h3 class="section-title">Progress</h3>
+      <select id="exDetailBrandFilter" class="exercise-filter-select" hidden></select>
+    </div>
+    <p class="chart-label">Weight</p>
+    <div id="exDetailChart" class="chart-wrap"></div>
+    <p class="chart-label">Volume</p>
+    <div id="exDetailVolumeChart" class="chart-wrap"></div>
+    <div class="actions">
+      <button type="button" id="exDetailEditCustom" class="ghost-btn" hidden>Edit exercise</button>
+      <button type="button" id="exDetailDeleteCustom" class="danger-btn" hidden>Delete exercise</button>
+      <button type="button" id="exDetailClose" class="ghost-btn block">Close</button>
+    </div>
+  </div>
+
+  <div id="exDetailEditForm" class="wo-new-exercise" hidden>
+    <label class="field">
+      <span>Exercise name</span>
+      <input id="exEditName" type="text">
+    </label>
+    <label class="field">
+      <span>Equipment</span>
+      <select id="exEditEquipment"></select>
+    </label>
+    <label class="field">
+      <span>Body part(s) <em>(tap all that apply)</em></span>
+      <div id="exEditMuscles" class="wo-picker-chips"></div>
+    </label>
+    <div class="actions">
+      <button type="button" id="exEditCancel" class="ghost-btn">Cancel</button>
+      <button type="button" id="exEditSave" class="primary">Save changes</button>
+    </div>
+  </div>
+</section>
+
+<div id="toast" class="toast" hidden></div>
+
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>
