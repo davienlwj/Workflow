@@ -871,6 +871,11 @@ button { font-family: var(--font-mono); }
 
 .pill-type { color: var(--dim); border-color: var(--line); }
 
+/* Dashboard-only: Recent Activity's per-item run/workout icon and type
+   pill get the brand orange, matching the calendar/legend/top stats. */
+#recentActivityList .glyph-icon { color: #FF6C2D; }
+#recentActivityList .pill-type { color: #FF6C2D; border-color: #FF6C2D; }
+
 /* ------------------------------------------------------------- zone table */
 
 .zone-table {
