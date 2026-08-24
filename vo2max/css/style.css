@@ -824,6 +824,12 @@ button { font-family: var(--font-mono); }
 .routine-row { display: flex; align-items: center; gap: 8px; }
 .routine-row .routine-item { flex: 1; }
 
+/* "Routines" needs a bit more room than the standard section-title gap
+   (10px) gives, and the list sits directly against "+ Create Routine"
+   with no title element between them to carry any spacing at all. */
+#routinesSectionTitle { margin-bottom: 16px; }
+#addRoutineTabBtn { margin-top: 8px; }
+
 .routine-delete {
   background: transparent;
   border: 1px solid var(--line);
