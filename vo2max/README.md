@@ -165,9 +165,13 @@ Settings → Amazfit → sign in with Zepp) **→ this app reading intervals.icu
 with your own free personal API key.
 
 Every new **run** synced this way gets imported automatically, checked
-each time the app is opened. Lifts aren't covered — intervals.icu has no
-equivalent to this app's per-exercise, per-set strength data, so workouts
-still need to be logged by hand regardless.
+each time the app is opened, complete with distance/duration/pace/HR - and
+**VO2max**, too, when your watch estimated one that day: intervals.icu's
+daily wellness log carries a VO2max reading alongside resting HR and
+sleep, and an imported run's VO2max reading field is auto-filled from it
+instead of being left for you to type in by hand. Lifts aren't covered —
+intervals.icu has no equivalent to this app's per-exercise, per-set
+strength data, so workouts still need to be logged by hand regardless.
 
 Unlike Strava or Google, intervals.icu needs no OAuth flow and no
 backend — just a personal API key you generate yourself, so setup is a

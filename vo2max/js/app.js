@@ -2399,8 +2399,10 @@ function isoDateDaysAgo(days) {
  *  already has a manually-logged run (no intervalsActivityId of its own)
  *  is skipped entirely, never touched - a run the user typed in by hand
  *  is never silently duplicated, overwritten, or replaced by an imported
- *  one, even if intervals.icu also has an activity for that same day. */
-function importNewIntervalsRunActivities(activities) {
+ *  one, even if intervals.icu also has an activity for that same day.
+ *  `vo2maxByDate` (optional, date -> number) fills in the watch's own
+ *  VO2max estimate for that day, if any - see fetchVo2maxByDate. */
+function importNewIntervalsRunActivities(activities, vo2maxByDate = new Map()) {
   const existingIds = new Set(sessions.map((s) => s.intervalsActivityId).filter(Boolean));
   const manualDates = new Set(sessions.filter((s) => !s.intervalsActivityId).map((s) => s.date));
   let count = 0;
@@ -2408,11 +2410,28 @@ function importNewIntervalsRunActivities(activities) {
     if (!isIntervalsRunActivity(activity) || existingIds.has(activity.id)) continue;
     const mapped = intervalsActivityToSession(activity);
     if (manualDates.has(mapped.date)) continue;
+    if (vo2maxByDate.has(mapped.date)) mapped.vo2max = vo2maxByDate.get(mapped.date);
     addSession(mapped);
     count += 1;
   }
   if (count > 0) sessions = loadSessions();
   return count;
+}
+
+/** Date -> VO2max map from intervals.icu's wellness log, covering the same
+ *  window as a run sync - lets a newly-imported run come in pre-filled
+ *  with the watch's own VO2max estimate for that day instead of leaving
+ *  the user to type it into the edit sheet by hand. Best-effort: a
+ *  failure here never blocks the run import itself, it just means those
+ *  sessions come in without a VO2max reading, same as before this existed. */
+async function fetchVo2maxByDate(athleteId, apiKey, oldestIso) {
+  try {
+    const history = await intervalsFetchWellnessHistory(athleteId, apiKey, oldestIso, todayIso());
+    return new Map(history.filter((w) => w.vo2max != null).map((w) => [w.date, w.vo2max]));
+  } catch (err) {
+    console.error('intervals.icu VO2max wellness fetch failed', err);
+    return new Map();
+  }
 }
 
 /** Pulls new run activities from intervals.icu into local sessions. The
@@ -2428,7 +2447,8 @@ async function syncIntervalsRuns({ silent = false } = {}) {
   try {
     const oldest = s.lastSyncedAt || isoDateDaysAgo(90);
     const activities = await intervalsListActivities(s.athleteId, s.apiKey, oldest);
-    imported = importNewIntervalsRunActivities(activities);
+    const vo2maxByDate = await fetchVo2maxByDate(s.athleteId, s.apiKey, oldest);
+    imported = importNewIntervalsRunActivities(activities, vo2maxByDate);
     settings = { ...settings, intervals: { ...settings.intervals, lastSyncedAt: todayIso() } };
     saveSettings(settings);
     intervalsNeedsReconnect = false;
@@ -2497,9 +2517,10 @@ $('intervalsConnect').addEventListener('click', async () => {
   if (!athleteId || !apiKey) { toast('Fill in both the Athlete ID and API Key first'); return; }
   try {
     const activities = await intervalsListActivities(athleteId, apiKey, isoDateDaysAgo(90));
+    const vo2maxByDate = await fetchVo2maxByDate(athleteId, apiKey, isoDateDaysAgo(90));
     settings = { ...settings, intervals: { athleteId, apiKey, enabled: true, lastSyncedAt: todayIso() } };
     saveSettings(settings);
-    const imported = importNewIntervalsRunActivities(activities);
+    const imported = importNewIntervalsRunActivities(activities, vo2maxByDate);
     intervalsNeedsReconnect = false;
     renderAll();
     renderIntervalsStatus();

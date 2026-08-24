@@ -93,9 +93,12 @@ export async function fetchRecentWellness(athleteId, apiKey, lookbackDays = 7) {
   };
 }
 
-/** Every day's resting HR and sleep in the given range (oldest/newest as
- *  YYYY-MM-DD), oldest first - the full history behind the Dashboard
- *  tiles' single latest-known values, for their tap-through detail charts. */
+/** Every day's resting HR, sleep and VO2max estimate in the given range
+ *  (oldest/newest as YYYY-MM-DD), oldest first - the full history behind
+ *  the Dashboard tiles' single latest-known values (for their tap-through
+ *  detail charts), and behind auto-filling a newly-imported run's VO2max
+ *  from the watch's own daily estimate instead of leaving it for the user
+ *  to type in by hand. */
 export async function fetchWellnessHistory(athleteId, apiKey, oldestIso, newestIso) {
   const params = new URLSearchParams({ oldest: oldestIso, newest: newestIso });
   const entries = await apiGet(`/athlete/${encodeURIComponent(athleteId)}/wellness?${params}`, apiKey);
@@ -105,6 +108,7 @@ export async function fetchWellnessHistory(athleteId, apiKey, oldestIso, newestI
       date: e.id,
       restingHR: e.restingHR != null ? Math.round(e.restingHR) : null,
       sleepHours: e.sleepSecs != null ? Math.round((e.sleepSecs / 3600) * 10) / 10 : null,
+      vo2max: e.vo2max != null ? Math.round(e.vo2max * 10) / 10 : null,
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
