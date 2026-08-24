@@ -1222,7 +1222,7 @@ $('woPickerSearch').addEventListener('input', renderWoPickerResults);
 $('woPickerResults').addEventListener('click', (e) => {
   const btn = e.target.closest('.wo-picker-result');
   if (!btn) return;
-  $('woExerciseList').insertAdjacentHTML('beforeend', exerciseBlockHTML(btn.dataset.id, [{}], undefined, findExercise(btn.dataset.id)?.brand));
+  $('woExerciseList').insertAdjacentHTML('beforeend', exerciseBlockHTML(btn.dataset.id, [{}]));
   if (pairingSourceBlock) {
     wrapAsSupersetGroup([pairingSourceBlock, $('woExerciseList').lastElementChild], `superset-${makeShortId()}`);
     pairingSourceBlock = null;
@@ -1568,7 +1568,7 @@ function openLiveWorkoutSheet(exerciseIds = []) {
   $('woDate').value = todayIso();
   $('woName').value = '';
   $('woNotes').value = '';
-  $('woExerciseList').innerHTML = exerciseIds.map((id) => exerciseBlockHTML(id, [{}], undefined, findExercise(id)?.brand)).join('');
+  $('woExerciseList').innerHTML = exerciseIds.map((id) => exerciseBlockHTML(id, [{}])).join('');
   $('woPicker').hidden = true;
   $('woDelete').hidden = true;
   $('woSaveRoutine').hidden = true;
@@ -2229,21 +2229,11 @@ $('exDetailBrandFilter').addEventListener('change', () => {
 
 /* -------------------------------------------------- edit custom exercise */
 
-/** Brand only means anything for Machine/Cable equipment - shows/hides
- *  #exEditBrandField to match whatever #exEditEquipment currently reads,
- *  same rule exerciseBlockHTML uses for the brand row on a logged set. */
-function refreshExEditBrandVisibility() {
-  const isBrandable = $('exEditEquipment').value === 'Machine' || $('exEditEquipment').value === 'Cable';
-  $('exEditBrandField').hidden = !isBrandable;
-}
-
 function openExEditForm() {
   const ex = findExercise(exerciseSheetId);
   if (!ex) return;
   $('exEditName').value = ex.name;
   $('exEditEquipment').innerHTML = EQUIPMENT.map((eq) => `<option value="${eq}"${eq === ex.equipment ? ' selected' : ''}>${eq}</option>`).join('');
-  $('exEditBrand').innerHTML = brandOptionsHTML(ex.brand || '');
-  refreshExEditBrandVisibility();
   $('exEditMuscles').innerHTML = MUSCLES.map((m) => `<button type="button" class="chip${ex.muscles.includes(m) ? ' active' : ''}" data-muscle="${m}">${MUSCLE_LABEL[m]}</button>`).join('');
   $('exDetailViewMode').hidden = true;
   $('exDetailEditForm').hidden = false;
@@ -2257,22 +2247,6 @@ function closeExEditForm() {
 $('exDetailEditCustom').addEventListener('click', openExEditForm);
 $('exEditCancel').addEventListener('click', closeExEditForm);
 
-$('exEditEquipment').addEventListener('change', refreshExEditBrandVisibility);
-
-$('exEditBrand').addEventListener('change', () => {
-  if ($('exEditBrand').value !== '__add__') return;
-  const name = window.prompt('New brand name:')?.trim();
-  if (name) {
-    addCustomBrand(name);
-    customBrands = loadCustomBrands();
-    const current = $('exEditBrand').value;
-    $('exEditBrand').innerHTML = brandOptionsHTML(current);
-    $('exEditBrand').value = name;
-  } else {
-    $('exEditBrand').value = '';
-  }
-});
-
 $('exEditMuscles').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
@@ -2283,12 +2257,10 @@ $('exEditSave').addEventListener('click', () => {
   if (!exerciseSheetId) return;
   const name = $('exEditName').value.trim();
   const equipment = $('exEditEquipment').value;
-  const isBrandable = equipment === 'Machine' || equipment === 'Cable';
-  const brand = isBrandable ? ($('exEditBrand').value || null) : null;
   const muscles = [...$('exEditMuscles').querySelectorAll('.chip.active')].map((c) => c.dataset.muscle);
   if (!name) { toast('Enter an exercise name'); return; }
   if (muscles.length === 0) { toast('Pick at least one body part'); return; }
-  updateCustomExercise(exerciseSheetId, { name, equipment, muscles, brand });
+  updateCustomExercise(exerciseSheetId, { name, equipment, muscles });
   customExercises = loadCustomExercises();
   openExerciseSheet(exerciseSheetId);
   renderWorkoutTab();
