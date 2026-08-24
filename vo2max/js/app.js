@@ -24,6 +24,15 @@ import {
   getOrCreateCalendar, upsertEvent as gcalUpsertEvent, deleteEvent as gcalDeleteEvent, CALENDAR_NAME,
 } from './gcal.js';
 import {
+  beginAuthorize as stravaBeginAuthorize,
+  consumeAuthorizeRedirect as stravaConsumeAuthorizeRedirect,
+  exchangeCode as stravaExchangeCode,
+  refreshAccessToken as stravaRefreshAccessToken,
+  listActivities as stravaListActivities,
+  isRunActivity as isStravaRunActivity,
+  activityToSession as stravaActivityToSession,
+} from './strava.js';
+import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
   exerciseById, searchExercises,
 } from './exercises.js';
@@ -2204,6 +2213,169 @@ $('gcalSyncNow').addEventListener('click', async () => {
   await syncAllToGoogle();
 });
 
+/* --------------------------------------------------------------- STRAVA */
+
+let stravaAccessToken = null;
+let stravaAccessTokenExpiresAt = 0;
+// Same purpose as gcalNeedsReconnect above - set when a sync attempt
+// couldn't get a usable token, cleared by the next successful one.
+let stravaNeedsReconnect = false;
+
+function hasValidStravaToken() {
+  return Boolean(stravaAccessToken) && Date.now() < stravaAccessTokenExpiresAt;
+}
+
+/** Gets a usable access token, refreshing via the proxy if the in-memory
+ *  one is missing or expired (true on every fresh page load, since the
+ *  access token itself is never persisted - only the long-lived refresh
+ *  token is). Strava rotates the refresh token on each use, so the new one
+ *  gets re-persisted too. Returns null (never throws) if a token can't be
+ *  had right now - callers should treat that as "sync skipped, will retry
+ *  on the next save/open, or an explicit reconnect". */
+async function getStravaAccessToken() {
+  if (hasValidStravaToken()) return stravaAccessToken;
+  const { proxyUrl, refreshToken } = settings.strava;
+  if (!proxyUrl || !refreshToken) return null;
+  try {
+    const data = await stravaRefreshAccessToken(proxyUrl, refreshToken);
+    stravaAccessToken = data.access_token;
+    stravaAccessTokenExpiresAt = (data.expires_at || 0) * 1000;
+    if (data.refresh_token && data.refresh_token !== refreshToken) {
+      settings = { ...settings, strava: { ...settings.strava, refreshToken: data.refresh_token } };
+      saveSettings(settings);
+    }
+    return stravaAccessToken;
+  } catch (err) {
+    console.error('Strava token refresh failed', err);
+    return null;
+  }
+}
+
+/** Runs `fn(accessToken)` if Strava sync is enabled and a token can be had.
+ *  Fire-and-forget by every caller below: a save always succeeds locally
+ *  regardless of whether the Strava pull that follows it does. */
+async function withStrava(fn) {
+  const s = settings.strava;
+  if (!s?.enabled || !s?.clientId || !s?.proxyUrl) return undefined;
+  try {
+    const token = await getStravaAccessToken();
+    if (!token) { stravaNeedsReconnect = true; renderStravaStatus(); return undefined; }
+    const result = await fn(token);
+    stravaNeedsReconnect = false;
+    renderStravaStatus();
+    return result;
+  } catch (err) {
+    console.error('Strava sync failed', err);
+    return undefined;
+  }
+}
+
+/** Pulls new run activities from Strava into local sessions, deduped by
+ *  stravaActivityId. The first sync (no lastSyncedAt yet) backfills the
+ *  last 90 days; every sync after that only asks for what's new. */
+async function syncStravaRuns({ silent = false } = {}) {
+  const imported = await withStrava(async (token) => {
+    const after = settings.strava.lastSyncedAt || Math.floor(Date.now() / 1000) - 90 * 86400;
+    const activities = await stravaListActivities(token, after);
+    const existingIds = new Set(sessions.map((s) => s.stravaActivityId).filter(Boolean));
+    let count = 0;
+    for (const activity of activities) {
+      if (!isStravaRunActivity(activity) || existingIds.has(activity.id)) continue;
+      addSession(stravaActivityToSession(activity));
+      count += 1;
+    }
+    if (count > 0) sessions = loadSessions();
+    settings = { ...settings, strava: { ...settings.strava, lastSyncedAt: Math.floor(Date.now() / 1000) } };
+    saveSettings(settings);
+    return count;
+  });
+  if (imported) renderAll();
+  if (silent) return;
+  if (imported == null) toast(stravaNeedsReconnect ? 'Reconnect needed to sync Strava' : 'Could not sync Strava');
+  else if (imported > 0) toast(`Imported ${imported} run${imported === 1 ? '' : 's'} from Strava`);
+  else toast('No new Strava runs to import');
+}
+
+function renderStravaStatus() {
+  $('stravaClientId').value = settings.strava.clientId;
+  $('stravaProxyUrl').value = settings.strava.proxyUrl;
+  const { enabled } = settings.strava;
+  $('stravaDisconnect').hidden = !enabled;
+  $('stravaSyncNow').hidden = !enabled;
+  if (!enabled) {
+    $('stravaStatus').textContent = 'Not connected.';
+    $('stravaConnect').hidden = false;
+  } else if (stravaNeedsReconnect) {
+    $('stravaStatus').textContent = 'Sync paused - tap Connect to resume.';
+    $('stravaConnect').hidden = false;
+  } else {
+    $('stravaStatus').textContent = 'Connected - importing your runs automatically.';
+    $('stravaConnect').hidden = true;
+  }
+}
+
+$('stravaClientId').addEventListener('change', () => {
+  settings = { ...settings, strava: { ...settings.strava, clientId: $('stravaClientId').value.trim() } };
+  saveSettings(settings);
+});
+$('stravaProxyUrl').addEventListener('change', () => {
+  settings = { ...settings, strava: { ...settings.strava, proxyUrl: $('stravaProxyUrl').value.trim().replace(/\/$/, '') } };
+  saveSettings(settings);
+});
+
+$('stravaConnect').addEventListener('click', () => {
+  const clientId = $('stravaClientId').value.trim();
+  const proxyUrl = $('stravaProxyUrl').value.trim().replace(/\/$/, '');
+  if (!clientId || !proxyUrl) { toast('Fill in both the Client ID and Proxy URL first'); return; }
+  settings = { ...settings, strava: { ...settings.strava, clientId, proxyUrl } };
+  saveSettings(settings);
+  stravaBeginAuthorize(clientId); // navigates away - completeStravaConnectIfRedirected() resumes this on the way back
+});
+
+$('stravaDisconnect').addEventListener('click', () => {
+  if (!confirm('Disconnect Strava? Runs already imported stay in your history - only future auto-import stops.')) return;
+  stravaAccessToken = null;
+  stravaAccessTokenExpiresAt = 0;
+  stravaNeedsReconnect = false;
+  settings = { ...settings, strava: { ...settings.strava, enabled: false, refreshToken: null, athleteId: null } };
+  saveSettings(settings);
+  renderStravaStatus();
+  toast('Disconnected');
+});
+
+$('stravaSyncNow').addEventListener('click', () => { syncStravaRuns(); });
+
+/** Called once at boot. If this page load is Strava sending the user back
+ *  from the consent screen, finishes the OAuth exchange and runs an
+ *  initial backfill sync; otherwise, if already connected, does a quiet
+ *  sync - this is the "automatic" half of the feature, since there's no
+ *  backend to push to the browser: opening the app is what checks for
+ *  anything new since last time. */
+async function completeStravaConnectIfRedirected() {
+  const code = stravaConsumeAuthorizeRedirect();
+  if (!code) {
+    if (settings.strava.enabled) await syncStravaRuns({ silent: true });
+    return;
+  }
+  try {
+    const data = await stravaExchangeCode(settings.strava.proxyUrl, code);
+    stravaAccessToken = data.access_token;
+    stravaAccessTokenExpiresAt = (data.expires_at || 0) * 1000;
+    settings = {
+      ...settings,
+      strava: { ...settings.strava, refreshToken: data.refresh_token, athleteId: data.athlete?.id ?? null, enabled: true },
+    };
+    saveSettings(settings);
+    renderStravaStatus();
+    toast('Connected - importing your runs now…');
+    await syncStravaRuns({ silent: true });
+    renderAll();
+  } catch (err) {
+    console.error('Strava connect failed', err);
+    toast('Could not connect to Strava');
+  }
+}
+
 /* ------------------------------------------------------------- SETTINGS */
 
 function renderSettingsForm() {
@@ -2222,6 +2394,7 @@ function renderSettingsForm() {
   $('sLTHR').value = settings.lthr;
   $('sPrimaryModel').value = settings.primaryZoneModel;
   renderGCalStatus();
+  renderStravaStatus();
 }
 
 $('sTheme').addEventListener('click', (e) => {
@@ -2238,6 +2411,7 @@ $('settingsForm').addEventListener('submit', (e) => {
   settings = {
     theme: settings.theme,
     googleCalendar: settings.googleCalendar,
+    strava: settings.strava,
     profile: {
       name: $('sName').value.trim(),
       dob: $('sDob').value,
@@ -2309,6 +2483,7 @@ resetLogForm();
 renderAll();
 switchView('dashboard');
 resumeLiveWorkoutIfAny();
+completeStravaConnectIfRedirected();
 
 // The boot splash (index.html) has done its job now that the real UI is
 // rendered - fade it out, then drop it from the DOM once the transition

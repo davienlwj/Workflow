@@ -237,6 +237,27 @@
     </details>
 
     <details class="settings-details">
+      <summary class="section-title">Strava sync (via Zepp)</summary>
+      <div class="settings-details-body form">
+        <p class="field-hint">Automatically imports your runs from Strava - enable Zepp's own auto-sync to Strava first (Zepp app → Profile → Add accounts → Strava), then connect that same Strava account here. Runs only - Strava has no equivalent to per-exercise lift data, so workouts still need to be logged by hand. Needs a Strava API app and a small proxy you deploy yourself (free, ~10 min) - see the app's README.</p>
+        <label class="field">
+          <span>Strava Client ID</span>
+          <input id="stravaClientId" type="text" placeholder="e.g. 123456" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>Proxy URL</span>
+          <input id="stravaProxyUrl" type="text" placeholder="https://hybr-strava-proxy.your-name.workers.dev" autocomplete="off" spellcheck="false">
+        </label>
+        <p id="stravaStatus" class="field-hint">Not connected.</p>
+        <div class="actions">
+          <button type="button" id="stravaConnect" class="ghost-btn">Connect</button>
+          <button type="button" id="stravaDisconnect" class="ghost-btn" hidden>Disconnect</button>
+        </div>
+        <button type="button" id="stravaSyncNow" class="ghost-btn block" hidden>Sync runs now</button>
+      </div>
+    </details>
+
+    <details class="settings-details">
       <summary class="section-title">Zones reference</summary>
       <div class="settings-details-body">
         <h2 class="section-title">LTHR-based zones <span id="lthrPrimaryBadge" class="badge" hidden>primary</span></h2>

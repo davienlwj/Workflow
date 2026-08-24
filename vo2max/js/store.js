@@ -33,6 +33,16 @@ export const DEFAULT_SETTINGS = {
     calendarId: '', // id of the app-created "HYBR. Workouts" calendar, cached after first connect
     enabled: false, // true once connected at least once - auto-sync only runs while this is true
   },
+  strava: {
+    clientId: '', // Strava app's Client ID (not secret, pasted by the user)
+    proxyUrl: '', // the user's deployed strava-proxy Worker URL (see strava-proxy/)
+    refreshToken: null, // long-lived - Strava's flow has no silent-reauth equivalent to
+    // Google's, so unlike googleCalendar this has to be persisted to keep syncing
+    // across page loads without asking the user to reconnect every time
+    athleteId: null,
+    enabled: false, // true once connected at least once - auto-sync only runs while this is true
+    lastSyncedAt: null, // unix seconds - incremental syncs only fetch activities after this
+  },
 };
 
 function clone(value) {
@@ -50,6 +60,7 @@ export function loadSettings() {
       ...parsed,
       profile: { ...DEFAULT_SETTINGS.profile, ...(parsed.profile || {}) },
       googleCalendar: { ...DEFAULT_SETTINGS.googleCalendar, ...(parsed.googleCalendar || {}) },
+      strava: { ...DEFAULT_SETTINGS.strava, ...(parsed.strava || {}) },
     };
   } catch {
     return clone(DEFAULT_SETTINGS);

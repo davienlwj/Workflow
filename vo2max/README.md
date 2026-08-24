@@ -97,7 +97,9 @@ Dashboard as the place they come together.
   reps/timing/frequency) is editable here — nothing is hardcoded once you've
   changed it. Export/import a JSON backup (workouts included), or reset to
   defaults. A **Google Calendar sync** section (see below) automatically
-  pushes every run and workout to its own dedicated calendar once connected.
+  pushes every run and workout to its own dedicated calendar once connected,
+  and a **Strava sync** section automatically imports your runs from Strava
+  (e.g. synced there from a Zepp-paired watch) — see below for both.
   Below that, an expandable **Zones & protocol reference**
   section: both the LTHR-based and RHR-based (Karvonen) zone tables, the
   interval target zone highlighted, and a protocol quick-reference card —
@@ -146,6 +148,54 @@ again before syncing resumes — **Sync all now** in Settings re-syncs
 anything that was saved while disconnected. Disconnecting stops future
 syncing but leaves everything already pushed to your calendar untouched.
 
+## Strava sync (for Zepp watches)
+
+There's no public API for pulling data directly out of the Zepp app, but
+Zepp *can* auto-push your workouts to Strava (Profile → Add accounts →
+Strava, inside the Zepp app), and Strava has a real public API — so that's
+the bridge this app uses: connect the same Strava account here, and every
+new **run** on it gets imported automatically, checked each time the app is
+opened. Lifts aren't covered — Strava's data model has no equivalent to
+this app's per-exercise, per-set strength data, so workouts still need to
+be logged by hand regardless.
+
+Unlike Google, Strava's sign-in has no way to hand the browser a token
+directly — the exchange requires a secret that can never be shipped to a
+static site. So this one feature needs a tiny piece of backend: a
+[Cloudflare Worker](https://workers.cloudflare.com/) (free tier is plenty)
+that holds that secret and does nothing else. Setup is two parts, ~10
+minutes total:
+
+**Part 1 — Strava API app:**
+
+1. Go to [strava.com/settings/api](https://www.strava.com/settings/api) and
+   create an API application. **Authorization Callback Domain** should be
+   the domain the app is served from, e.g. `davienlwj.github.io` (no
+   `https://`, no path).
+2. Note the **Client ID** and **Client Secret** it gives you.
+
+**Part 2 — deploy the proxy** (this repo's `vo2max/strava-proxy/` folder):
+
+1. [Sign up for Cloudflare](https://dash.cloudflare.com/sign-up) (free) and
+   install the CLI: `npm install -g wrangler`.
+2. Edit `vo2max/strava-proxy/wrangler.toml`: set `STRAVA_CLIENT_ID` to the
+   Client ID from Part 1, and `ALLOWED_ORIGIN` to your app's origin (e.g.
+   `https://davienlwj.github.io`).
+3. From `vo2max/strava-proxy/`, run `wrangler login`, then
+   `wrangler secret put STRAVA_CLIENT_SECRET` and paste the Client Secret
+   from Part 1 when prompted (this keeps it out of source entirely).
+4. `wrangler deploy` — copy the `*.workers.dev` URL it prints out.
+
+**Part 3 — connect from the app:**
+
+In Settings → Strava sync, paste the Client ID and the Worker URL from
+above, then tap **Connect** and approve access. Your run history from the
+last 90 days imports automatically right after connecting; every app open
+after that checks for anything new since the last sync.
+
+Like Google Calendar sync, disconnecting stops future imports but leaves
+already-imported runs in your history untouched.
+
 ## Zone math
 
 Both zone tables are computed live from your HR settings, not stored as
@@ -177,6 +227,10 @@ js/chart.js                 dependency-free SVG charts: VO2max trend, mileage ba
 js/ics.js                   builds a per-session .ics file for calendar export, and the shared
                               summary/description text + event resources used by gcal.js
 js/gcal.js                  Google Identity Services auth + Calendar API calls for automatic sync
+js/strava.js                 Strava OAuth (via strava-proxy/) + activity fetch/mapping for run import
+strava-proxy/                the one piece of backend this app needs - a Cloudflare Worker holding
+                              Strava's OAuth client secret, deployed separately (see the README's
+                              Strava sync section)
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/icon-source.jpg        the hand-drawn mark the app icons are built from

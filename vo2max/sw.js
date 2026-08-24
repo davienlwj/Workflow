@@ -1,6 +1,6 @@
 /* HYBR. - offline shell. Bump CACHE when the app files change. */
 
-const CACHE = 'vo2max-v69';
+const CACHE = 'vo2max-v70';
 
 const SHELL = [
   './',
@@ -15,6 +15,7 @@ const SHELL = [
   './js/ics.js',
   './js/muscleDiagram.js',
   './js/store.js',
+  './js/strava.js',
   './js/workout.js',
   './js/zones.js',
   './manifest.webmanifest',

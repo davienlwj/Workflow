@@ -1,0 +1,11 @@
+name = "hybr-strava-proxy"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# Not secret - fine to commit. Fill these in for your own deployment.
+[vars]
+STRAVA_CLIENT_ID = "your-strava-client-id"
+ALLOWED_ORIGIN = "https://your-username.github.io"
+
+# STRAVA_CLIENT_SECRET is set separately as a real secret, never here:
+#   wrangler secret put STRAVA_CLIENT_SECRET
