@@ -211,6 +211,46 @@ function sessionTypeOf(session) {
   return session.type ?? 'interval';
 }
 
+// Warm up / cool down are optional phases toggled on/off per session, each
+// with its own pace/distance/HR readings kept separate from the main run's
+// - both the Log and Edit forms repeat the same `${prefix}${phase}Field` id
+// pattern, so one set of helpers drives all four toggle+fieldset pairs.
+function readPhaseFields(prefix, phase) {
+  if (!$(`${prefix}${phase}Toggle`).checked) return null;
+  return {
+    avgPace: parsePaceMinKm($(`${prefix}${phase}AvgPace`).value),
+    distanceKm: numOrNull($(`${prefix}${phase}DistanceKm`).value),
+    avgHR: numOrNull($(`${prefix}${phase}AvgHR`).value),
+    maxHR: numOrNull($(`${prefix}${phase}MaxHR`).value),
+  };
+}
+
+function resetPhaseFields(prefix, phase) {
+  $(`${prefix}${phase}Toggle`).checked = false;
+  $(`${prefix}${phase}Fields`).hidden = true;
+  $(`${prefix}${phase}AvgPace`).value = '';
+  $(`${prefix}${phase}DistanceKm`).value = '';
+  $(`${prefix}${phase}AvgHR`).value = '';
+  $(`${prefix}${phase}MaxHR`).value = '';
+}
+
+function populatePhaseFields(prefix, phase, data) {
+  $(`${prefix}${phase}Toggle`).checked = Boolean(data);
+  $(`${prefix}${phase}Fields`).hidden = !data;
+  $(`${prefix}${phase}AvgPace`).value = data ? formatPaceMinKm(data.avgPace) : '';
+  $(`${prefix}${phase}DistanceKm`).value = data?.distanceKm ?? '';
+  $(`${prefix}${phase}AvgHR`).value = data?.avgHR ?? '';
+  $(`${prefix}${phase}MaxHR`).value = data?.maxHR ?? '';
+}
+
+for (const prefix of ['log', 'edit']) {
+  for (const phase of ['Warmup', 'Cooldown']) {
+    $(`${prefix}${phase}Toggle`).addEventListener('change', () => {
+      $(`${prefix}${phase}Fields`).hidden = !$(`${prefix}${phase}Toggle`).checked;
+    });
+  }
+}
+
 function resetLogForm() {
   $('logDate').value = todayIso();
   $('logType').value = 'interval';
@@ -219,6 +259,8 @@ function resetLogForm() {
   $('logDistanceKm').value = '';
   $('logRunAvgHR').value = '';
   $('logRunMaxHR').value = '';
+  resetPhaseFields('log', 'Warmup');
+  resetPhaseFields('log', 'Cooldown');
   $('logRPE').value = 6;
   $('logRPEOut').textContent = '6';
   $('logNotes').value = '';
@@ -250,6 +292,8 @@ function readSessionForm(prefix) {
     distanceKm: numOrNull($(`${prefix}DistanceKm`).value),
     avgHR: numOrNull($(`${prefix}RunAvgHR`).value),
     maxHR: numOrNull($(`${prefix}RunMaxHR`).value),
+    warmup: readPhaseFields(prefix, 'Warmup'),
+    cooldown: readPhaseFields(prefix, 'Cooldown'),
   };
 }
 
@@ -616,6 +660,8 @@ function openEditSheet(session) {
   $('editDistanceKm').value = session.distanceKm ?? '';
   $('editRunAvgHR').value = session.avgHR ?? '';
   $('editRunMaxHR').value = session.maxHR ?? '';
+  populatePhaseFields('edit', 'Warmup', session.warmup);
+  populatePhaseFields('edit', 'Cooldown', session.cooldown);
   $('editRPE').value = session.rpe;
   $('editRPEOut').textContent = String(session.rpe);
   $('editVO2max').value = session.vo2max ?? '';

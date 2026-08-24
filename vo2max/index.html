@@ -271,6 +271,33 @@
       </select>
     </label>
 
+    <label class="field field-toggle">
+      <span>Warm up</span>
+      <input id="editWarmupToggle" type="checkbox">
+    </label>
+    <div id="editWarmupFields" class="form" hidden>
+      <div class="row">
+        <label class="field">
+          <span>Avg pace (min/km)</span>
+          <input id="editWarmupAvgPace" type="text" placeholder="e.g. 6:30">
+        </label>
+        <label class="field">
+          <span>Distance (km)</span>
+          <input id="editWarmupDistanceKm" type="number" step="0.01" min="0">
+        </label>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>Average HR</span>
+          <input id="editWarmupAvgHR" type="number" min="60" max="230">
+        </label>
+        <label class="field">
+          <span>Max HR</span>
+          <input id="editWarmupMaxHR" type="number" min="60" max="230">
+        </label>
+      </div>
+    </div>
+
     <div id="editRunFields" class="form">
       <div class="row">
         <label class="field">
@@ -294,6 +321,33 @@
         <label class="field">
           <span>Max HR</span>
           <input id="editRunMaxHR" type="number" min="60" max="230">
+        </label>
+      </div>
+    </div>
+
+    <label class="field field-toggle">
+      <span>Cool down</span>
+      <input id="editCooldownToggle" type="checkbox">
+    </label>
+    <div id="editCooldownFields" class="form" hidden>
+      <div class="row">
+        <label class="field">
+          <span>Avg pace (min/km)</span>
+          <input id="editCooldownAvgPace" type="text" placeholder="e.g. 6:45">
+        </label>
+        <label class="field">
+          <span>Distance (km)</span>
+          <input id="editCooldownDistanceKm" type="number" step="0.01" min="0">
+        </label>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>Average HR</span>
+          <input id="editCooldownAvgHR" type="number" min="60" max="230">
+        </label>
+        <label class="field">
+          <span>Max HR</span>
+          <input id="editCooldownMaxHR" type="number" min="60" max="230">
         </label>
       </div>
     </div>
@@ -351,6 +405,33 @@
       </select>
     </label>
 
+    <label class="field field-toggle">
+      <span>Warm up</span>
+      <input id="logWarmupToggle" type="checkbox">
+    </label>
+    <div id="logWarmupFields" class="form" hidden>
+      <div class="row">
+        <label class="field">
+          <span>Avg pace (min/km)</span>
+          <input id="logWarmupAvgPace" type="text" placeholder="e.g. 6:30">
+        </label>
+        <label class="field">
+          <span>Distance (km)</span>
+          <input id="logWarmupDistanceKm" type="number" step="0.01" min="0" placeholder="e.g. 1.00">
+        </label>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>Average HR</span>
+          <input id="logWarmupAvgHR" type="number" min="60" max="230" placeholder="bpm">
+        </label>
+        <label class="field">
+          <span>Max HR</span>
+          <input id="logWarmupMaxHR" type="number" min="60" max="230" placeholder="bpm">
+        </label>
+      </div>
+    </div>
+
     <div id="logRunFields" class="form">
       <div class="row">
         <label class="field">
@@ -374,6 +455,33 @@
         <label class="field">
           <span>Max HR</span>
           <input id="logRunMaxHR" type="number" min="60" max="230" placeholder="bpm">
+        </label>
+      </div>
+    </div>
+
+    <label class="field field-toggle">
+      <span>Cool down</span>
+      <input id="logCooldownToggle" type="checkbox">
+    </label>
+    <div id="logCooldownFields" class="form" hidden>
+      <div class="row">
+        <label class="field">
+          <span>Avg pace (min/km)</span>
+          <input id="logCooldownAvgPace" type="text" placeholder="e.g. 6:45">
+        </label>
+        <label class="field">
+          <span>Distance (km)</span>
+          <input id="logCooldownDistanceKm" type="number" step="0.01" min="0" placeholder="e.g. 1.00">
+        </label>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>Average HR</span>
+          <input id="logCooldownAvgHR" type="number" min="60" max="230" placeholder="bpm">
+        </label>
+        <label class="field">
+          <span>Max HR</span>
+          <input id="logCooldownMaxHR" type="number" min="60" max="230" placeholder="bpm">
         </label>
       </div>
     </div>
