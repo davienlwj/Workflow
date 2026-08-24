@@ -1174,8 +1174,9 @@ button { font-family: var(--font-mono); }
 
 /* The search input sits directly above this list with no flex/gap wrapper
    between them (unlike .wo-picker's search field, spaced by its own
-   flex gap), so it needs its own breathing room here. */
-#exerciseSearchInput { margin-bottom: 12px; }
+   flex gap), so it needs its own breathing room here - 8px, matching
+   every other "list-adjacent element" gap (.wo-add-set, #addRoutineTabBtn). */
+#exerciseSearchInput { margin-bottom: 8px; }
 
 .exercise-summary-list {
   display: flex;
