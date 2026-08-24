@@ -224,6 +224,15 @@ export function addRoutine(routine) {
   return record;
 }
 
+export function updateRoutine(id, patch) {
+  const routines = loadRoutines();
+  const idx = routines.findIndex((r) => r.id === id);
+  if (idx === -1) return null;
+  routines[idx] = { ...routines[idx], ...patch, id };
+  saveRoutines(routines);
+  return routines[idx];
+}
+
 export function deleteRoutine(id) {
   const routines = loadRoutines().filter((r) => r.id !== id);
   saveRoutines(routines);

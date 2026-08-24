@@ -4,7 +4,7 @@ import {
   loadWorkouts, addWorkout, updateWorkout, deleteWorkout,
   loadCustomExercises, addCustomExercise, deleteCustomExercise, updateCustomExercise,
   loadLiveWorkout, saveLiveWorkout, clearLiveWorkout,
-  loadRoutines, addRoutine, deleteRoutine,
+  loadRoutines, addRoutine, updateRoutine, deleteRoutine,
   loadCustomBrands, addCustomBrand,
   exportAll, importAll,
 } from './store.js';
@@ -44,7 +44,7 @@ import {
   loggedExerciseIds, daysSinceLastWorkout, volumeSince,
   muscleSetBreakdown, muscleSetBreakdownDetailed, workoutSummaryByExercise,
 } from './workout.js';
-import { runIconSVG, dumbbellIconSVG } from './icons.js';
+import { runIconSVG, dumbbellIconSVG, swapIconSVG } from './icons.js';
 
 let settings = loadSettings();
 
@@ -80,6 +80,9 @@ let lastFinishedWorkout = null; // set by openWorkoutSummarySheet, read by "Save
 let lastFinishedDurationMs = 0; // set by openWorkoutSummarySheet, read by "Share image"
 let lastFinishedNewPRs = []; // set by openWorkoutSummarySheet, read by "Share image"
 let routineSelectedIds = []; // exercise ids chosen so far in the open routine builder
+let editingRoutineId = null; // id of the routine being edited, or null when creating a new one
+let swappingIndex = null; // index in routineSelectedIds currently being replaced via the picker, or null
+let routineDrag = null; // { id, pointerId, longPressTimer, startX, startY, dragging } while reordering
 
 const $ = (id) => document.getElementById(id);
 
@@ -1555,6 +1558,7 @@ function routineRowHTML(routine) {
         </div>
         <div class="history-meta"><span>${count} exercise${count === 1 ? '' : 's'}</span></div>
       </button>
+      <button type="button" class="routine-edit" data-id="${routine.id}" aria-label="Edit routine">✎</button>
       <button type="button" class="routine-delete" data-id="${routine.id}" aria-label="Delete routine">✕</button>
     </li>
   `;
@@ -1585,6 +1589,14 @@ function closeRoutinesSheet() {
 $('routinesClose').addEventListener('click', closeRoutinesSheet);
 
 $('routinesList').addEventListener('click', (e) => {
+  const editBtn = e.target.closest('.routine-edit');
+  if (editBtn) {
+    const routine = routines.find((r) => r.id === editBtn.dataset.id);
+    if (!routine) return;
+    closeRoutinesSheet();
+    openRoutineBuilderSheet(routine.exerciseIds, routine);
+    return;
+  }
   const deleteBtn = e.target.closest('.routine-delete');
   if (deleteBtn) {
     if (!confirm('Delete this routine?')) return;
@@ -1608,6 +1620,13 @@ $('addRoutineBtn').addEventListener('click', () => {
 });
 
 $('routinesTabList').addEventListener('click', (e) => {
+  const editBtn = e.target.closest('.routine-edit');
+  if (editBtn) {
+    const routine = routines.find((r) => r.id === editBtn.dataset.id);
+    if (!routine) return;
+    openRoutineBuilderSheet(routine.exerciseIds, routine);
+    return;
+  }
   const deleteBtn = e.target.closest('.routine-delete');
   if (deleteBtn) {
     if (!confirm('Delete this routine?')) return;
@@ -1633,17 +1652,24 @@ function renderRoutinePickerChips() {
   $('routinePickerChips').innerHTML = MUSCLES.map((m) => `<button type="button" class="chip" data-muscle="${m}">${MUSCLE_LABEL[m]}</button>`).join('');
 }
 
+/** Renders the routine builder's picked-exercise list. Each row is
+ *  long-press draggable to reorder (see the pointer handlers below), and
+ *  carries a swap button that lets the picker below replace just that
+ *  slot's exercise in place instead of removing and re-adding it (which
+ *  would lose its position in the order). */
 function renderRoutineSelectedList() {
   $('routineSelectedEmpty').hidden = routineSelectedIds.length > 0;
-  $('routineSelectedList').innerHTML = routineSelectedIds.map((id) => {
+  $('routineSelectedList').innerHTML = routineSelectedIds.map((id, idx) => {
     const ex = findExercise(id);
     if (!ex) return '';
     return `
-      <div class="routine-selected-item">
-        <div>
+      <div class="routine-selected-item${idx === swappingIndex ? ' swapping' : ''}" data-id="${id}">
+        <span class="routine-drag-handle" aria-hidden="true">⠿</span>
+        <div class="routine-selected-info">
           <div class="wo-exercise-name">${escapeHTML(ex.name)}</div>
           <div class="wo-exercise-meta">${escapeHTML(exerciseMetaText(ex))}</div>
         </div>
+        <button type="button" class="routine-selected-swap" data-id="${id}" aria-label="Swap exercise">${swapIconSVG()}</button>
         <button type="button" class="routine-selected-remove" data-id="${id}" aria-label="Remove exercise">✕</button>
       </div>
     `;
@@ -1710,12 +1736,19 @@ $('routineNewExSave').addEventListener('click', () => {
   toast('Exercise added');
 });
 
-/** Opens the routine builder blank, or pre-seeded with `exerciseIds` (used
- *  by "Save as Routine" on the finish-workout summary). */
-function openRoutineBuilderSheet(exerciseIds = []) {
+/** Opens the routine builder blank or pre-seeded with `exerciseIds` (used
+ *  by "Save as Routine" on the finish-workout summary), or in edit mode
+ *  for an existing routine when `editingRoutine` is passed (its own
+ *  exerciseIds are what should be passed as `exerciseIds` too). */
+function openRoutineBuilderSheet(exerciseIds = [], editingRoutine = null) {
   routineSelectedIds = [...new Set(exerciseIds)];
-  $('routineName').value = '';
+  editingRoutineId = editingRoutine?.id ?? null;
+  swappingIndex = null;
+  $('routineBuilderTitle').textContent = editingRoutine ? 'Edit Routine' : 'New Routine';
+  $('routineSave').textContent = editingRoutine ? 'Save changes' : 'Save routine';
+  $('routineName').value = editingRoutine?.name ?? '';
   $('routinePickerSearch').value = '';
+  $('routinePickerHint').hidden = true;
   renderRoutinePickerChips();
   renderRoutineSelectedList();
   renderRoutinePickerResults();
@@ -1726,6 +1759,9 @@ function openRoutineBuilderSheet(exerciseIds = []) {
 }
 
 function closeRoutineBuilderSheet() {
+  cancelRoutineDrag();
+  editingRoutineId = null;
+  swappingIndex = null;
   $('scrim').hidden = true;
   $('routineBuilderSheet').hidden = true;
 }
@@ -1747,6 +1783,15 @@ $('routinePickerResults').addEventListener('click', (e) => {
   const btn = e.target.closest('.wo-picker-result');
   if (!btn) return;
   const id = btn.dataset.id;
+  if (swappingIndex != null) {
+    if (routineSelectedIds.includes(id)) { toast('Already in this routine'); return; }
+    routineSelectedIds[swappingIndex] = id;
+    swappingIndex = null;
+    $('routinePickerHint').hidden = true;
+    renderRoutineSelectedList();
+    renderRoutinePickerResults();
+    return;
+  }
   const idx = routineSelectedIds.indexOf(id);
   if (idx === -1) routineSelectedIds.push(id); else routineSelectedIds.splice(idx, 1);
   renderRoutineSelectedList();
@@ -1754,23 +1799,100 @@ $('routinePickerResults').addEventListener('click', (e) => {
 });
 
 $('routineSelectedList').addEventListener('click', (e) => {
-  const btn = e.target.closest('.routine-selected-remove');
-  if (!btn) return;
-  routineSelectedIds = routineSelectedIds.filter((id) => id !== btn.dataset.id);
+  const swapBtn = e.target.closest('.routine-selected-swap');
+  if (swapBtn) {
+    const idx = routineSelectedIds.indexOf(swapBtn.dataset.id);
+    if (idx === -1) return;
+    swappingIndex = idx;
+    const ex = findExercise(swapBtn.dataset.id);
+    $('routinePickerHint').textContent = `Tap an exercise below to replace "${ex?.name ?? 'this exercise'}"`;
+    $('routinePickerHint').hidden = false;
+    renderRoutineSelectedList();
+    $('routinePickerSearch').focus();
+    return;
+  }
+  const removeBtn = e.target.closest('.routine-selected-remove');
+  if (!removeBtn) return;
+  routineSelectedIds = routineSelectedIds.filter((id) => id !== removeBtn.dataset.id);
+  if (swappingIndex != null) { swappingIndex = null; $('routinePickerHint').hidden = true; }
   renderRoutineSelectedList();
   renderRoutinePickerResults();
 });
+
+/** Long-press-and-drag reordering for the routine builder's selected-
+ *  exercise list, via Pointer Events (works for touch and mouse alike,
+ *  unlike HTML5 drag-and-drop which mobile Safari doesn't support). A
+ *  350ms hold confirms the drag is intentional rather than a scroll/tap;
+ *  each time the pointer crosses into a sibling row, that row swaps
+ *  places with the dragged one and the list re-renders around it. */
+const ROUTINE_DRAG_HOLD_MS = 350;
+const ROUTINE_DRAG_CANCEL_PX = 10;
+
+function cancelRoutineDrag() {
+  if (routineDrag?.longPressTimer) clearTimeout(routineDrag.longPressTimer);
+  if (routineDrag?.dragging) {
+    $('routineSelectedList').querySelectorAll('.routine-selected-item.dragging')
+      .forEach((el) => el.classList.remove('dragging'));
+  }
+  routineDrag = null;
+}
+
+$('routineSelectedList').addEventListener('pointerdown', (e) => {
+  if (e.target.closest('button')) return; // remove/swap buttons behave normally
+  const item = e.target.closest('.routine-selected-item');
+  if (!item) return;
+  const id = item.dataset.id;
+  const pointerId = e.pointerId;
+  const longPressTimer = setTimeout(() => {
+    if (!routineDrag || routineDrag.id !== id) return;
+    routineDrag.dragging = true;
+    const el = $('routineSelectedList').querySelector(`.routine-selected-item[data-id="${CSS.escape(id)}"]`);
+    el?.classList.add('dragging');
+    el?.setPointerCapture(pointerId);
+  }, ROUTINE_DRAG_HOLD_MS);
+  routineDrag = { id, pointerId, longPressTimer, startX: e.clientX, startY: e.clientY, dragging: false };
+});
+
+$('routineSelectedList').addEventListener('pointermove', (e) => {
+  if (!routineDrag || routineDrag.pointerId !== e.pointerId) return;
+  if (!routineDrag.dragging) {
+    const dx = Math.abs(e.clientX - routineDrag.startX);
+    const dy = Math.abs(e.clientY - routineDrag.startY);
+    if (dx > ROUTINE_DRAG_CANCEL_PX || dy > ROUTINE_DRAG_CANCEL_PX) cancelRoutineDrag();
+    return;
+  }
+  e.preventDefault();
+  const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.routine-selected-item');
+  if (!target || target.dataset.id === routineDrag.id) return;
+  const fromIdx = routineSelectedIds.indexOf(routineDrag.id);
+  const toIdx = routineSelectedIds.indexOf(target.dataset.id);
+  if (fromIdx === -1 || toIdx === -1) return;
+  routineSelectedIds.splice(fromIdx, 1);
+  routineSelectedIds.splice(toIdx, 0, routineDrag.id);
+  renderRoutineSelectedList();
+  const revived = $('routineSelectedList').querySelector(`.routine-selected-item[data-id="${CSS.escape(routineDrag.id)}"]`);
+  revived?.classList.add('dragging');
+  revived?.setPointerCapture(routineDrag.pointerId);
+});
+
+$('routineSelectedList').addEventListener('pointerup', cancelRoutineDrag);
+$('routineSelectedList').addEventListener('pointercancel', cancelRoutineDrag);
 
 $('routineForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const name = $('routineName').value.trim();
   if (!name) { toast('Enter a routine name'); return; }
   if (routineSelectedIds.length === 0) { toast('Add at least one exercise'); return; }
-  addRoutine({ name, exerciseIds: routineSelectedIds });
+  if (editingRoutineId) {
+    updateRoutine(editingRoutineId, { name, exerciseIds: routineSelectedIds });
+  } else {
+    addRoutine({ name, exerciseIds: routineSelectedIds });
+  }
   routines = loadRoutines();
   renderRoutinesList();
+  const wasEditing = Boolean(editingRoutineId);
   closeRoutineBuilderSheet();
-  toast('Routine saved');
+  toast(wasEditing ? 'Routine updated' : 'Routine saved');
 });
 
 /** @param {ReturnType<typeof newPRsInWorkout>} [newPRs] shown as a

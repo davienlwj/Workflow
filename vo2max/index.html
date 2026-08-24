@@ -629,7 +629,7 @@
 <!-- Routine builder sheet (popup, name + pick exercises, opened from Routines or "Save as Routine") -->
 <section id="routineBuilderSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="New routine">
   <div class="grabber"></div>
-  <h2 class="view-title">New Routine</h2>
+  <h2 id="routineBuilderTitle" class="view-title">New Routine</h2>
   <form id="routineForm" class="form">
     <label class="field">
       <span>Routine name</span>
@@ -639,6 +639,7 @@
     <div id="routineSelectedList" class="routine-selected-list"></div>
     <p id="routineSelectedEmpty" class="empty" hidden>No exercises picked yet — search below to add some.</p>
 
+    <p id="routinePickerHint" class="wo-picker-hint" hidden></p>
     <input id="routinePickerSearch" type="text" class="wo-picker-search" placeholder="Search exercises…">
     <div id="routinePickerChips" class="wo-picker-chips"></div>
     <button type="button" id="routineNewExerciseBtn" class="ghost-btn block">+ Create new exercise</button>

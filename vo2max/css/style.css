@@ -835,7 +835,7 @@ button { font-family: var(--font-mono); }
 #routinesSectionTitle { margin-bottom: 16px; }
 #addRoutineTabBtn { margin-top: 8px; }
 
-.routine-delete {
+.routine-delete, .routine-edit {
   background: transparent;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -860,11 +860,33 @@ button { font-family: var(--font-mono); }
   padding: 8px 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
+  /* Long-press drag reads the pointer's own movement (see the pointer
+     handlers) - touch-action:none stops the browser also trying to
+     scroll/zoom the sheet underneath the same gesture. */
+  touch-action: none;
+  user-select: none;
 }
 
-.routine-selected-remove {
+.routine-selected-item.dragging {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  border-color: var(--accent);
+  position: relative;
+  z-index: 1;
+}
+
+.routine-selected-item.swapping { border-color: #FF6C2D; }
+
+.routine-drag-handle {
+  color: var(--dimmer);
+  font-size: 18px;
+  flex-shrink: 0;
+  cursor: grab;
+}
+
+.routine-selected-info { flex: 1; min-width: 0; }
+
+.routine-selected-remove, .routine-selected-swap {
   background: transparent;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -874,7 +896,12 @@ button { font-family: var(--font-mono); }
   font-size: 13px;
   line-height: 1;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+.routine-selected-swap .glyph-swap { width: 14px; height: 14px; color: var(--dim); }
 
 .wo-picker-result.selected {
   background: var(--accent);

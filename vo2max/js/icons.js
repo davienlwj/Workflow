@@ -38,3 +38,14 @@ export function dumbbellIconSVG(extraClass = '') {
     <path d="${DUMBBELL_PATH_D}" fill="currentColor" fill-rule="evenodd"/>
   </svg>`;
 }
+
+// Plain stroke-based double-headed arrow (bar + two arrowheads), used for
+// the "swap exercise" button. Drawn as strokes rather than reusing a
+// Unicode arrow character - some platforms render arrow codepoints via a
+// color emoji fallback font even with a text-presentation selector, which
+// looks out of place next to the app's flat monochrome icon buttons.
+export function swapIconSVG(extraClass = '') {
+  return `<svg viewBox="0 0 24 24" class="glyph-icon glyph-swap ${extraClass}" xmlns="${NS}" aria-hidden="true">
+    <path d="M4,12 L20,12 M4,12 L8,8 M4,12 L8,16 M20,12 L16,8 M20,12 L16,16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
