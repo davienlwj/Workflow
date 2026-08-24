@@ -1123,7 +1123,7 @@ button { font-family: var(--font-mono); }
 .settings-details summary::after {
   content: '+';
   font-size: 16px;
-  color: var(--dim);
+  color: #FF6C2D;
 }
 
 .settings-details[open] summary::after { content: '−'; }
