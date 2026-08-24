@@ -617,16 +617,16 @@ function renderDashboard() {
   const mileageThisWeek = weekBuckets.length ? weekBuckets[weekBuckets.length - 1].km : 0;
 
   const tiles = [
-    [String(sessions.length), 'Runs logged'],
-    [String(workouts.length), 'Workouts logged'],
-    [`${mileageThisWeek} km`, 'Mileage this week'],
-    [`${volumeSince(workouts, 7, todayIso(), allExercises(), bodyweightKg())} kg`, 'Volume this week'],
-    [daysSinceRun != null ? String(daysSinceRun) : '—', 'Days since last run'],
-    [daysSinceWorkout != null ? String(daysSinceWorkout) : '—', 'Days since last workout'],
+    [String(sessions.length), 'Runs logged', true],
+    [String(workouts.length), 'Workouts logged', true],
+    [`${mileageThisWeek} km`, 'Mileage this week', true],
+    [`${volumeSince(workouts, 7, todayIso(), allExercises(), bodyweightKg())} kg`, 'Volume this week', true],
+    [daysSinceRun != null ? String(daysSinceRun) : '—', 'Days since last run', false],
+    [daysSinceWorkout != null ? String(daysSinceWorkout) : '—', 'Days since last workout', false],
   ];
-  const plainTilesHTML = tiles.map(([value, label]) => `
+  const plainTilesHTML = tiles.map(([value, label, accent]) => `
     <div class="stat-tile">
-      <div class="stat-value mono">${value}</div>
+      <div class="stat-value mono${accent ? ' stat-value-accent' : ''}">${value}</div>
       <div class="stat-label">${label}</div>
     </div>
   `).join('');
