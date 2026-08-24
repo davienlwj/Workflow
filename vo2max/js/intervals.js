@@ -13,11 +13,12 @@
  * Strava API subscription Strava now charges developers never applies to
  * an individual user going through intervals.icu.
  *
- * Read-only and one-way: activities are never modified on intervals.icu's
- * side, only pulled into local sessions. Only run-type activities are
- * imported - like Strava, intervals.icu has no equivalent to this app's
- * per-exercise, per-set strength data, so lift workouts still need to be
- * logged by hand.
+ * Read-only and one-way: nothing is ever modified on intervals.icu's side,
+ * only pulled in. Only run-type activities are imported - like Strava,
+ * intervals.icu has no equivalent to this app's per-exercise, per-set
+ * strength data, so lift workouts still need to be logged by hand. Daily
+ * wellness data (resting HR, sleep) is also read-only, shown as Dashboard
+ * stat tiles rather than stored as its own history.
  */
 
 const API_BASE = 'https://intervals.icu/api/v1';
@@ -30,16 +31,10 @@ function authHeader(apiKey) {
   return `Basic ${btoa(`API_KEY:${apiKey}`)}`;
 }
 
-/** Every activity on/after `oldestIso` (a YYYY-MM-DD date - intervals.icu's
- *  `oldest` param takes a date, not a unix timestamp), most recent first.
- *  Throws on an invalid Athlete ID/API Key (401/403/404) so callers can
- *  surface that immediately when the user hits Connect. */
-export async function listActivities(athleteId, apiKey, oldestIso) {
-  const params = new URLSearchParams({ oldest: oldestIso });
-  const url = `${API_BASE}/athlete/${encodeURIComponent(athleteId)}/activities?${params}`;
+async function apiGet(path, apiKey) {
   let res;
   try {
-    res = await fetch(url, { headers: { Authorization: authHeader(apiKey) } });
+    res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: authHeader(apiKey) } });
   } catch (err) {
     // fetch() throws (rather than resolving with a non-ok response) when no
     // response came back at all - offline, or the browser refused to even
@@ -59,8 +54,41 @@ export async function listActivities(athleteId, apiKey, oldestIso) {
   return res.json();
 }
 
+/** Every activity on/after `oldestIso` (a YYYY-MM-DD date - intervals.icu's
+ *  `oldest` param takes a date, not a unix timestamp), most recent first.
+ *  Throws on an invalid Athlete ID/API Key (401/403/404) so callers can
+ *  surface that immediately when the user hits Connect. */
+export async function listActivities(athleteId, apiKey, oldestIso) {
+  const params = new URLSearchParams({ oldest: oldestIso });
+  return apiGet(`/athlete/${encodeURIComponent(athleteId)}/activities?${params}`, apiKey);
+}
+
 export function isRunActivity(activity) {
   return RUN_TYPES.has(activity.type);
+}
+
+/** Most recent resting HR and sleep duration from intervals.icu's daily
+ *  wellness log, looking back up to `lookbackDays` (a watch doesn't always
+ *  sync same-day, so this covers a small gap rather than only checking
+ *  today). Each field independently falls back to the most recent day
+ *  that actually has it, and comes back null if it never shows up in the
+ *  window at all. */
+export async function fetchRecentWellness(athleteId, apiKey, lookbackDays = 7) {
+  const newest = new Date();
+  const oldest = new Date();
+  oldest.setDate(oldest.getDate() - lookbackDays);
+  const params = new URLSearchParams({
+    oldest: oldest.toISOString().slice(0, 10),
+    newest: newest.toISOString().slice(0, 10),
+  });
+  const entries = await apiGet(`/athlete/${encodeURIComponent(athleteId)}/wellness?${params}`, apiKey);
+  const sorted = [...(entries || [])].sort((a, b) => (b.id || '').localeCompare(a.id || ''));
+  const restingHR = sorted.find((e) => e.restingHR != null)?.restingHR ?? null;
+  const sleepSecs = sorted.find((e) => e.sleepSecs != null)?.sleepSecs ?? null;
+  return {
+    restingHR: restingHR != null ? Math.round(restingHR) : null,
+    sleepHours: sleepSecs != null ? Math.round((sleepSecs / 3600) * 10) / 10 : null,
+  };
 }
 
 function round2(n) {

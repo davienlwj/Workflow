@@ -39,6 +39,9 @@ export const DEFAULT_SETTINGS = {
     enabled: false, // true once connected at least once - auto-sync only runs while this is true
     lastSyncedAt: null, // YYYY-MM-DD - intervals.icu's `oldest` param takes a date, not a
     // timestamp; incremental syncs only fetch activities on/after this
+    wellness: { restingHR: null, sleepHours: null }, // last-known values, refreshed on
+    // every app open while connected - cached here (rather than re-fetched only when
+    // needed) so the Dashboard has something to show immediately, even offline
   },
 };
 

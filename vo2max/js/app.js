@@ -27,6 +27,7 @@ import {
   listActivities as intervalsListActivities,
   isRunActivity as isIntervalsRunActivity,
   activityToSession as intervalsActivityToSession,
+  fetchRecentWellness as intervalsFetchRecentWellness,
 } from './intervals.js';
 import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
@@ -601,14 +602,21 @@ function renderDashboard() {
   const weekBuckets = mileageBuckets(sessions, 'week');
   const mileageThisWeek = weekBuckets.length ? weekBuckets[weekBuckets.length - 1].km : 0;
 
-  $('dashStatGrid').innerHTML = [
+  const tiles = [
     [String(sessions.length), 'Runs logged'],
     [String(workouts.length), 'Workouts logged'],
     [`${mileageThisWeek} km`, 'Mileage this week'],
     [`${volumeSince(workouts, 7, todayIso(), allExercises(), bodyweightKg())} kg`, 'Volume this week'],
     [daysSinceRun != null ? String(daysSinceRun) : '—', 'Days since last run'],
     [daysSinceWorkout != null ? String(daysSinceWorkout) : '—', 'Days since last workout'],
-  ].map(([value, label]) => `
+  ];
+  // Only shown once connected and something has actually come back from a
+  // sync - no empty placeholder tiles for a feature that isn't set up.
+  const wellness = settings.intervals.enabled ? settings.intervals.wellness : null;
+  if (wellness?.restingHR != null) tiles.push([`${wellness.restingHR} bpm`, 'Resting HR']);
+  if (wellness?.sleepHours != null) tiles.push([`${wellness.sleepHours} h`, 'Sleep']);
+
+  $('dashStatGrid').innerHTML = tiles.map(([value, label]) => `
     <div class="stat-tile">
       <div class="stat-value mono">${value}</div>
       <div class="stat-label">${label}</div>
@@ -2266,6 +2274,24 @@ async function syncIntervalsRuns({ silent = false } = {}) {
   else toast('No new runs to import');
 }
 
+/** Refreshes the cached resting HR / sleep shown as Dashboard stat tiles.
+ *  Always silent (no toast, no reconnect-state changes) since it's a
+ *  supplementary enrichment alongside the real sync above, not its own
+ *  user-facing action - a failure here just means the tiles keep showing
+ *  whatever was cached from the last successful check. */
+async function syncIntervalsWellness() {
+  const s = settings.intervals;
+  if (!s?.enabled || !s?.athleteId || !s?.apiKey) return;
+  try {
+    const wellness = await intervalsFetchRecentWellness(s.athleteId, s.apiKey);
+    settings = { ...settings, intervals: { ...settings.intervals, wellness } };
+    saveSettings(settings);
+    renderDashboard();
+  } catch (err) {
+    console.error('intervals.icu wellness sync failed', err);
+  }
+}
+
 function renderIntervalsStatus() {
   $('intervalsAthleteId').value = settings.intervals.athleteId;
   $('intervalsApiKey').value = settings.intervals.apiKey;
@@ -2305,6 +2331,7 @@ $('intervalsConnect').addEventListener('click', async () => {
     intervalsNeedsReconnect = false;
     renderAll();
     renderIntervalsStatus();
+    syncIntervalsWellness();
     toast(imported > 0 ? `Connected - imported ${imported} run${imported === 1 ? '' : 's'}` : 'Connected - no runs to import yet');
   } catch (err) {
     console.error('intervals.icu connect failed', err);
@@ -2320,6 +2347,7 @@ $('intervalsDisconnect').addEventListener('click', () => {
   settings = { ...settings, intervals: { ...settings.intervals, enabled: false } };
   saveSettings(settings);
   renderIntervalsStatus();
+  renderDashboard(); // drops the Resting HR/Sleep tiles immediately - switchView alone doesn't re-render
   toast('Disconnected');
 });
 
@@ -2432,7 +2460,10 @@ resetLogForm();
 renderAll();
 switchView('dashboard');
 resumeLiveWorkoutIfAny();
-if (settings.intervals.enabled) syncIntervalsRuns({ silent: true });
+if (settings.intervals.enabled) {
+  syncIntervalsRuns({ silent: true });
+  syncIntervalsWellness();
+}
 
 // The boot splash (index.html) has done its job now that the real UI is
 // rendered - fade it out, then drop it from the DOM once the transition

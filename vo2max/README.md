@@ -37,8 +37,9 @@ Dashboard as the place they come together.
   something logged shows a small icon: a run gets the running-figure glyph,
   a workout gets the dumbbell glyph, a day with both gets both), six stat
   tiles below it (runs logged, workouts logged, mileage this week, volume
-  this week, days since your last run, days since your last workout), and a
-  combined **recent activity** feed — the last few runs and workouts,
+  this week, days since your last run, days since your last workout) — plus
+  Resting HR and Sleep tiles once intervals.icu sync is connected (see
+  below) — and a combined **recent activity** feed — the last few runs and workouts,
   newest first, each tagged with a small running-figure or dumbbell icon
   and tappable straight into its edit sheet. Tapping a date on the calendar
   opens a popup listing that day's runs and workouts separately (tap one to
@@ -186,6 +187,13 @@ couple of minutes:
 
 Disconnecting stops future imports but leaves already-imported runs in
 your history untouched.
+
+Connecting also adds **Resting HR** and **Sleep** tiles to the Dashboard,
+reading intervals.icu's daily wellness log (looking back up to a week for
+whichever value most recently showed up, since a watch doesn't always sync
+same-day) - refreshed automatically on every app open alongside the run
+sync, no separate action needed. Tiles only appear once there's actually a
+value to show; nothing changes on the Dashboard before that.
 
 ## Zone math
 
