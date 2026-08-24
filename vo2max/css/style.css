@@ -508,9 +508,14 @@ button { font-family: var(--font-mono); }
 #mileageChartWrap .chart-bar { fill: #FF6C2D; stroke: #FF6C2D; }
 .chart-empty { color: var(--dimmer); font-size: 14px; text-align: center; padding: 40px 0; }
 .chart-radar-fill { fill: var(--accent); fill-opacity: 0.12; stroke: none; }
-/* Muscle balance radar's axis labels get the brand orange - the
-   percentage (.chart-radar-pct, styled separately below) stays as-is. */
+/* Muscle balance radar's axis labels, data shape (fill/outline) and point
+   markers get the brand orange - the percentage under each label
+   (.chart-radar-pct, styled separately below) stays as-is, and #muscleChartWrap
+   keeps this off every other chart that shares .chart-line/.chart-dot. */
 .chart-radar-label { font-size: 12px; fill: #FF6C2D; }
+#muscleChartWrap .chart-radar-fill { fill: #FF6C2D; fill-opacity: 0.18; }
+#muscleChartWrap .chart-line { stroke: #FF6C2D; }
+#muscleChartWrap .chart-dot { fill: #FF6C2D; stroke: #FF6C2D; }
 
 .activity-detail-stats { margin-top: 12px; }
 
