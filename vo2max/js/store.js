@@ -28,6 +28,11 @@ export const DEFAULT_SETTINGS = {
   maxHR: 194,
   lthr: 181,
   primaryZoneModel: 'lthr', // 'lthr' | 'rhr'
+  googleCalendar: {
+    clientId: '', // pasted by the user from their own Google Cloud OAuth client
+    calendarId: '', // id of the app-created "HYBR. Workouts" calendar, cached after first connect
+    enabled: false, // true once connected at least once - auto-sync only runs while this is true
+  },
 };
 
 function clone(value) {
@@ -44,6 +49,7 @@ export function loadSettings() {
       ...clone(DEFAULT_SETTINGS),
       ...parsed,
       profile: { ...DEFAULT_SETTINGS.profile, ...(parsed.profile || {}) },
+      googleCalendar: { ...DEFAULT_SETTINGS.googleCalendar, ...(parsed.googleCalendar || {}) },
     };
   } catch {
     return clone(DEFAULT_SETTINGS);

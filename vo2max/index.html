@@ -220,6 +220,23 @@
     </form>
 
     <details class="settings-details">
+      <summary class="section-title">Google Calendar sync</summary>
+      <div class="settings-details-body form">
+        <p class="field-hint">Automatically pushes every run and workout to a dedicated "HYBR. Workouts" calendar in your Google account, kept in sync on every save. Requires a one-time Google Cloud OAuth Client ID (free, ~5 min) - see the app's README for the setup steps.</p>
+        <label class="field">
+          <span>OAuth Client ID</span>
+          <input id="gcalClientId" type="text" placeholder="xxxxxxxxxx.apps.googleusercontent.com" autocomplete="off" spellcheck="false">
+        </label>
+        <p id="gcalStatus" class="field-hint">Not connected.</p>
+        <div class="actions">
+          <button type="button" id="gcalConnect" class="ghost-btn">Connect</button>
+          <button type="button" id="gcalDisconnect" class="ghost-btn" hidden>Disconnect</button>
+        </div>
+        <button type="button" id="gcalSyncNow" class="ghost-btn block" hidden>Sync all now</button>
+      </div>
+    </details>
+
+    <details class="settings-details">
       <summary class="section-title">Zones reference</summary>
       <div class="settings-details-body">
         <h2 class="section-title">LTHR-based zones <span id="lthrPrimaryBadge" class="badge" hidden>primary</span></h2>

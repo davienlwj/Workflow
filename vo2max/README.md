@@ -96,11 +96,55 @@ Dashboard as the place they come together.
   HR, which zone model is primary, and all of the protocol's
   reps/timing/frequency) is editable here — nothing is hardcoded once you've
   changed it. Export/import a JSON backup (workouts included), or reset to
-  defaults. Below that, an expandable **Zones & protocol reference**
+  defaults. A **Google Calendar sync** section (see below) automatically
+  pushes every run and workout to its own dedicated calendar once connected.
+  Below that, an expandable **Zones & protocol reference**
   section: both the LTHR-based and RHR-based (Karvonen) zone tables, the
   interval target zone highlighted, and a protocol quick-reference card —
   collapsed by default so it doesn't compete with the settings form for
   attention.
+
+## Google Calendar sync
+
+Every run and workout you save is automatically pushed to a dedicated
+**"HYBR. Workouts"** calendar in your Google account (created for you on
+first connect), and kept up to date — editing or deleting a session/workout
+updates or removes its calendar event too. This is a static site with no
+backend, so it talks to the Calendar API directly from your browser using
+Google's own sign-in (Google Identity Services) — which means the app can
+only ever see or edit the one calendar it created for itself, never your
+existing calendars or events.
+
+Because there's no backend, Google requires *you* to register the app with
+your own free Google Cloud project before it can connect (a one-time, ~5
+minute setup):
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com/) and
+   create a project (or reuse one you already have).
+2. **APIs & Services → Library** — search for **Google Calendar API** and
+   enable it.
+3. **APIs & Services → OAuth consent screen** — choose **External**, fill in
+   an app name (e.g. "HYBR. Workouts"), your email as both support and
+   developer contact. Leave the app in **Testing** status and add your own
+   Google account under **Test users** — no verification/review needed for
+   personal use.
+4. **APIs & Services → Credentials → Create Credentials → OAuth client ID**
+   — Application type **Web application**. Under **Authorized JavaScript
+   origins**, add the origin the app is served from, e.g.
+   `https://<username>.github.io` (no path, no trailing slash) — and
+   `http://localhost:8000` too if you also run it locally. Save, then copy
+   the generated Client ID (`xxxxxxxxxx.apps.googleusercontent.com`).
+5. In the app: **Settings → Google Calendar sync**, paste that Client ID,
+   tap **Connect**, and approve access (you'll see an "unverified app"
+   warning since the app is only registered for your own testing use — that's
+   expected; choose **Advanced → Go to (app name)** to proceed). Your
+   existing run/workout history syncs automatically right after connecting.
+
+Since browsers don't let a static site hold onto Google's access token
+indefinitely, a fresh page load may occasionally need you to tap **Connect**
+again before syncing resumes — **Sync all now** in Settings re-syncs
+anything that was saved while disconnected. Disconnecting stops future
+syncing but leaves everything already pushed to your calendar untouched.
 
 ## Zone math
 
@@ -130,7 +174,9 @@ js/exercises.js              the built-in exercise library (name, equipment, mus
 js/muscleDiagram.js          stacks the muscle-diagram image assets for an exercise's muscles
 js/icons.js                  the running-figure / dumbbell pictograms (calendar, recent activity)
 js/chart.js                 dependency-free SVG charts: VO2max trend, mileage bars, exercise progress
-js/ics.js                   builds a per-session .ics file for calendar export
+js/ics.js                   builds a per-session .ics file for calendar export, and the shared
+                              summary/description text + event resources used by gcal.js
+js/gcal.js                  Google Identity Services auth + Calendar API calls for automatic sync
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/icon-source.jpg        the hand-drawn mark the app icons are built from

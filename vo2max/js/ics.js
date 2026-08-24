@@ -1,10 +1,15 @@
 /*
  * Turns a logged session into a downloadable .ics file (RFC 5545), so it can
  * be added to Apple Calendar, Google Calendar, or Outlook without an
- * account or backend — just a file the OS already knows how to import.
+ * account or backend — just a file the OS already knows how to import. Also
+ * builds the same summary/description text as Google Calendar event
+ * resources for the automatic sync path (see gcal.js) - one set of "what
+ * does this session/workout look like as a calendar event" logic shared by
+ * both the manual .ics export and the automatic Google sync.
  */
 
 import { formatPaceMinKm } from './block.js';
+import { workoutSummaryByExercise, workoutVolume } from './workout.js';
 
 const recoveryLabel = { easy: 'Easy', moderate: 'Moderate', hard: 'Hard' };
 
@@ -54,7 +59,7 @@ function hasLegacyIntervalData(session) {
   return Boolean(session.intervalsCompleted) || Boolean((session.intervals || []).length);
 }
 
-function descriptionText(session) {
+export function descriptionText(session) {
   const lines = [];
   if (hasLegacyIntervalData(session)) {
     lines.push(`Intervals completed: ${session.intervalsCompleted}`);
@@ -88,7 +93,7 @@ function typeOf(session) {
   return session.type ?? 'interval';
 }
 
-function summaryText(session) {
+export function summaryText(session) {
   const type = typeOf(session);
   if (hasLegacyIntervalData(session)) {
     const recovery = recoveryLabel[session.recovery] ?? session.recovery;
@@ -119,4 +124,50 @@ export function sessionToICS(session) {
   ];
 
   return lines.map(foldLine).join('\r\n') + '\r\n';
+}
+
+function nextIsoDate(iso) {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  const y = d.getFullYear();
+  const m = pad(d.getMonth() + 1);
+  const day = pad(d.getDate());
+  return `${y}-${m}-${day}`;
+}
+
+/** A logged session as a Google Calendar event resource (all-day, since
+ *  sessions only carry a date - see gcal.js's upsertEvent). */
+export function sessionToGCalEvent(session) {
+  return {
+    summary: summaryText(session),
+    description: descriptionText(session),
+    start: { date: session.date },
+    end: { date: nextIsoDate(session.date) },
+  };
+}
+
+function workoutSummaryText(workout, exercises, bodyweightKg) {
+  const exCount = (workout.exercises || []).length;
+  const volume = workoutVolume(workout, exercises, bodyweightKg);
+  const label = workout.name || `Workout (${exCount} exercise${exCount === 1 ? '' : 's'})`;
+  return `${label}, ${volume}kg volume`;
+}
+
+function workoutDescriptionText(workout, exercises, bodyweightKg) {
+  const rows = workoutSummaryByExercise(workout, exercises, bodyweightKg);
+  const lines = rows.map((r) => `${r.name}: ${r.setCount} set${r.setCount === 1 ? '' : 's'}, ${r.totalReps} reps, ${r.volume}kg volume`);
+  if (workout.notes) lines.push(`Notes: ${workout.notes}`);
+  return lines.length ? lines.join('\n') : 'No working sets logged.';
+}
+
+/** A logged workout as a Google Calendar event resource (all-day). `exercises`
+ *  should include the user's custom exercises alongside the built-in
+ *  library (see allExercises() in app.js) so names resolve for those too. */
+export function workoutToGCalEvent(workout, exercises, bodyweightKg) {
+  return {
+    summary: workoutSummaryText(workout, exercises, bodyweightKg),
+    description: workoutDescriptionText(workout, exercises, bodyweightKg),
+    start: { date: workout.date },
+    end: { date: nextIsoDate(workout.date) },
+  };
 }

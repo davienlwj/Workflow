@@ -18,7 +18,11 @@ import {
 import {
   vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG, exerciseVolumeSVG, muscleRadarSVG,
 } from './chart.js';
-import { sessionToICS } from './ics.js';
+import { sessionToICS, sessionToGCalEvent, workoutToGCalEvent } from './ics.js';
+import {
+  connect as gcalConnectFlow, silentToken as gcalSilentToken, clearToken as gcalClearToken,
+  getOrCreateCalendar, upsertEvent as gcalUpsertEvent, deleteEvent as gcalDeleteEvent, CALENDAR_NAME,
+} from './gcal.js';
 import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
   exerciseById, searchExercises,
@@ -315,8 +319,9 @@ $('logCancel').addEventListener('click', closeLogSheet);
 
 $('logForm').addEventListener('submit', (e) => {
   e.preventDefault();
-  addSession(readSessionForm('log'));
+  const saved = addSession(readSessionForm('log'));
   sessions = loadSessions();
+  syncSessionToGoogle(saved);
   closeLogSheet();
   renderAll();
   toast('Session saved');
@@ -705,8 +710,9 @@ $('editAddToCalendar').addEventListener('click', () => {
 $('editForm').addEventListener('submit', (e) => {
   e.preventDefault();
   if (!editingId) return;
-  updateSession(editingId, readSessionForm('edit'));
+  const saved = updateSession(editingId, readSessionForm('edit'));
   sessions = loadSessions();
+  if (saved) syncSessionToGoogle(saved);
   closeEditSheet();
   renderAll();
   toast('Session updated');
@@ -715,8 +721,10 @@ $('editForm').addEventListener('submit', (e) => {
 $('editDelete').addEventListener('click', () => {
   if (!editingId) return;
   if (!confirm('Delete this session? This cannot be undone.')) return;
+  const toDelete = sessions.find((s) => s.id === editingId);
   deleteSession(editingId);
   sessions = loadSessions();
+  if (toDelete) deleteSessionFromGoogle(toDelete);
   closeEditSheet();
   renderAll();
   toast('Session deleted');
@@ -1640,6 +1648,7 @@ function finishLiveWorkout(data) {
   const saved = addWorkout(cleaned);
   workouts = loadWorkouts();
   const newPRs = newPRsInWorkout(workouts, saved, allExercises(), bodyweightKg());
+  syncWorkoutToGoogle(saved);
   discardLiveWorkout();
   renderAll();
   openWorkoutSummarySheet(saved, durationMs, newPRs);
@@ -1697,15 +1706,17 @@ $('workoutForm').addEventListener('submit', (e) => {
     return;
   }
   if (workoutEditingId) {
-    updateWorkout(workoutEditingId, data);
+    const saved = updateWorkout(workoutEditingId, data);
     toast('Workout updated');
     workouts = loadWorkouts();
+    if (saved) syncWorkoutToGoogle(saved);
   } else {
     const saved = addWorkout(data);
     workouts = loadWorkouts();
     const newPRs = newPRsInWorkout(workouts, saved, allExercises(), bodyweightKg());
     if (newPRs.length > 0) toast(newPRToastMessage(newPRs), 3400);
     else toast('Workout saved');
+    syncWorkoutToGoogle(saved);
   }
   closeWorkoutSheet();
   renderAll();
@@ -1728,8 +1739,10 @@ window.addEventListener('pagehide', () => saveLiveWorkoutState());
 $('woDelete').addEventListener('click', () => {
   if (!workoutEditingId) return;
   if (!confirm('Delete this workout? This cannot be undone.')) return;
+  const toDelete = workouts.find((w) => w.id === workoutEditingId);
   deleteWorkout(workoutEditingId);
   workouts = loadWorkouts();
+  if (toDelete) deleteWorkoutFromGoogle(toDelete);
   closeWorkoutSheet();
   renderAll();
   toast('Workout deleted');
@@ -2060,6 +2073,137 @@ function renderZones() {
   $('rhrPrimaryBadge').hidden = settings.primaryZoneModel !== 'rhr';
 }
 
+/* ------------------------------------------------------- GOOGLE CALENDAR */
+
+// Set when an automatic (silent) sync attempt couldn't get a valid token -
+// surfaced in Settings as "reconnect needed" instead of the steady-state
+// "Connected", and cleared again by any successful sync or explicit connect.
+let gcalNeedsReconnect = false;
+
+/** Runs `fn(token, calendarId)` against the app's dedicated Google Calendar
+ *  if sync is enabled and a token can be obtained silently (this never pops
+ *  a consent screen itself - only the Connect button's click handler does
+ *  that). Caches the calendar id back into settings the first time it
+ *  differs from what was already cached. Every call site below is
+ *  fire-and-forget: a save always succeeds locally regardless of whether
+ *  the calendar push that follows it succeeds. */
+async function withGoogleCalendar(fn) {
+  const gc = settings.googleCalendar;
+  if (!gc?.enabled || !gc?.clientId) return;
+  try {
+    const token = await gcalSilentToken(gc.clientId);
+    if (!token) { gcalNeedsReconnect = true; renderGCalStatus(); return; }
+    const calendarId = await getOrCreateCalendar(token, gc.calendarId);
+    if (calendarId !== gc.calendarId) {
+      settings = { ...settings, googleCalendar: { ...settings.googleCalendar, calendarId } };
+      saveSettings(settings);
+    }
+    await fn(token, calendarId);
+    gcalNeedsReconnect = false;
+    renderGCalStatus();
+  } catch (err) {
+    console.error('Google Calendar sync failed', err);
+  }
+}
+
+async function syncSessionToGoogle(session) {
+  await withGoogleCalendar(async (token, calendarId) => {
+    const eventId = await gcalUpsertEvent(token, calendarId, session.gcalEventId || null, sessionToGCalEvent(session));
+    if (eventId !== session.gcalEventId) {
+      updateSession(session.id, { gcalEventId: eventId });
+      sessions = loadSessions();
+    }
+  });
+}
+
+async function deleteSessionFromGoogle(session) {
+  if (!session.gcalEventId) return;
+  await withGoogleCalendar(async (token, calendarId) => {
+    await gcalDeleteEvent(token, calendarId, session.gcalEventId);
+  });
+}
+
+async function syncWorkoutToGoogle(workout) {
+  await withGoogleCalendar(async (token, calendarId) => {
+    const event = workoutToGCalEvent(workout, allExercises(), bodyweightKg());
+    const eventId = await gcalUpsertEvent(token, calendarId, workout.gcalEventId || null, event);
+    if (eventId !== workout.gcalEventId) {
+      updateWorkout(workout.id, { gcalEventId: eventId });
+      workouts = loadWorkouts();
+    }
+  });
+}
+
+async function deleteWorkoutFromGoogle(workout) {
+  if (!workout.gcalEventId) return;
+  await withGoogleCalendar(async (token, calendarId) => {
+    await gcalDeleteEvent(token, calendarId, workout.gcalEventId);
+  });
+}
+
+async function syncAllToGoogle() {
+  const reconnectedBefore = !gcalNeedsReconnect;
+  for (const s of sessions) await syncSessionToGoogle(s);
+  for (const w of workouts) await syncWorkoutToGoogle(w);
+  if (gcalNeedsReconnect) toast('Reconnect needed to finish syncing');
+  else if (reconnectedBefore) toast('Google Calendar sync complete');
+}
+
+function renderGCalStatus() {
+  $('gcalClientId').value = settings.googleCalendar.clientId;
+  const { enabled } = settings.googleCalendar;
+  $('gcalDisconnect').hidden = !enabled;
+  $('gcalSyncNow').hidden = !enabled;
+  if (!enabled) {
+    $('gcalStatus').textContent = 'Not connected.';
+    $('gcalConnect').hidden = false;
+  } else if (gcalNeedsReconnect) {
+    $('gcalStatus').textContent = 'Sync paused - tap Connect to resume.';
+    $('gcalConnect').hidden = false;
+  } else {
+    $('gcalStatus').textContent = `Connected - syncing to "${CALENDAR_NAME}".`;
+    $('gcalConnect').hidden = true;
+  }
+}
+
+$('gcalClientId').addEventListener('change', () => {
+  settings = { ...settings, googleCalendar: { ...settings.googleCalendar, clientId: $('gcalClientId').value.trim() } };
+  saveSettings(settings);
+});
+
+$('gcalConnect').addEventListener('click', async () => {
+  const clientId = $('gcalClientId').value.trim();
+  if (!clientId) { toast('Paste your Google OAuth Client ID first'); return; }
+  try {
+    const token = await gcalConnectFlow(clientId);
+    const calendarId = await getOrCreateCalendar(token, settings.googleCalendar.calendarId);
+    settings = { ...settings, googleCalendar: { clientId, calendarId, enabled: true } };
+    saveSettings(settings);
+    gcalNeedsReconnect = false;
+    renderGCalStatus();
+    toast('Connected - syncing your history now…');
+    await syncAllToGoogle();
+  } catch (err) {
+    console.error('Google Calendar connect failed', err);
+    toast('Could not connect to Google Calendar');
+  }
+});
+
+$('gcalDisconnect').addEventListener('click', () => {
+  if (!confirm('Disconnect Google Calendar? Already-synced events stay in your calendar - only future auto-sync stops.')) return;
+  gcalClearToken();
+  settings = { ...settings, googleCalendar: { ...settings.googleCalendar, enabled: false } };
+  saveSettings(settings);
+  gcalNeedsReconnect = false;
+  renderGCalStatus();
+  toast('Disconnected');
+});
+
+$('gcalSyncNow').addEventListener('click', async () => {
+  toast('Syncing to Google Calendar…');
+  await syncAllToGoogle();
+});
+
 /* ------------------------------------------------------------- SETTINGS */
 
 function renderSettingsForm() {
@@ -2077,6 +2221,7 @@ function renderSettingsForm() {
   $('sMaxHR').value = settings.maxHR;
   $('sLTHR').value = settings.lthr;
   $('sPrimaryModel').value = settings.primaryZoneModel;
+  renderGCalStatus();
 }
 
 $('sTheme').addEventListener('click', (e) => {
@@ -2092,6 +2237,7 @@ $('settingsForm').addEventListener('submit', (e) => {
   e.preventDefault();
   settings = {
     theme: settings.theme,
+    googleCalendar: settings.googleCalendar,
     profile: {
       name: $('sName').value.trim(),
       dob: $('sDob').value,
