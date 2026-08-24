@@ -1260,6 +1260,19 @@ button { font-family: var(--font-mono); }
   gap: 14px;
 }
 
+.wo-exercise-block, .wo-superset-group {
+  /* The drag handle's long-press timer starts on any touch inside the
+     block, but a real finger easily overlaps the name/meta text next to
+     the small handle glyph - without this, iOS reads that as a text
+     long-press and pops its own Copy/Look Up callout (with its own blue
+     selection highlight) on top of the drag. Doesn't affect the kg/reps
+     <input> fields - those keep their native text editing regardless of
+     an ancestor's user-select. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .wo-exercise-block {
   background: var(--panel);
   border: 1px solid var(--line);
