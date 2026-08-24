@@ -35,6 +35,49 @@ const MAX_EXERCISE_ROWS = 7;
 
 const MUSCLE_ICON_BASE = './icons/muscles';
 
+const ASSET_LABEL = {
+  chest: 'Chest',
+  shoulders: 'Shoulders',
+  biceps: 'Biceps',
+  triceps: 'Triceps',
+  forearms: 'Forearms',
+  abs: 'Abs',
+  quads: 'Quads',
+  back: 'Back',
+  hamstrings: 'Hamstrings',
+  glutes: 'Glutes',
+  calves: 'Calves',
+};
+
+// Where to draw each asset's callout label, as a fraction of the body
+// image's own width/height (both body-front.png and body-back.png are
+// ~448x869, and MUSCLE_META's asset names are exactly this table's keys -
+// see muscleDiagram.js). Derived from gen-muscle-diagram.py's own seed
+// points (each asset's seeds average out to a centroid on the body's
+// vertical midline, since every region is a left/right symmetric pair),
+// then nudged left/right off that midline wherever two regions land close
+// enough in y to otherwise collide (e.g. front chest/shoulders, back
+// back/triceps) - approximate anatomical placement, not exact, but this
+// is a share-card callout label, not a medical illustration.
+const LABEL_ANCHORS = {
+  front: {
+    shoulders: { x: 0.16, y: 0.19 },
+    chest: { x: 0.84, y: 0.24 },
+    biceps: { x: 0.50, y: 0.32 },
+    abs: { x: 0.16, y: 0.42 },
+    forearms: { x: 0.84, y: 0.43 },
+    quads: { x: 0.50, y: 0.60 },
+  },
+  back: {
+    shoulders: { x: 0.50, y: 0.15 },
+    triceps: { x: 0.84, y: 0.26 },
+    back: { x: 0.16, y: 0.30 },
+    glutes: { x: 0.50, y: 0.49 },
+    hamstrings: { x: 0.50, y: 0.62 },
+    calves: { x: 0.50, y: 0.77 },
+  },
+};
+
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -89,6 +132,29 @@ function line(ctx, text, cx, topY, { weight = 400, size, color, lineHeight = 1.2
   ctx.textBaseline = 'top';
   ctx.fillText(text, cx, topY);
   return topY + size * lineHeight;
+}
+
+/** Draws a small rounded "callout" pill of text centered on (cx, cy) - used
+ *  to label a muscle group directly on the body diagram, where the text
+ *  needs to stay legible over both the plain body art and the orange
+ *  highlight overlay it might be sitting on top of. */
+function labelPill(ctx, text, cx, cy) {
+  const size = 20;
+  ctx.font = font(700, size);
+  const padX = 12;
+  const padY = 6;
+  const pillW = ctx.measureText(text).width + padX * 2;
+  const pillH = size + padY * 2;
+  ctx.fillStyle = 'rgba(10, 10, 10, 0.75)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+  ctx.lineWidth = 1;
+  roundRect(ctx, cx - pillW / 2, cy - pillH / 2, pillW, pillH, pillH / 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = INK;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, cx, cy + 1);
 }
 
 /**
@@ -243,27 +309,40 @@ export async function renderWorkoutShareCard(data) {
  * @param {{
  *   workoutName: string|null,
  *   dateLabel: string,
- *   activeMuscles: string[],
- *   groupRows: {label: string, pct: number}[],
- * }} data `activeMuscles` are fine-grained MUSCLES ids (see exercises.js)
- *   with at least one set in this workout - which overlay art to draw, the
- *   same mapping muscleDiagram.js uses for the in-app body diagram.
- *   `groupRows` are the coarser RADAR_GROUPS rollup (10 regions) already
- *   sorted by share descending, for the percentage list below the diagram -
- *   a 22-row list of every fine muscle would be unreadable at this size,
- *   same reasoning as the in-app radar chart.
+ *   muscleDetailed: {muscle: string, sets: number}[],
+ * }} data `muscleDetailed` is every fine-grained MUSCLES id (see
+ *   exercises.js) with its set count in this workout - e.g. workout.js's
+ *   muscleSetBreakdownDetailed called with just this one workout. Rolled
+ *   up here into MUSCLE_META's asset groups (the same ones the artwork is
+ *   organized by) for both which overlay art to draw and each visible
+ *   region's callout label/percentage - a 22-label diagram would be
+ *   unreadable, so a fine muscle with no dedicated asset overlay (e.g.
+ *   side-abs) folds into its shared one (abs) same as the in-app diagram.
  * @returns {Promise<Blob>} a transparent 1080x1920 PNG
  */
 export async function renderMuscleBalanceCard(data) {
   await ensureFontLoaded();
-  const frontAssets = [...new Set(
-    data.activeMuscles.filter((m) => MUSCLE_META[m]?.views.includes('front')).map((m) => MUSCLE_META[m].asset),
-  )];
-  const backAssets = [...new Set(
-    data.activeMuscles.filter((m) => MUSCLE_META[m]?.views.includes('back')).map((m) => MUSCLE_META[m].asset),
-  )];
+
+  const totalSets = data.muscleDetailed.reduce((sum, m) => sum + m.sets, 0);
+  // Per (asset, view) - a fine muscle only ever contributes to the views
+  // MUSCLE_META lists for it (e.g. front-delts -> shoulders/front only),
+  // so front and back tallies for the same asset (e.g. shoulders) can
+  // differ and are tracked separately.
+  const assetSets = new Map();
+  for (const { muscle, sets } of data.muscleDetailed) {
+    if (sets === 0) continue;
+    const meta = MUSCLE_META[muscle];
+    if (!meta) continue;
+    for (const view of meta.views) {
+      const key = `${view}:${meta.asset}`;
+      assetSets.set(key, (assetSets.get(key) || 0) + sets);
+    }
+  }
+  const frontAssets = [...new Set([...assetSets.keys()].filter((k) => k.startsWith('front:')).map((k) => k.slice(6)))];
+  const backAssets = [...new Set([...assetSets.keys()].filter((k) => k.startsWith('back:')).map((k) => k.slice(5)))];
   const showFront = frontAssets.length > 0 || backAssets.length === 0; // same "front is the default view" rule as muscleDiagramHTML
   const showBack = backAssets.length > 0;
+
   const [logo, bodyFront, bodyBack, frontOverlays, backOverlays] = await Promise.all([
     loadImage('./icons/logo-header.png'),
     showFront ? loadImage(`${MUSCLE_ICON_BASE}/body-front.png`) : null,
@@ -280,10 +359,8 @@ export async function renderMuscleBalanceCard(data) {
   const logoH = 72;
   const logoW = logoH * (logo.width / logo.height);
   const bodyRef = bodyFront || bodyBack;
-  const bodyDrawW = 300;
+  const bodyDrawW = 340;
   const bodyDrawH = bodyRef ? bodyDrawW * (bodyRef.height / bodyRef.width) : 0;
-  const rows = data.groupRows;
-  const ROW_H = 46;
 
   const measure = () => {
     let y = 64;
@@ -291,16 +368,13 @@ export async function renderMuscleBalanceCard(data) {
     y += 26 * 1.3 + 16; // "MUSCLES WORKED"
     y += 46 * 1.25 + 12; // workout name
     y += 26 * 1.3 + 40; // date
-    y += bodyDrawH + 40;
-    y += rows.length * ROW_H;
+    y += bodyDrawH;
     y += 56;
     return y;
   };
   const contentH = measure();
   const panelX = PAD_X;
   const panelW = W - PAD_X * 2;
-  const innerX = panelX + 56;
-  const innerW = panelW - 112;
   const panelH = Math.min(contentH, H - 160);
   const panelY = (H - panelH) / 2;
 
@@ -330,34 +404,23 @@ export async function renderMuscleBalanceCard(data) {
   if (showFront && bodyFront) {
     ctx.drawImage(bodyFront, bx, y, bodyDrawW, bodyDrawH);
     for (const overlay of frontOverlays) ctx.drawImage(overlay, bx, y, bodyDrawW, bodyDrawH);
+    for (const asset of frontAssets) {
+      const anchor = LABEL_ANCHORS.front[asset];
+      if (!anchor) continue;
+      const pct = totalSets ? Math.round((assetSets.get(`front:${asset}`) / totalSets) * 100) : 0;
+      labelPill(ctx, `${ASSET_LABEL[asset] || asset} ${pct}%`, bx + anchor.x * bodyDrawW, y + anchor.y * bodyDrawH);
+    }
     bx += bodyDrawW + gap;
   }
   if (showBack && bodyBack) {
     ctx.drawImage(bodyBack, bx, y, bodyDrawW, bodyDrawH);
     for (const overlay of backOverlays) ctx.drawImage(overlay, bx, y, bodyDrawW, bodyDrawH);
-  }
-  y += bodyDrawH + 40;
-
-  for (const row of rows) {
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.font = font(700, 24);
-    ctx.fillStyle = INK;
-    ctx.fillText(row.label, innerX, y);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = BRAND_ORANGE;
-    ctx.fillText(`${row.pct}%`, innerX + innerW, y);
-
-    const barY = y + 32;
-    const barH = 8;
-    ctx.fillStyle = LINE;
-    roundRect(ctx, innerX, barY, innerW, barH, 4);
-    ctx.fill();
-    ctx.fillStyle = BRAND_ORANGE;
-    roundRect(ctx, innerX, barY, innerW * (row.pct / 100), barH, 4);
-    ctx.fill();
-
-    y += ROW_H;
+    for (const asset of backAssets) {
+      const anchor = LABEL_ANCHORS.back[asset];
+      if (!anchor) continue;
+      const pct = totalSets ? Math.round((assetSets.get(`back:${asset}`) / totalSets) * 100) : 0;
+      labelPill(ctx, `${ASSET_LABEL[asset] || asset} ${pct}%`, bx + anchor.x * bodyDrawW, y + anchor.y * bodyDrawH);
+    }
   }
 
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));

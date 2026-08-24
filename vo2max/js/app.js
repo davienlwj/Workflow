@@ -2037,18 +2037,10 @@ async function buildShareCardBlob(option) {
       newPRs,
     });
   } else if (option === 'muscle') {
-    const detailed = muscleSetBreakdownDetailed([workout], 'all', workout.date, allExercises());
-    const activeMuscles = detailed.filter((m) => m.sets > 0).map((m) => m.muscle);
-    const groups = muscleSetBreakdown([workout], 'all', workout.date, allExercises()).filter((g) => g.sets > 0);
-    const totalGroupSets = groups.reduce((sum, g) => sum + g.sets, 0);
-    const groupRows = groups
-      .map((g) => ({ label: RADAR_GROUP_LABEL[g.muscle], pct: totalGroupSets ? Math.round((g.sets / totalGroupSets) * 100) : 0 }))
-      .sort((a, b) => b.pct - a.pct);
     blob = await renderMuscleBalanceCard({
       workoutName: workout.name || null,
       dateLabel: fmtDateLong(workout.date),
-      activeMuscles,
-      groupRows,
+      muscleDetailed: muscleSetBreakdownDetailed([workout], 'all', workout.date, allExercises()),
     });
   } else {
     const exerciseIds = [...new Set((workout.exercises || []).map((ex) => ex.exerciseId))];

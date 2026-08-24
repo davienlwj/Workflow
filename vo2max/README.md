@@ -247,7 +247,8 @@ there, the same way Strava's own post-activity share card works:
   counts, any new PRs, and a per-exercise breakdown.
 - **Muscles** - the same front/back body-diagram artwork used elsewhere
   in the app, highlighting every muscle group this workout's exercises
-  targeted, with a percentage-share breakdown below.
+  targeted, each with its own name-and-percentage callout label placed
+  directly next to that region on the diagram (no separate list).
 - **PRs** - every exercise this workout touched, its all-time best
   weight and estimated 1RM, with a "NEW" badge on whichever one this
   workout actually just beat.
