@@ -10,7 +10,7 @@ import {
 } from './store.js';
 import { lthrZoneTable, rhrZoneTable, zoneTable, hrZoneDurations } from './zones.js';
 import {
-  todayIso,
+  todayIso, fmtDateLong, fmtElapsed,
   daysSinceLastSession, averageSessionHR, vo2maxSeries,
   mileageBuckets, totalMileage,
   parsePaceMinKm, formatPaceMinKm,
@@ -38,6 +38,7 @@ import {
   exerciseById, searchExercises,
 } from './exercises.js';
 import { muscleDiagramHTML } from './muscleDiagram.js';
+import { renderWorkoutShareCard } from './shareCard.js';
 import {
   workoutVolume, lastPerformance, personalRecords, newPRsInWorkout, exerciseProgress, exerciseVolumeProgress, loggedBrandsForExercise,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince,
@@ -76,6 +77,8 @@ let liveSession = null; // { startedAt } while a live "today's workout" session 
 let workoutSheetMode = 'instant'; // 'instant' | 'live' - which mode #workoutSheet is currently rendering
 let liveTimerInterval = null;
 let lastFinishedWorkout = null; // set by openWorkoutSummarySheet, read by "Save as Routine"
+let lastFinishedDurationMs = 0; // set by openWorkoutSummarySheet, read by "Share image"
+let lastFinishedNewPRs = []; // set by openWorkoutSummarySheet, read by "Share image"
 let routineSelectedIds = []; // exercise ids chosen so far in the open routine builder
 
 const $ = (id) => document.getElementById(id);
@@ -193,11 +196,6 @@ function downloadFile(filename, content, mime) {
   URL.revokeObjectURL(url);
 }
 
-function fmtDateLong(iso) {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', {
-    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
-  });
-}
 
 function fmtDateShort(iso) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -1402,15 +1400,6 @@ function hideLiveMiniBar() {
   $('main').classList.remove('has-live-bar');
 }
 
-function fmtElapsed(ms) {
-  const totalSec = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  const mm = String(m).padStart(2, '0');
-  const ss = String(s).padStart(2, '0');
-  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
 
 /** Scans the live sheet's current DOM for the first exercise with an
  *  un-ticked set, for the mini-bar's "current exercise / current set" copy. */
@@ -1788,6 +1777,8 @@ $('routineForm').addEventListener('submit', (e) => {
  *  celebratory banner above the duration when non-empty. */
 function openWorkoutSummarySheet(workout, durationMs, newPRs = []) {
   lastFinishedWorkout = workout;
+  lastFinishedDurationMs = durationMs;
+  lastFinishedNewPRs = newPRs;
   $('summaryPRBanner').hidden = newPRs.length === 0;
   $('summaryPRBanner').innerHTML = newPRs.length === 0 ? '' : [
     `<div class="pr-banner-title">🎉 New Personal Record${newPRs.length > 1 ? 's' : ''}!</div>`,
@@ -1812,6 +1803,46 @@ $('summarySaveRoutine').addEventListener('click', () => {
   $('workoutSummarySheet').hidden = true;
   const ids = (lastFinishedWorkout?.exercises || []).map((ex) => ex.exerciseId);
   openRoutineBuilderSheet(ids);
+});
+
+/** Renders the same stats as the summary sheet into a transparent PNG,
+ *  then hands it to the OS share sheet (so Instagram Stories shows up as
+ *  a direct target, same as Strava's own post-activity share) - falling
+ *  back to a plain file download wherever navigator.share doesn't support
+ *  image files (desktop browsers, mainly). */
+$('summaryShare').addEventListener('click', async () => {
+  if (!lastFinishedWorkout) return;
+  const btn = $('summaryShare');
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  try {
+    const exerciseRows = workoutSummaryByExercise(lastFinishedWorkout, allExercises(), bodyweightKg());
+    const totalVolume = workoutVolume(lastFinishedWorkout, allExercises(), bodyweightKg());
+    const blob = await renderWorkoutShareCard({
+      workoutName: lastFinishedWorkout.name || null,
+      dateLabel: fmtDateLong(lastFinishedWorkout.date),
+      durationMs: lastFinishedDurationMs,
+      totalVolume,
+      exerciseRows,
+      newPRs: lastFinishedNewPRs,
+    });
+    const file = new File([blob], `hybrd-workout-${lastFinishedWorkout.date}.png`, { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Workout complete' });
+    } else {
+      downloadFile(file.name, blob, 'image/png');
+      toast('Image saved - share it from your Photos/Downloads');
+    }
+  } catch (err) {
+    if (err?.name !== 'AbortError') { // the user cancelling the native share sheet isn't a failure
+      console.error('Failed to create share image', err);
+      toast('Could not create the share image');
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
 });
 
 function finishLiveWorkout(data) {

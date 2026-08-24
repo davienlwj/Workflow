@@ -43,6 +43,23 @@ export function todayIso(now = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
+export function fmtDateLong(iso) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+  });
+}
+
+/** Milliseconds -> "mm:ss", or "h:mm:ss" past an hour. */
+export function fmtElapsed(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const mm = String(m).padStart(2, '0');
+  const ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
 export function daysSinceLastSession(sessions, now = todayIso()) {
   if (sessions.length === 0) return null;
   const last = [...sessions].sort((a, b) => b.date.localeCompare(a.date))[0];

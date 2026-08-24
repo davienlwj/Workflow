@@ -234,6 +234,23 @@ values like 146–158 rather than whatever a lone `round()` of each bound
 would give. `../tests/vo2max-zones.test.mjs` pins the exact bpm bands for
 the defaults in this app.
 
+## Share your workout
+
+Finishing a workout adds a **Share image** button to the summary sheet,
+next to Save as Routine/Done. It renders the same stats already on that
+sheet - workout name, date, duration, total volume, exercise/set counts,
+any new PRs, and a per-exercise breakdown - as a 1080×1920 PNG with a
+**transparent background**, drawn entirely client-side on a `<canvas>` (no
+backend, no third-party image service). Only a translucent stat panel is
+painted; everything outside it stays transparent, so posting the PNG as
+an Instagram Story sticker drops it straight onto whatever photo is
+already there, the same way Strava's own post-activity share card works.
+
+Tapping the button hands the image straight to your device's native share
+sheet (`navigator.share`) when available, so Instagram shows up as a
+direct target - on a desktop browser (or anywhere Web Share doesn't
+support image files) it just downloads the PNG instead.
+
 ## Layout
 
 ```
@@ -252,6 +269,8 @@ js/ics.js                   builds a per-session .ics file for calendar export, 
 js/gcal.js                  Google Identity Services auth + Calendar API calls for automatic sync
 js/intervals.js              intervals.icu API-key auth + activity fetch/mapping for run import
                               (no backend needed - see the README's intervals.icu sync section)
+js/shareCard.js               renders the post-workout summary as a shareable transparent PNG
+                              (canvas-drawn, no backend) - see "Share your workout" below
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/icon-source.png        the orange wordmark logo the app icons are built from

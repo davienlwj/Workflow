@@ -1087,6 +1087,9 @@ button { font-family: var(--font-mono); }
   margin-bottom: 18px;
 }
 
+/* Sits directly against the Save as Routine/Done row with no gap otherwise. */
+#summaryShare { margin-bottom: 8px; }
+
 .summary-exercise-row {
   background: var(--panel);
   border: 1px solid var(--line);
