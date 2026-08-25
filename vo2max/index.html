@@ -695,9 +695,10 @@
   <div class="grabber"></div>
   <h2 class="view-title">Save PNG</h2>
   <div id="shareCardTabs" class="scopes" role="tablist" aria-label="Which image to save">
-    <button type="button" class="scope" role="tab" data-option="summary" aria-selected="true">Summary</button>
-    <button type="button" class="scope" role="tab" data-option="muscle" aria-selected="false">Muscles</button>
-    <button type="button" class="scope" role="tab" data-option="prs" aria-selected="false">PRs</button>
+    <button type="button" class="scope" role="tab" data-option="summary" data-kinds="workout,run" aria-selected="true">Summary</button>
+    <button type="button" class="scope" role="tab" data-option="muscle" data-kinds="workout" aria-selected="false">Muscles</button>
+    <button type="button" class="scope" role="tab" data-option="prs" data-kinds="workout" aria-selected="false">PRs</button>
+    <button type="button" class="scope" role="tab" data-option="receipt" data-kinds="workout,run" aria-selected="false">Receipt</button>
   </div>
   <div class="share-card-preview-wrap">
     <img id="shareCardPreviewImg" class="share-card-preview-img" alt="Share card preview" hidden>

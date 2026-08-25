@@ -238,25 +238,29 @@ the defaults in this app.
 
 A **Save PNG** button opens a preview sheet offering shareable 1080×1920
 PNGs, each drawn entirely client-side on a `<canvas>` (no backend, no
-third-party image service) with a **transparent background** - only a
-translucent stat panel is painted, so posting one as an Instagram Story
-sticker drops it straight onto whatever photo is already there, the same
-way Strava's own post-activity share card works. A workout gets a choice
-of three designs (a tab picker at the top of the sheet); a run has just
-the one, so the picker is hidden and the sheet goes straight to its
-preview:
+third-party image service). A tab picker at the top of the sheet only
+shows the designs that apply - a workout gets all four, a run gets the
+two general-purpose ones:
 
-**Workout** - pick between:
-
-- **Summary** - workout name, date, duration, total volume, exercise/set
-  counts, any new PRs, and a per-exercise breakdown.
-- **Muscles** - the same front/back body-diagram artwork used elsewhere
-  in the app, highlighting every muscle group this workout's exercises
-  targeted, each with its own name-and-percentage callout label placed
-  directly next to that region on the diagram (no separate list).
-- **PRs** - every exercise this workout touched, its all-time best
-  weight and estimated 1RM, with a "NEW" badge on whichever one this
-  workout actually just beat.
+- **Summary** - the Strava-style stat card: workout name/date/duration/
+  volume/exercise+set counts/new PRs (or, for a run, distance as the hero
+  stat plus duration/avg pace/avg-max HR). A **transparent background**
+  with only a translucent stat panel painted, so posting it as an
+  Instagram Story sticker drops it straight onto whatever photo is
+  already there, the same way Strava's own post-activity share works.
+- **Muscles** *(workout only)* - the same front/back body-diagram artwork
+  used elsewhere in the app, highlighting every muscle group this
+  workout's exercises targeted, each with its own name-and-percentage
+  callout label placed directly next to that region on the diagram.
+- **PRs** *(workout only)* - every exercise this workout touched, its
+  all-time best weight and estimated 1RM, with a "NEW" badge on whichever
+  one this workout actually just beat.
+- **Receipt** - a torn-paper strip styled like a printed gym/running
+  receipt (deliberately not transparent - a receipt is paper, not a
+  sticker): logo letterhead, dashed dividers, dotted-leader line items
+  (exercises as items priced in kg for a workout; distance/duration/pace/
+  HR as the items for a run), a bold totals block, a "THANK YOU / COME
+  AGAIN" footer, and a decorative barcode.
 
 Switching tabs re-renders the preview `<img>` in place (each option's PNG
 is cached the first time it's generated so re-visiting a tab is instant);
@@ -273,13 +277,9 @@ already-saved workout from the calendar/history later, so you can come
 back and post it whenever you actually have time. A workout logged via
 the live timer has its duration persisted (`workout.durationMs`)
 specifically so it's still available for that last case; one logged
-directly for a past date has no duration to show and the Summary card
-just omits that stat.
-
-**Run** - the same button, on the Edit session sheet (Run tab -> tap a
-logged session), renders one design: distance as the hero stat, then
-duration/avg pace/avg-max HR, plus a VO2max line when that session has a
-reading logged against it.
+directly for a past date has no duration to show and the Summary/Receipt
+cards just omit that stat. For a run, the same button lives on the Edit
+session sheet (Run tab -> tap a logged session).
 
 ## Layout
 

@@ -40,6 +40,7 @@ import {
 import { muscleDiagramHTML } from './muscleDiagram.js';
 import {
   renderWorkoutShareCard, renderMuscleBalanceCard, renderPRsCard, renderRunShareCard,
+  renderWorkoutReceiptCard, renderRunReceiptCard,
 } from './shareCard.js';
 import {
   workoutVolume, lastPerformance, personalRecords, newPRsInWorkout, exerciseProgress, exerciseVolumeProgress, loggedBrandsForExercise,
@@ -2035,37 +2036,28 @@ function buildRunShareCardData(session) {
     paceLabel: session.avgPace != null ? `${formatPaceMinKm(session.avgPace)}/km` : null,
     avgHR: session.avgHR ?? null,
     maxHR: session.maxHR ?? null,
-    vo2max: session.vo2max ?? null,
   };
 }
 
 /** Builds and caches (per #shareCardSheet visit) the PNG blob for the
- *  currently open subject - a run session (one design, `option` is
- *  always 'run') or a workout (one of the three designs `option` picks
- *  between) - see shareCardContext. */
+ *  currently open subject - a run session or a workout, each offering a
+ *  Summary/Receipt design plus (workout only) Muscles/PRs - see
+ *  shareCardContext and #shareCardTabs' data-kinds. */
 async function buildShareCardBlob(option) {
   if (shareCardBlobs[option]) return shareCardBlobs[option];
   let blob;
   if (shareCardContext.kind === 'run') {
-    blob = await renderRunShareCard(buildRunShareCardData(shareCardContext.session));
+    const data = buildRunShareCardData(shareCardContext.session);
+    blob = option === 'receipt' ? await renderRunReceiptCard(data) : await renderRunShareCard(data);
   } else {
     const { workout, workoutsForPRs, durationMs, newPRs } = shareCardContext;
-    if (option === 'summary') {
-      blob = await renderWorkoutShareCard({
-        workoutName: workout.name || null,
-        dateLabel: fmtDateLong(workout.date),
-        durationMs,
-        totalVolume: workoutVolume(workout, allExercises(), bodyweightKg()),
-        exerciseRows: workoutSummaryByExercise(workout, allExercises(), bodyweightKg()),
-        newPRs,
-      });
-    } else if (option === 'muscle') {
+    if (option === 'muscle') {
       blob = await renderMuscleBalanceCard({
         workoutName: workout.name || null,
         dateLabel: fmtDateLong(workout.date),
         muscleDetailed: muscleSetBreakdownDetailed([workout], 'all', workout.date, allExercises()),
       });
-    } else {
+    } else if (option === 'prs') {
       const exerciseIds = [...new Set((workout.exercises || []).map((ex) => ex.exerciseId))];
       const newPRIds = new Set(newPRs.map((p) => p.exerciseId));
       const prs = exerciseIds.map((id) => {
@@ -2076,6 +2068,16 @@ async function buildShareCardBlob(option) {
         } : null;
       }).filter(Boolean);
       blob = await renderPRsCard({ workoutName: workout.name || null, dateLabel: fmtDateLong(workout.date), prs });
+    } else {
+      const data = {
+        workoutName: workout.name || null,
+        dateLabel: fmtDateLong(workout.date),
+        durationMs,
+        totalVolume: workoutVolume(workout, allExercises(), bodyweightKg()),
+        exerciseRows: workoutSummaryByExercise(workout, allExercises(), bodyweightKg()),
+        newPRs,
+      };
+      blob = option === 'receipt' ? await renderWorkoutReceiptCard(data) : await renderWorkoutShareCard(data);
     }
   }
   shareCardBlobs[option] = blob;
@@ -2106,10 +2108,19 @@ async function renderShareCardPreview(option) {
   }
 }
 
+/** Shows only the #shareCardTabs buttons whose data-kinds includes
+ *  `kind` - a workout gets all four (Summary/Muscles/PRs/Receipt), a run
+ *  just the two that apply to it (Summary/Receipt). */
+function setShareCardTabsForKind(kind) {
+  $('shareCardTabs').querySelectorAll('.scope').forEach((b) => {
+    b.hidden = !b.dataset.kinds.split(',').includes(kind);
+  });
+}
+
 /** Opens #shareCardSheet for `workout` (either an already-saved one, or a
  *  synthetic in-progress record built from the live sheet's current form
  *  state - either way its `id`/`date`/`exercises` shape is all any of the
- *  three renderers need) - the three-way tab picker (Summary/Muscles/PRs).
+ *  four renderers need).
  * @param {object} workout
  * @param {object[]} workoutsForPRs full workouts list to compute PRs
  *   against - see shareCardContext's own comment.
@@ -2123,24 +2134,22 @@ function openShareCardSheetFor(workout, workoutsForPRs, durationMs) {
     newPRs: newPRsInWorkout(workoutsForPRs, workout, allExercises(), bodyweightKg()),
   };
   shareCardBlobs = {};
-  $('shareCardTabs').hidden = false;
+  setShareCardTabsForKind('workout');
   $('scrim').hidden = false;
   $('shareCardSheet').hidden = false;
   $('shareCardSheet').scrollTop = 0;
   renderShareCardPreview('summary');
 }
 
-/** Opens #shareCardSheet for a run session - just the one design, so the
- *  Summary/Muscles/PRs tab picker (workout-only, meaningless for a run)
- *  is hidden rather than shown with a single option. */
+/** Opens #shareCardSheet for a run session. */
 function openRunShareCardSheet(session) {
   shareCardContext = { kind: 'run', session };
   shareCardBlobs = {};
-  $('shareCardTabs').hidden = true;
+  setShareCardTabsForKind('run');
   $('scrim').hidden = false;
   $('shareCardSheet').hidden = false;
   $('shareCardSheet').scrollTop = 0;
-  renderShareCardPreview('run');
+  renderShareCardPreview('summary');
 }
 
 function closeShareCardSheet() {
@@ -2197,10 +2206,9 @@ $('shareCardSave').addEventListener('click', async () => {
   btn.textContent = 'Saving…';
   try {
     const blob = await buildShareCardBlob(shareCardOption);
-    const filename = shareCardContext.kind === 'run'
-      ? `hybrd-run-${shareCardContext.session.date}.png`
-      : `hybrd-workout-${shareCardContext.workout.date}-${{ summary: 'summary', muscle: 'muscles', prs: 'prs' }[shareCardOption]}.png`;
-    const file = new File([blob], filename, { type: 'image/png' });
+    const date = shareCardContext.kind === 'run' ? shareCardContext.session.date : shareCardContext.workout.date;
+    const suffix = { summary: 'summary', muscle: 'muscles', prs: 'prs', receipt: 'receipt' }[shareCardOption];
+    const file = new File([blob], `hybrd-${shareCardContext.kind}-${date}-${suffix}.png`, { type: 'image/png' });
     if (navigator.canShare?.({ files: [file] })) {
       await navigator.share({ files: [file], title: shareCardContext.kind === 'run' ? 'Run' : 'Workout' });
     } else {
