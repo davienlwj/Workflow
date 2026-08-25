@@ -873,7 +873,7 @@ function closeEditSheet() {
   $('editSheet').hidden = true;
 }
 
-$('scrim').addEventListener('click', () => {
+function closeAllSheets() {
   closeEditSheet();
   closeLogSheet();
   closeWorkoutSheet();
@@ -887,8 +887,51 @@ $('scrim').addEventListener('click', () => {
   $('restingHRDetailSheet').hidden = true;
   $('sleepDetailSheet').hidden = true;
   $('activityDetailSheet').hidden = true;
-});
+}
+
+$('scrim').addEventListener('click', closeAllSheets);
 $('editCancel').addEventListener('click', closeEditSheet);
+
+/* --------------------------------------------------- swipe down to close */
+
+(() => {
+  const SWIPE_CLOSE_PX = 90;
+  let sheet = null;
+  let startY = 0;
+  let dy = 0;
+  let dragging = false;
+
+  document.addEventListener('pointerdown', (e) => {
+    const grabber = e.target.closest('.grabber');
+    const host = grabber && grabber.closest('.sheet');
+    if (!host || host.hidden) return;
+    sheet = host;
+    startY = e.clientY;
+    dy = 0;
+    dragging = true;
+    sheet.classList.add('dragging');
+    grabber.setPointerCapture(e.pointerId);
+  });
+
+  document.addEventListener('pointermove', (e) => {
+    if (!dragging || !sheet) return;
+    dy = Math.max(0, e.clientY - startY);
+    sheet.style.transform = `translateY(${dy}px)`;
+  });
+
+  const endDrag = () => {
+    if (!dragging || !sheet) return;
+    sheet.classList.remove('dragging');
+    sheet.style.transform = '';
+    if (dy > SWIPE_CLOSE_PX) closeAllSheets();
+    sheet = null;
+    dragging = false;
+    dy = 0;
+  };
+
+  document.addEventListener('pointerup', endDrag);
+  document.addEventListener('pointercancel', endDrag);
+})();
 
 $('editDurationMin').addEventListener('input', () => updateComputedDistance('edit'));
 $('editAvgPace').addEventListener('input', () => updateComputedDistance('edit'));

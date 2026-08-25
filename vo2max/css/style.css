@@ -1023,14 +1023,29 @@ button { font-family: var(--font-mono); }
   padding: 10px 16px calc(20px + var(--safe-b));
   max-height: 88vh;
   overflow-y: auto;
+  transition: transform 0.2s ease;
+}
+
+.sheet.dragging {
+  transition: none;
 }
 
 .grabber {
+  position: relative;
   width: 36px;
   height: 4px;
   border-radius: 2px;
   background: var(--line);
   margin: 4px auto 14px;
+  touch-action: none;
+}
+
+/* Invisible padding around the visual bar so the drag handle is easy to
+   grab on a touchscreen without changing the sheet's layout spacing. */
+.grabber::before {
+  content: '';
+  position: absolute;
+  inset: -16px -40px;
 }
 
 /* ------------------------------------------------------------ live workout */
