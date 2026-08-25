@@ -234,14 +234,19 @@ values like 146–158 rather than whatever a lone `round()` of each bound
 would give. `../tests/vo2max-zones.test.mjs` pins the exact bpm bands for
 the defaults in this app.
 
-## Share your workout
+## Share your workout (or run)
 
-A **Save PNG** button opens a preview sheet offering three shareable
-1080×1920 PNGs, each drawn entirely client-side on a `<canvas>` (no
-backend, no third-party image service) with a **transparent background**
-- only a translucent stat panel is painted, so posting one as an
-Instagram Story sticker drops it straight onto whatever photo is already
-there, the same way Strava's own post-activity share card works:
+A **Save PNG** button opens a preview sheet offering shareable 1080×1920
+PNGs, each drawn entirely client-side on a `<canvas>` (no backend, no
+third-party image service) with a **transparent background** - only a
+translucent stat panel is painted, so posting one as an Instagram Story
+sticker drops it straight onto whatever photo is already there, the same
+way Strava's own post-activity share card works. A workout gets a choice
+of three designs (a tab picker at the top of the sheet); a run has just
+the one, so the picker is hidden and the sheet goes straight to its
+preview:
+
+**Workout** - pick between:
 
 - **Summary** - workout name, date, duration, total volume, exercise/set
   counts, any new PRs, and a per-exercise breakdown.
@@ -260,15 +265,21 @@ native share sheet (`navigator.share`) when available, so Instagram shows
 up as a direct target - on a desktop browser (or anywhere Web Share
 doesn't support image files) it just downloads the PNG instead.
 
-**Save PNG** appears in three places, all opening the same preview sheet:
-the finish-workout summary (next to Save as Routine/Done); the workout
-sheet mid-live-session (so you don't have to wait until you're done and
-possibly rushed); and the workout sheet when reopening an already-saved
-workout from the calendar/history later, so you can come back and post it
-whenever you actually have time. A workout logged via the live timer has
-its duration persisted (`workout.durationMs`) specifically so it's still
-available for that last case; one logged directly for a past date has no
-duration to show and the Summary card just omits that stat.
+**Save PNG** appears in three places for workouts, all opening the same
+preview sheet: the finish-workout summary (next to Save as Routine/Done);
+the workout sheet mid-live-session (so you don't have to wait until
+you're done and possibly rushed); and the workout sheet when reopening an
+already-saved workout from the calendar/history later, so you can come
+back and post it whenever you actually have time. A workout logged via
+the live timer has its duration persisted (`workout.durationMs`)
+specifically so it's still available for that last case; one logged
+directly for a past date has no duration to show and the Summary card
+just omits that stat.
+
+**Run** - the same button, on the Edit session sheet (Run tab -> tap a
+logged session), renders one design: distance as the hero stat, then
+duration/avg pace/avg-max HR, plus a VO2max line when that session has a
+reading logged against it.
 
 ## Layout
 

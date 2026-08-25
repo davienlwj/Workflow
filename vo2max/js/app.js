@@ -38,7 +38,9 @@ import {
   exerciseById, searchExercises,
 } from './exercises.js';
 import { muscleDiagramHTML } from './muscleDiagram.js';
-import { renderWorkoutShareCard, renderMuscleBalanceCard, renderPRsCard } from './shareCard.js';
+import {
+  renderWorkoutShareCard, renderMuscleBalanceCard, renderPRsCard, renderRunShareCard,
+} from './shareCard.js';
 import {
   workoutVolume, lastPerformance, personalRecords, newPRsInWorkout, exerciseProgress, exerciseVolumeProgress, loggedBrandsForExercise,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince,
@@ -2020,39 +2022,61 @@ $('summarySaveRoutine').addEventListener('click', () => {
   openRoutineBuilderSheet(ids);
 });
 
-/** Builds and caches (per #shareCardSheet visit) the PNG blob for one of
- *  the three share-card designs, from whatever workout #shareCardSheet is
- *  currently open for (see shareCardContext). */
+/** Builds a run's share-card data from a saved session - typeLabel reuses
+ *  the same map the History list's own row labels come from, paceLabel
+ *  pre-formats through block.js's own mm:ss pace parsing/formatting
+ *  rather than duplicating it in shareCard.js. */
+function buildRunShareCardData(session) {
+  return {
+    typeLabel: typeLabel[session.type] || 'Run',
+    dateLabel: fmtDateLong(session.date),
+    distanceKm: session.distanceKm ?? null,
+    durationMin: session.durationMin ?? null,
+    paceLabel: session.avgPace != null ? `${formatPaceMinKm(session.avgPace)}/km` : null,
+    avgHR: session.avgHR ?? null,
+    maxHR: session.maxHR ?? null,
+    vo2max: session.vo2max ?? null,
+  };
+}
+
+/** Builds and caches (per #shareCardSheet visit) the PNG blob for the
+ *  currently open subject - a run session (one design, `option` is
+ *  always 'run') or a workout (one of the three designs `option` picks
+ *  between) - see shareCardContext. */
 async function buildShareCardBlob(option) {
   if (shareCardBlobs[option]) return shareCardBlobs[option];
-  const { workout, workoutsForPRs, durationMs, newPRs } = shareCardContext;
   let blob;
-  if (option === 'summary') {
-    blob = await renderWorkoutShareCard({
-      workoutName: workout.name || null,
-      dateLabel: fmtDateLong(workout.date),
-      durationMs,
-      totalVolume: workoutVolume(workout, allExercises(), bodyweightKg()),
-      exerciseRows: workoutSummaryByExercise(workout, allExercises(), bodyweightKg()),
-      newPRs,
-    });
-  } else if (option === 'muscle') {
-    blob = await renderMuscleBalanceCard({
-      workoutName: workout.name || null,
-      dateLabel: fmtDateLong(workout.date),
-      muscleDetailed: muscleSetBreakdownDetailed([workout], 'all', workout.date, allExercises()),
-    });
+  if (shareCardContext.kind === 'run') {
+    blob = await renderRunShareCard(buildRunShareCardData(shareCardContext.session));
   } else {
-    const exerciseIds = [...new Set((workout.exercises || []).map((ex) => ex.exerciseId))];
-    const newPRIds = new Set(newPRs.map((p) => p.exerciseId));
-    const prs = exerciseIds.map((id) => {
-      const def = findExercise(id);
-      const pr = personalRecords(workoutsForPRs, id, allExercises(), bodyweightKg());
-      return def && pr ? {
-        name: def.name, maxWeight: pr.maxWeight, best1RM: pr.best1RM, isNew: newPRIds.has(id),
-      } : null;
-    }).filter(Boolean);
-    blob = await renderPRsCard({ workoutName: workout.name || null, dateLabel: fmtDateLong(workout.date), prs });
+    const { workout, workoutsForPRs, durationMs, newPRs } = shareCardContext;
+    if (option === 'summary') {
+      blob = await renderWorkoutShareCard({
+        workoutName: workout.name || null,
+        dateLabel: fmtDateLong(workout.date),
+        durationMs,
+        totalVolume: workoutVolume(workout, allExercises(), bodyweightKg()),
+        exerciseRows: workoutSummaryByExercise(workout, allExercises(), bodyweightKg()),
+        newPRs,
+      });
+    } else if (option === 'muscle') {
+      blob = await renderMuscleBalanceCard({
+        workoutName: workout.name || null,
+        dateLabel: fmtDateLong(workout.date),
+        muscleDetailed: muscleSetBreakdownDetailed([workout], 'all', workout.date, allExercises()),
+      });
+    } else {
+      const exerciseIds = [...new Set((workout.exercises || []).map((ex) => ex.exerciseId))];
+      const newPRIds = new Set(newPRs.map((p) => p.exerciseId));
+      const prs = exerciseIds.map((id) => {
+        const def = findExercise(id);
+        const pr = personalRecords(workoutsForPRs, id, allExercises(), bodyweightKg());
+        return def && pr ? {
+          name: def.name, maxWeight: pr.maxWeight, best1RM: pr.best1RM, isNew: newPRIds.has(id),
+        } : null;
+      }).filter(Boolean);
+      blob = await renderPRsCard({ workoutName: workout.name || null, dateLabel: fmtDateLong(workout.date), prs });
+    }
   }
   shareCardBlobs[option] = blob;
   return blob;
@@ -2085,23 +2109,38 @@ async function renderShareCardPreview(option) {
 /** Opens #shareCardSheet for `workout` (either an already-saved one, or a
  *  synthetic in-progress record built from the live sheet's current form
  *  state - either way its `id`/`date`/`exercises` shape is all any of the
- *  three renderers need).
+ *  three renderers need) - the three-way tab picker (Summary/Muscles/PRs).
  * @param {object} workout
  * @param {object[]} workoutsForPRs full workouts list to compute PRs
  *   against - see shareCardContext's own comment.
  * @param {number|null} durationMs */
 function openShareCardSheetFor(workout, workoutsForPRs, durationMs) {
   shareCardContext = {
+    kind: 'workout',
     workout,
     workoutsForPRs,
     durationMs,
     newPRs: newPRsInWorkout(workoutsForPRs, workout, allExercises(), bodyweightKg()),
   };
   shareCardBlobs = {};
+  $('shareCardTabs').hidden = false;
   $('scrim').hidden = false;
   $('shareCardSheet').hidden = false;
   $('shareCardSheet').scrollTop = 0;
   renderShareCardPreview('summary');
+}
+
+/** Opens #shareCardSheet for a run session - just the one design, so the
+ *  Summary/Muscles/PRs tab picker (workout-only, meaningless for a run)
+ *  is hidden rather than shown with a single option. */
+function openRunShareCardSheet(session) {
+  shareCardContext = { kind: 'run', session };
+  shareCardBlobs = {};
+  $('shareCardTabs').hidden = true;
+  $('scrim').hidden = false;
+  $('shareCardSheet').hidden = false;
+  $('shareCardSheet').scrollTop = 0;
+  renderShareCardPreview('run');
 }
 
 function closeShareCardSheet() {
@@ -2140,6 +2179,12 @@ $('shareCardTabs').addEventListener('click', (e) => {
   renderShareCardPreview(btn.dataset.option);
 });
 
+$('sessionSharePNG').addEventListener('click', () => {
+  const session = sessions.find((s) => s.id === editingId);
+  if (!session) return;
+  openRunShareCardSheet(session);
+});
+
 $('shareCardCancel').addEventListener('click', closeShareCardSheet);
 
 /** Shares (or, where navigator.share can't take image files - desktop
@@ -2152,10 +2197,12 @@ $('shareCardSave').addEventListener('click', async () => {
   btn.textContent = 'Saving…';
   try {
     const blob = await buildShareCardBlob(shareCardOption);
-    const suffix = { summary: 'summary', muscle: 'muscles', prs: 'prs' }[shareCardOption];
-    const file = new File([blob], `hybrd-workout-${shareCardContext.workout.date}-${suffix}.png`, { type: 'image/png' });
+    const filename = shareCardContext.kind === 'run'
+      ? `hybrd-run-${shareCardContext.session.date}.png`
+      : `hybrd-workout-${shareCardContext.workout.date}-${{ summary: 'summary', muscle: 'muscles', prs: 'prs' }[shareCardOption]}.png`;
+    const file = new File([blob], filename, { type: 'image/png' });
     if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'Workout' });
+      await navigator.share({ files: [file], title: shareCardContext.kind === 'run' ? 'Run' : 'Workout' });
     } else {
       downloadFile(file.name, blob, 'image/png');
       toast('Image saved - share it from your Photos/Downloads');

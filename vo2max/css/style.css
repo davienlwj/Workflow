@@ -657,6 +657,7 @@ button { font-family: var(--font-mono); }
 /* -------------------------------------------------------------- scopes */
 
 .scopes { display: flex; gap: 8px; margin: 8px 0 10px; }
+.scopes[hidden] { display: none; }
 
 .scope {
   flex: 1;

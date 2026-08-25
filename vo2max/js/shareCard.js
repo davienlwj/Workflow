@@ -1,11 +1,12 @@
 /*
- * Renders a workout as one of three shareable PNGs - a translucent stat
- * card floating on a fully transparent canvas, the same shape as
- * Strava's own "share to Instagram Stories" card: drop it straight onto
- * a story as a sticker and whatever photo/background is already there
- * shows through around it. Pure rendering only - the caller (app.js)
- * assembles each card's data from the same pure functions the in-app
- * summary/muscle-balance/exercise sheets already use.
+ * Renders a workout (as one of three shareable PNGs) or a run into a
+ * translucent stat card floating on a fully transparent canvas, the same
+ * shape as Strava's own "share to Instagram Stories" card: drop it
+ * straight onto a story as a sticker and whatever photo/background is
+ * already there shows through around it. Pure rendering only - the
+ * caller (app.js) assembles each card's data from the same pure
+ * functions the in-app summary/muscle-balance/exercise/session sheets
+ * already use.
  *
  * All text uses textBaseline "top" and stacks by simple, explicit line
  * heights (fontSize * ~1.2) rather than baseline-to-baseline offsets -
@@ -114,6 +115,15 @@ async function ensureFontLoaded() {
  *  fmtElapsed's "mm:ss" reads as a stopwatch, not a summary stat. */
 function fmtDurationWords(ms) {
   const totalMin = Math.round(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+/** Minutes (a run session's own unit, unlike the millisecond duration a
+ *  live-timed workout tracks) -> the same "1h 12m" / "42m" wording. */
+function fmtDurationMinWords(totalMinRaw) {
+  const totalMin = Math.round(totalMinRaw);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
@@ -526,6 +536,105 @@ export async function renderPRsCard(data) {
       ctx.fillText(`Best: ${pr.maxWeight}kg  ·  Est. 1RM: ${pr.best1RM}kg`, innerX, y + 38);
       y += ROW_H;
     }
+  }
+
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+}
+
+/**
+ * @param {{
+ *   typeLabel: string,
+ *   dateLabel: string,
+ *   distanceKm: number|null,
+ *   durationMin: number|null,
+ *   paceLabel: string|null,
+ *   avgHR: number|null,
+ *   maxHR: number|null,
+ *   vo2max: number|null,
+ * }} data `paceLabel` is pre-formatted (e.g. "5:15/km", via block.js's
+ *   formatPaceMinKm) rather than a raw number, since that mm:ss-style
+ *   parsing/formatting already lives there and belongs kept in one place
+ *   - everything else here is simple enough to format inline.
+ * @returns {Promise<Blob>} a transparent 1080x1920 PNG
+ */
+export async function renderRunShareCard(data) {
+  await ensureFontLoaded();
+  const logo = await loadImage('./icons/logo-header.png');
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  const logoH = 72;
+  const logoW = logoH * (logo.width / logo.height);
+  const hasVO2max = data.vo2max != null;
+
+  const measure = () => {
+    let y = 64;
+    y += logoH + 40;
+    y += 26 * 1.3 + 16; // "RUN COMPLETE"
+    y += 46 * 1.25 + 12; // type label
+    y += 26 * 1.3 + 40; // date
+    y += 22 * 1.3 + 8; // "DISTANCE" label
+    y += 84 * 1.15 + 40; // big distance value
+    y += 44 * 1.15 + 5 + 20 * 1.2; // stat row
+    if (hasVO2max) y += 24 + 26 * 1.3;
+    y += 56;
+    return y;
+  };
+  const contentH = measure();
+  const panelX = PAD_X;
+  const panelW = W - PAD_X * 2;
+  const innerX = panelX + 56;
+  const innerW = panelW - 112;
+  const panelH = Math.min(contentH, H - 160);
+  const panelY = (H - panelH) / 2;
+
+  ctx.fillStyle = PANEL_FILL;
+  ctx.strokeStyle = PANEL_BORDER;
+  ctx.lineWidth = 2;
+  roundRect(ctx, panelX, panelY, panelW, panelH, 40);
+  ctx.fill();
+  ctx.stroke();
+
+  const cx = W / 2;
+  let y = panelY + 64;
+
+  ctx.drawImage(logo, cx - logoW / 2, y, logoW, logoH);
+  y += logoH + 40;
+
+  y = line(ctx, 'RUN COMPLETE', cx, y, { weight: 700, size: 26, color: DIM, lineHeight: 1.3 });
+  y += 16;
+  y = line(ctx, data.typeLabel, cx, y, { weight: 700, size: 46, color: INK, lineHeight: 1.25 });
+  y += 12;
+  y = line(ctx, data.dateLabel, cx, y, { weight: 400, size: 26, color: DIM, lineHeight: 1.3 });
+  y += 40;
+
+  y = line(ctx, 'DISTANCE', cx, y, { weight: 700, size: 22, color: DIM, lineHeight: 1.3 });
+  y += 8;
+  const distanceText = data.distanceKm != null ? `${data.distanceKm}km` : '–';
+  y = line(ctx, distanceText, cx, y, { weight: 700, size: 84, color: BRAND_ORANGE, lineHeight: 1.15 });
+  y += 40;
+
+  const hrText = data.avgHR != null || data.maxHR != null ? `${data.avgHR ?? '–'}/${data.maxHR ?? '–'}` : '–';
+  const stats = [
+    [data.durationMin != null ? fmtDurationMinWords(data.durationMin) : '–', 'DURATION'],
+    [data.paceLabel || '–', 'AVG PACE'],
+    [hrText, 'AVG/MAX HR'],
+  ];
+  const colW = innerW / 3;
+  const statTopY = y;
+  for (let i = 0; i < stats.length; i++) {
+    const colCx = innerX + colW * i + colW / 2;
+    let sy = line(ctx, stats[i][0], colCx, statTopY, { weight: 700, size: 44, color: BRAND_ORANGE, lineHeight: 1.15 });
+    line(ctx, stats[i][1], colCx, sy + 5, { weight: 700, size: 20, color: DIM, lineHeight: 1.2 });
+  }
+  y = statTopY + 44 * 1.15 + 5 + 20 * 1.2;
+
+  if (hasVO2max) {
+    y += 24;
+    line(ctx, `VO2max ${data.vo2max}`, cx, y, { weight: 700, size: 26, color: BRAND_ORANGE, lineHeight: 1.3 });
   }
 
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
