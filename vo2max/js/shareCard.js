@@ -424,15 +424,53 @@ async function renderReceiptCard(spec) {
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 
+// A paired superset's dashed box in the exercise list - "⚭ SUPERSET" label
+// line, then the box itself wrapping both rows (same padding top/bottom),
+// then breathing room before whatever comes next. Kept as named constants
+// (rather than inlined numbers) so the measure and draw passes below can't
+// drift out of sync with each other.
+const SUPERSET_LABEL_H = 18 * 1.3 + 8;
+const SUPERSET_BOX_PAD = 14;
+const SUPERSET_GAP_AFTER = 16;
+const EXERCISE_ROW_H = 76;
+
+/** Groups exerciseRows into superset pairs (two consecutive rows sharing a
+ *  non-null supersetId) or singles - see groupSummaryRows in app.js, which
+ *  does the same grouping for the in-app finish-workout summary list this
+ *  card mirrors. */
+function groupExerciseRows(rows) {
+  const groups = [];
+  let i = 0;
+  while (i < rows.length) {
+    const row = rows[i];
+    const next = rows[i + 1];
+    if (row.supersetId && next?.supersetId === row.supersetId) {
+      groups.push([row, next]);
+      i += 2;
+    } else {
+      groups.push([row]);
+      i += 1;
+    }
+  }
+  return groups;
+}
+
+function exerciseGroupHeight(group) {
+  if (group.length > 1) return SUPERSET_LABEL_H + SUPERSET_BOX_PAD * 2 + group.length * EXERCISE_ROW_H + SUPERSET_GAP_AFTER;
+  return EXERCISE_ROW_H;
+}
+
 /**
  * @param {{
  *   workoutName: string|null,
  *   dateLabel: string,
  *   durationMs: number|null,
  *   totalVolume: number,
- *   exerciseRows: {name: string, setCount: number, totalReps: number, volume: number}[],
+ *   exerciseRows: {name: string, setCount: number, totalReps: number, volume: number, supersetId: string|null}[],
  *   newPRs: {name: string, weight: number}[],
- * }} data
+ * }} data a paired superset (two consecutive rows sharing a non-null
+ *   supersetId) gets a dashed "⚭ SUPERSET" box around both, the same
+ *   grouping the live workout sheet itself shows.
  * @returns {Promise<Blob>} a transparent 1080x1920 PNG
  */
 export async function renderWorkoutShareCard(data) {
@@ -447,8 +485,16 @@ export async function renderWorkoutShareCard(data) {
   // the panel itself, so the exported PNG sits cleanly on any background.
 
   const totalSets = data.exerciseRows.reduce((sum, r) => sum + r.setCount, 0);
-  const shownRows = data.exerciseRows.slice(0, MAX_EXERCISE_ROWS);
+  let shownRows = data.exerciseRows.slice(0, MAX_EXERCISE_ROWS);
+  // Never cut a superset pair in half at the boundary - drop the orphaned
+  // row too rather than showing one half of a pair with no partner.
+  const firstHidden = data.exerciseRows[shownRows.length];
+  const lastShown = shownRows[shownRows.length - 1];
+  if (lastShown?.supersetId && firstHidden?.supersetId === lastShown.supersetId) {
+    shownRows = shownRows.slice(0, -1);
+  }
   const hiddenCount = data.exerciseRows.length - shownRows.length;
+  const exerciseGroups = groupExerciseRows(shownRows);
   const hasPRs = data.newPRs.length > 0;
   // Only a workout finished through the live timer has a known duration -
   // one logged directly for a past date, or opened for share long after it
@@ -479,7 +525,7 @@ export async function renderWorkoutShareCard(data) {
     }
     y += 44 * 1.15 + 20 * 1.2 + 40; // stat row (value + label)
     y += 1 + 32; // divider
-    y += shownRows.length * 76;
+    y += exerciseGroups.reduce((sum, g) => sum + exerciseGroupHeight(g), 0);
     if (hiddenCount > 0) y += 34;
     y += 56; // bottom padding
     return y;
@@ -553,14 +599,40 @@ export async function renderWorkoutShareCard(data) {
 
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  for (const row of shownRows) {
+  const drawExerciseRow = (row, rowY) => {
     ctx.font = font(700, 30);
     ctx.fillStyle = INK;
-    ctx.fillText(row.name, innerX, y);
+    ctx.fillText(row.name, innerX, rowY);
     ctx.font = font(400, 22);
     ctx.fillStyle = DIMMER;
-    ctx.fillText(`${row.setCount} sets · ${row.totalReps} reps · ${Math.round(row.volume)}kg`, innerX, y + 38);
-    y += 76;
+    ctx.fillText(`${row.setCount} sets · ${row.totalReps} reps · ${Math.round(row.volume)}kg`, innerX, rowY + 38);
+  };
+  for (const group of exerciseGroups) {
+    if (group.length > 1) {
+      ctx.font = font(700, 18);
+      ctx.fillStyle = BRAND_ORANGE;
+      ctx.fillText('⚭ SUPERSET', innerX, y);
+      y += SUPERSET_LABEL_H;
+
+      const boxH = SUPERSET_BOX_PAD * 2 + group.length * EXERCISE_ROW_H;
+      ctx.save();
+      ctx.setLineDash([6, 6]);
+      ctx.strokeStyle = BRAND_ORANGE;
+      ctx.lineWidth = 2;
+      roundRect(ctx, innerX - SUPERSET_BOX_PAD, y, innerW + SUPERSET_BOX_PAD * 2, boxH, 18);
+      ctx.stroke();
+      ctx.restore();
+
+      let rowY = y + SUPERSET_BOX_PAD;
+      for (const row of group) {
+        drawExerciseRow(row, rowY);
+        rowY += EXERCISE_ROW_H;
+      }
+      y += boxH + SUPERSET_GAP_AFTER;
+    } else {
+      drawExerciseRow(group[0], y);
+      y += EXERCISE_ROW_H;
+    }
   }
   if (hiddenCount > 0) {
     ctx.font = font(400, 24);

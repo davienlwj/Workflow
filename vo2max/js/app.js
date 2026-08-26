@@ -2450,6 +2450,37 @@ $('routineForm').addEventListener('submit', (e) => {
 
 /** @param {ReturnType<typeof newPRsInWorkout>} [newPRs] shown as a
  *  celebratory banner above the duration when non-empty. */
+function summaryExerciseRowHTML(r) {
+  return `
+    <div class="summary-exercise-row">
+      <div class="summary-exercise-name">${escapeHTML(r.name)}</div>
+      <div class="summary-exercise-stats mono">${r.setCount} sets · ${r.totalReps} reps · ${r.volume}kg volume</div>
+    </div>
+  `;
+}
+
+/** Groups workoutSummaryByExercise's rows into superset pairs (two
+ *  consecutive rows sharing a non-null supersetId) or singles - matches
+ *  how the live workout sheet's own blocks end up grouped (readWorkoutForm
+ *  reads them in document order, and pairing always moves both blocks into
+ *  a shared wrapper, so a real pair is always adjacent in the saved data). */
+function groupSummaryRows(rows) {
+  const groups = [];
+  let i = 0;
+  while (i < rows.length) {
+    const row = rows[i];
+    const next = rows[i + 1];
+    if (row.supersetId && next?.supersetId === row.supersetId) {
+      groups.push([row, next]);
+      i += 2;
+    } else {
+      groups.push([row]);
+      i += 1;
+    }
+  }
+  return groups;
+}
+
 function openWorkoutSummarySheet(workout, durationMs, newPRs = []) {
   lastFinishedWorkout = workout;
   lastFinishedDurationMs = durationMs;
@@ -2462,12 +2493,10 @@ function openWorkoutSummarySheet(workout, durationMs, newPRs = []) {
   $('summaryDuration').textContent = fmtElapsed(durationMs);
   const rows = workoutSummaryByExercise(workout, allExercises(), bodyweightKg());
   $('summaryExercises').innerHTML = rows.length
-    ? rows.map((r) => `
-      <div class="summary-exercise-row">
-        <div class="summary-exercise-name">${escapeHTML(r.name)}</div>
-        <div class="summary-exercise-stats mono">${r.setCount} sets · ${r.totalReps} reps · ${r.volume}kg volume</div>
-      </div>
-    `).join('')
+    ? groupSummaryRows(rows).map((group) => (group.length > 1
+      ? `<div class="summary-superset-group"><div class="summary-superset-label">⚭ Superset</div>${group.map(summaryExerciseRowHTML).join('')}</div>`
+      : summaryExerciseRowHTML(group[0])
+    )).join('')
     : '<p class="empty">No working sets logged.</p>';
   $('scrim').hidden = false;
   $('workoutSummarySheet').hidden = false;

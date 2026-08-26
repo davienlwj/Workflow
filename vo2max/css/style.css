@@ -1191,6 +1191,26 @@ button { font-family: var(--font-mono); }
 .summary-exercise-name { font-weight: 700; font-size: 14px; }
 .summary-exercise-stats { font-size: 12px; color: var(--dim); margin-top: 2px; }
 
+/* A paired superset in the finish-workout summary - same dashed-border
+   grouping as .wo-superset-group during the live workout itself. */
+.summary-superset-group {
+  border: 1px dashed var(--accent);
+  border-radius: 14px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.summary-superset-group .summary-exercise-row { border-color: transparent; }
+.summary-superset-label {
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 /* ----------------------------------------------------------------- toast */
 
 .toast {

@@ -173,7 +173,10 @@ export function exerciseVolumeProgress(workouts, exerciseId, exercises = EXERCIS
  * Per-exercise recap for the finish-workout summary screen: sets logged,
  * total reps, and volume (weight x reps, warm-ups excluded per
  * workoutVolume's convention), in the order the exercises appear in the
- * workout.
+ * workout. `supersetId` is carried straight through from the exercise
+ * entry (null when it wasn't paired) so callers can visually group a
+ * paired pair the same way the live workout sheet does - two consecutive
+ * rows sharing a non-null supersetId are one pair.
  * @param {typeof EXERCISES} [exercises] defaults to the built-in library;
  *   pass a list that also includes the user's custom exercises to resolve
  *   names for those too.
@@ -191,6 +194,7 @@ export function workoutSummaryByExercise(workout, exercises = EXERCISES, bodywei
       setCount: workingSets.length,
       totalReps: workingSets.reduce((sum, s) => sum + s.reps, 0),
       volume: workingSets.reduce((sum, s) => sum + loadWeight(s, isBodyweight, bodyweightKg) * s.reps, 0),
+      supersetId: ex.supersetId ?? null,
     };
   });
 }
