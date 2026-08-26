@@ -12,6 +12,7 @@ const CUSTOM_EXERCISES_KEY = 'vo2max.customExercises.v1';
 const LIVE_WORKOUT_KEY = 'vo2max.liveWorkout.v1';
 const ROUTINES_KEY = 'vo2max.routines.v1';
 const CUSTOM_BRANDS_KEY = 'vo2max.customBrands.v1';
+const CUSTOM_SESSION_TYPES_KEY = 'vo2max.customSessionTypes.v1';
 
 export const DEFAULT_SETTINGS = {
   theme: 'light', // 'light' | 'dark'
@@ -264,6 +265,33 @@ export function addCustomBrand(name) {
   return brands;
 }
 
+/** User-added session type labels, layered on top of the built-in
+ *  Interval/Easy run/Long run presets in app.js - same role/shape as
+ *  loadCustomBrands above. */
+export function loadCustomSessionTypes() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_SESSION_TYPES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomSessionTypes(types) {
+  localStorage.setItem(CUSTOM_SESSION_TYPES_KEY, JSON.stringify(types));
+}
+
+export function addCustomSessionType(name) {
+  const types = loadCustomSessionTypes();
+  if (!types.includes(name)) {
+    types.push(name);
+    saveCustomSessionTypes(types);
+  }
+  return types;
+}
+
 /** In-progress "today's workout" live session, so backgrounding/killing the
  *  PWA mid-workout at the gym doesn't lose it. Shape: { startedAt, date,
  *  name, notes, exercises } - same as readWorkoutForm()'s output plus
@@ -293,6 +321,7 @@ export function exportAll() {
     customExercises: loadCustomExercises(),
     routines: loadRoutines(),
     customBrands: loadCustomBrands(),
+    customSessionTypes: loadCustomSessionTypes(),
     exportedAt: new Date().toISOString(),
   }, null, 2);
 }
@@ -305,4 +334,5 @@ export function importAll(json) {
   if (Array.isArray(data.customExercises)) saveCustomExercises(data.customExercises);
   if (Array.isArray(data.routines)) saveRoutines(data.routines);
   if (Array.isArray(data.customBrands)) saveCustomBrands(data.customBrands);
+  if (Array.isArray(data.customSessionTypes)) saveCustomSessionTypes(data.customSessionTypes);
 }

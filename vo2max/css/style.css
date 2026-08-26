@@ -269,6 +269,7 @@ main.has-live-bar {
 .form[hidden] { display: none; }
 
 .row { display: flex; gap: 10px; max-width: 100%; }
+.row[hidden] { display: none; }
 .row .field { flex: 1; min-width: 0; }
 
 .field {

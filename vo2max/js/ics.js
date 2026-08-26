@@ -79,6 +79,8 @@ export function descriptionText(session) {
   if (session.avgPace != null) lines.push(`Avg pace: ${formatPaceMinKm(session.avgPace)} min/km`);
   if (session.avgSpeedKmh != null) lines.push(`Avg speed: ${session.avgSpeedKmh} km/h`);
   if (session.avgPace100m != null) lines.push(`Avg pace: ${formatPaceMinKm(session.avgPace100m)} min/100m`);
+  if (session.avgRpm != null) lines.push(`Avg cadence: ${session.avgRpm} rpm`);
+  if (session.avgPower != null) lines.push(`Avg power: ${session.avgPower} W`);
   if (session.distanceKm != null) lines.push(`Distance: ${session.distanceKm} km`);
   if (session.avgHR != null) lines.push(`Average HR: ${session.avgHR} bpm`);
   if (session.maxHR != null) lines.push(`Max HR: ${session.maxHR} bpm`);

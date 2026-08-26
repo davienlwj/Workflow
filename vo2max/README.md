@@ -172,7 +172,10 @@ distance/duration/HR plus whichever pace-like metric actually makes sense
 for it: pace (min/km) for a run, speed (km/h) for a ride, pace/100m for a
 swim, or just duration/distance/HR for everything else (walks, hikes,
 weight training, ...), which has no single metric that fits every possible
-activity type. Runs also get **VO2max** filled in automatically, too, when
+activity type. A ride's edit sheet also has optional **Avg RPM** and **Avg
+power (W)** fields - intervals.icu doesn't hand these over, so they're
+blank on import and there to key in by hand if you track cadence/power on
+your bike computer. Runs also get **VO2max** filled in automatically, too, when
 your watch estimated one that day: intervals.icu's daily wellness log
 carries a VO2max reading alongside resting HR and sleep, and an imported
 run's VO2max reading field is auto-filled from it instead of being left for

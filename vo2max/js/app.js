@@ -6,6 +6,7 @@ import {
   loadLiveWorkout, saveLiveWorkout, clearLiveWorkout,
   loadRoutines, addRoutine, updateRoutine, deleteRoutine,
   loadCustomBrands, addCustomBrand,
+  loadCustomSessionTypes, addCustomSessionType,
   exportAll, importAll,
 } from './store.js';
 import { lthrZoneTable, rhrZoneTable, zoneTable, hrZoneDurations } from './zones.js';
@@ -67,6 +68,7 @@ let workouts = loadWorkouts();
 let customExercises = loadCustomExercises();
 let routines = loadRoutines();
 let customBrands = loadCustomBrands();
+let customSessionTypes = loadCustomSessionTypes();
 let editingId = null;
 // The sport of the session currently open in the Edit sheet ('run' unless
 // it's a synced ride/swim/other activity) - readSessionForm and
@@ -293,7 +295,7 @@ for (const prefix of ['log', 'edit']) {
 
 function resetLogForm() {
   $('logDate').value = todayIso();
-  $('logType').value = 'interval';
+  refreshTypeSelect($('logType'), 'interval');
   $('logDurationMin').value = '';
   $('logAvgPace').value = '';
   $('logDistanceKm').value = '';
@@ -320,15 +322,19 @@ $('logRPE').addEventListener('input', () => { $('logRPEOut').textContent = $('lo
 //
 // The Log form only ever creates runs (there's no manual-entry UI for other
 // sports), so it's always read as sport 'run'. The Edit form can also be
-// open on a synced ride/swim/other session, whose type/pace-metric fields
-// are hidden or repurposed (see openEditSheet) - editingSport says which,
-// and the patch simply omits whatever field isn't live in the form, so
+// open on a synced ride/swim/other session, whose pace-metric fields are
+// hidden or repurposed (see openEditSheet) - editingSport says which, and
+// the patch omits whatever metric field isn't live in the form, so
 // updateSession's merge leaves the session's existing value there alone.
+// `type` is always read regardless of sport - the Session type select is a
+// free-text label the user can rename/pick for any session (see
+// typeOptionsHTML), not tied to what sport it is.
 function readSessionForm(prefix) {
   const sport = prefix === 'edit' ? editingSport : 'run';
   // The Log form has no VO2max field (only Edit does, for filling one in after the fact).
   const vo2maxEl = $(`${prefix}VO2max`);
   const base = {
+    type: $(`${prefix}Type`).value,
     date: $(`${prefix}Date`).value,
     rpe: Number($(`${prefix}RPE`).value),
     vo2max: vo2maxEl ? numOrNull(vo2maxEl.value) : null,
@@ -341,15 +347,21 @@ function readSessionForm(prefix) {
   if (sport === 'run') {
     return {
       ...base,
-      type: $(`${prefix}Type`).value,
       avgPace: parsePaceMinKm($(`${prefix}AvgPace`).value),
       warmup: readPhaseFields(prefix, 'Warmup'),
       cooldown: readPhaseFields(prefix, 'Cooldown'),
     };
   }
-  if (sport === 'ride') return { ...base, avgSpeedKmh: numOrNull($(`${prefix}AvgPace`).value) };
+  if (sport === 'ride') {
+    return {
+      ...base,
+      avgSpeedKmh: numOrNull($(`${prefix}AvgPace`).value),
+      avgRpm: numOrNull($(`${prefix}AvgRpm`).value),
+      avgPower: numOrNull($(`${prefix}AvgPower`).value),
+    };
+  }
   if (sport === 'swim') return { ...base, avgPace100m: parsePaceMinKm($(`${prefix}AvgPace`).value) };
-  return base; // 'other': no pace/speed metric, type stays whatever the sync set
+  return base; // 'other': no pace/speed metric
 }
 
 /** Opens the Log session popup for a given date (from a calendar day). */
@@ -398,6 +410,71 @@ const recoveryLabel = { easy: 'Easy', moderate: 'Moderate', hard: 'Hard' };
 // relying on color (monotone theme) or having to read the word.
 const recoverySymbol = { easy: '○', moderate: '◐', hard: '●' };
 const typeLabel = { interval: '4x4', 'easy-run': 'Easy run', 'long-run': 'Long run' };
+
+// The Session type dropdown's built-in presets (long-form labels, distinct
+// from typeLabel's short badge text above) plus any custom types the user
+// has added - a session's `type` is really just a free-text label at this
+// point (typeLabel[type] ?? type already falls back to it verbatim), so
+// this select works the same way for every sport: pick a preset, pick a
+// custom one you added before, or add a new one on the spot.
+const TYPE_PRESETS = [
+  { value: 'interval', label: 'Interval (Norwegian 4x4)' },
+  { value: 'easy-run', label: 'Easy run' },
+  { value: 'long-run', label: 'Long run' },
+];
+
+/** Builds a Session type <select>'s full option list: presets, then any
+ *  custom types, then a trailing "+ Add type…" option - mirrors
+ *  brandOptionsHTML's shape below. `selected` is shown pre-selected even if
+ *  it isn't (yet) one of those - e.g. a freshly-synced ride's own type
+ *  ("Ride") - so opening the sheet never silently jumps to a different
+ *  value. */
+function typeOptionsHTML(selected) {
+  const presetValues = new Set(TYPE_PRESETS.map((t) => t.value));
+  const customs = customSessionTypes.filter((t) => !presetValues.has(t));
+  const presetHTML = TYPE_PRESETS
+    .map((t) => `<option value="${t.value}"${t.value === selected ? ' selected' : ''}>${t.label}</option>`)
+    .join('');
+  const customHTML = customs
+    .map((t) => `<option value="${escapeHTML(t)}"${t === selected ? ' selected' : ''}>${escapeHTML(t)}</option>`)
+    .join('');
+  const knownValues = new Set([...presetValues, ...customs]);
+  const extraHTML = selected && !knownValues.has(selected)
+    ? `<option value="${escapeHTML(selected)}" selected>${escapeHTML(selected)}</option>`
+    : '';
+  return `${presetHTML}${customHTML}${extraHTML}<option value="__add__">+ Add type…</option>`;
+}
+
+/** Rebuilds a Session type select's options and selects `value`, tracking
+ *  it in data-confirmed so wireTypeSelectAddFlow can revert to it if the
+ *  user opens "+ Add type…" and then cancels. */
+function refreshTypeSelect(select, value) {
+  select.innerHTML = typeOptionsHTML(value);
+  select.value = value;
+  select.dataset.confirmed = value;
+}
+
+/** Wires the "+ Add type…" entry once per select (Log and Edit each have
+ *  their own) - mirrors the .wo-brand-select add-flow used for machine
+ *  brands. */
+function wireTypeSelectAddFlow(select) {
+  select.addEventListener('change', () => {
+    if (select.value !== '__add__') {
+      select.dataset.confirmed = select.value;
+      return;
+    }
+    const name = window.prompt('New session type name:')?.trim();
+    if (name) {
+      addCustomSessionType(name);
+      customSessionTypes = loadCustomSessionTypes();
+      refreshTypeSelect(select, name);
+    } else {
+      refreshTypeSelect(select, select.dataset.confirmed || 'interval');
+    }
+  });
+}
+wireTypeSelectAddFlow($('logType'));
+wireTypeSelectAddFlow($('editType'));
 
 /** The sport-appropriate pace-like metric for a session - avgPace (min/km)
  *  for a run, avgSpeedKmh for a ride, avgPace100m for a swim, or nothing at
@@ -456,6 +533,8 @@ function renderHistory() {
       ${s.durationMin != null ? `<span class="mono">${s.durationMin}min</span>` : ''}
       ${s.distanceKm != null ? `<span class="mono">${s.distanceKm}km</span>` : ''}
       ${metric.text ? `<span class="mono">${metric.text}</span>` : ''}
+      ${s.avgRpm != null ? `<span class="mono">${s.avgRpm}rpm</span>` : ''}
+      ${s.avgPower != null ? `<span class="mono">${s.avgPower}W</span>` : ''}
       ${s.avgHR != null ? `<span class="mono">avg ${s.avgHR}</span>` : ''}
       ${s.maxHR != null ? `<span class="mono">max ${s.maxHR}</span>` : ''}
       <span class="mono">RPE ${s.rpe}</span>
@@ -910,29 +989,6 @@ $('recentActivityList').addEventListener('click', (e) => {
 
 /* --------------------------------------------------------- edit sheet */
 
-/** For a run, the Session type select behaves exactly as before (editable,
- *  Interval/Easy/Long). A synced ride/swim/other activity has no such
- *  sub-classification to offer, so instead of leaving the select showing
- *  a misleading default, this injects a single option carrying the synced
- *  activity's own type label and locks the select on it. */
-function setEditTypeControl(sport, session) {
-  const select = $('editType');
-  const injected = select.querySelector('option[data-synced]');
-  if (injected) injected.remove();
-  if (sport === 'run') {
-    select.disabled = false;
-    select.value = sessionTypeOf(session);
-    return;
-  }
-  const opt = document.createElement('option');
-  opt.value = session.type ?? '';
-  opt.textContent = typeLabel[session.type] ?? session.type ?? 'Activity';
-  opt.dataset.synced = 'true';
-  select.appendChild(opt);
-  select.value = opt.value;
-  select.disabled = true;
-}
-
 const EDIT_METRIC_LABEL = { run: 'Avg pace (min/km)', ride: 'Avg speed (km/h)', swim: 'Avg pace (min/100m)' };
 
 /** The Edit sheet's one pace-like input is reused across sports rather than
@@ -957,12 +1013,15 @@ function openEditSheet(session) {
   const sport = session.sport ?? 'run';
   editingSport = sport;
   $('editDate').value = session.date;
-  setEditTypeControl(sport, session);
+  refreshTypeSelect($('editType'), session.type ?? 'interval');
   $('editDurationMin').value = session.durationMin ?? '';
   setEditMetricField(sport, session);
   $('editDistanceKm').value = session.distanceKm ?? '';
   $('editRunAvgHR').value = session.avgHR ?? '';
   $('editRunMaxHR').value = session.maxHR ?? '';
+  $('editRideExtraFields').hidden = sport !== 'ride';
+  $('editAvgRpm').value = session.avgRpm ?? '';
+  $('editAvgPower').value = session.avgPower ?? '';
   $('editWarmupToggleField').hidden = sport !== 'run';
   $('editCooldownToggleField').hidden = sport !== 'run';
   populatePhaseFields('edit', 'Warmup', session.warmup);
