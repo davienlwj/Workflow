@@ -294,6 +294,17 @@ main.has-live-bar {
   font-weight: 700;
   color: var(--ink);
 }
+
+/* Same text styling as .field-toggle's Warm up/Cool down labels, for a
+   plain (non-toggle) section heading like the run form's "Workout" label -
+   margin zeroed since .form's own flex gap already spaces it from its
+   siblings, same as .field-toggle relies on. */
+.field-section-label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
 .field-toggle input[type="checkbox"] {
   width: 20px;
   height: 20px;
