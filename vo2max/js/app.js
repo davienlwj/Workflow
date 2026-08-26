@@ -18,7 +18,8 @@ import {
 import {
   vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG, exerciseVolumeSVG, muscleRadarSVG,
   restingHRTrendSVG, sleepBarChartSVG,
-  activityHRLineChartSVG, activityPaceLineChartSVG, hrZoneDurationListHTML,
+  activityHRLineChartSVG, activityPaceLineChartSVG, activitySpeedLineChartSVG, activitySwimPaceLineChartSVG,
+  hrZoneDurationListHTML,
 } from './chart.js';
 import { sessionToICS, sessionToGCalEvent, workoutToGCalEvent } from './ics.js';
 import {
@@ -27,7 +28,6 @@ import {
 } from './gcal.js';
 import {
   listActivities as intervalsListActivities,
-  isRunActivity as isIntervalsRunActivity,
   activityToSession as intervalsActivityToSession,
   fetchRecentWellness as intervalsFetchRecentWellness,
   fetchWellnessHistory as intervalsFetchWellnessHistory,
@@ -68,6 +68,12 @@ let customExercises = loadCustomExercises();
 let routines = loadRoutines();
 let customBrands = loadCustomBrands();
 let editingId = null;
+// The sport of the session currently open in the Edit sheet ('run' unless
+// it's a synced ride/swim/other activity) - readSessionForm and
+// updateComputedDistance consult this to know which fields are actually
+// live in the form, since a non-run session hides/repurposes several of
+// them (see openEditSheet).
+let editingSport = 'run';
 let workoutEditingId = null;
 let exerciseSheetId = null;
 let exDetailBrand = ''; // '' = all brands, else a brand logged for the open exercise
@@ -225,8 +231,12 @@ function numOrNull(v) {
   return Number.isNaN(n) ? null : n;
 }
 
-/** Distance = duration / pace, whenever both are present; otherwise left alone for manual entry. */
+/** Distance = duration / pace, whenever both are present; otherwise left
+ *  alone for manual entry. Only meaningful for a run's pace field - the
+ *  Edit sheet repurposes the same input for a ride's speed or a swim's
+ *  pace/100m, where this min/km formula would silently compute nonsense. */
 function updateComputedDistance(prefix) {
+  if (prefix === 'edit' && editingSport !== 'run') return;
   const duration = numOrNull($(`${prefix}DurationMin`).value);
   const pace = parsePaceMinKm($(`${prefix}AvgPace`).value);
   if (duration != null && pace != null && pace > 0) {
@@ -301,30 +311,45 @@ $('logAvgPace').addEventListener('input', () => updateComputedDistance('log'));
 
 $('logRPE').addEventListener('input', () => { $('logRPEOut').textContent = $('logRPE').value; });
 
-// Every session type shares the same fields now (duration/pace/distance/HR).
+// Every RUN session shares the same fields (duration/pace/distance/HR).
 // intervalsCompleted/intervals/recovery are deliberately left out of this
 // object rather than zeroed out: addSession simply won't have them, and
 // updateSession's patch merge (`{...existing, ...patch}`) leaves an older
 // interval session's per-rep HR breakdown untouched when it's re-saved,
 // since the edit form no longer collects or shows those fields.
+//
+// The Log form only ever creates runs (there's no manual-entry UI for other
+// sports), so it's always read as sport 'run'. The Edit form can also be
+// open on a synced ride/swim/other session, whose type/pace-metric fields
+// are hidden or repurposed (see openEditSheet) - editingSport says which,
+// and the patch simply omits whatever field isn't live in the form, so
+// updateSession's merge leaves the session's existing value there alone.
 function readSessionForm(prefix) {
-  const type = $(`${prefix}Type`).value;
+  const sport = prefix === 'edit' ? editingSport : 'run';
   // The Log form has no VO2max field (only Edit does, for filling one in after the fact).
   const vo2maxEl = $(`${prefix}VO2max`);
-  return {
-    type,
+  const base = {
     date: $(`${prefix}Date`).value,
     rpe: Number($(`${prefix}RPE`).value),
     vo2max: vo2maxEl ? numOrNull(vo2maxEl.value) : null,
     notes: $(`${prefix}Notes`).value.trim(),
     durationMin: numOrNull($(`${prefix}DurationMin`).value),
-    avgPace: parsePaceMinKm($(`${prefix}AvgPace`).value),
     distanceKm: numOrNull($(`${prefix}DistanceKm`).value),
     avgHR: numOrNull($(`${prefix}RunAvgHR`).value),
     maxHR: numOrNull($(`${prefix}RunMaxHR`).value),
-    warmup: readPhaseFields(prefix, 'Warmup'),
-    cooldown: readPhaseFields(prefix, 'Cooldown'),
   };
+  if (sport === 'run') {
+    return {
+      ...base,
+      type: $(`${prefix}Type`).value,
+      avgPace: parsePaceMinKm($(`${prefix}AvgPace`).value),
+      warmup: readPhaseFields(prefix, 'Warmup'),
+      cooldown: readPhaseFields(prefix, 'Cooldown'),
+    };
+  }
+  if (sport === 'ride') return { ...base, avgSpeedKmh: numOrNull($(`${prefix}AvgPace`).value) };
+  if (sport === 'swim') return { ...base, avgPace100m: parsePaceMinKm($(`${prefix}AvgPace`).value) };
+  return base; // 'other': no pace/speed metric, type stays whatever the sync set
 }
 
 /** Opens the Log session popup for a given date (from a calendar day). */
@@ -349,8 +374,11 @@ $('logForm').addEventListener('submit', (e) => {
   // Warn (rather than silently double-logging) if intervals.icu already
   // auto-synced a run for this same date - the user gets to decide it's
   // really a second run that day (e.g. two-a-days) instead of finding a
-  // surprise duplicate later.
-  const autoSyncedSameDay = sessions.find((s) => s.date === form.date && s.intervalsActivityId);
+  // surprise duplicate later. Scoped to sport 'run': a synced ride or swim
+  // on the same date isn't a duplicate of a manually-logged run at all.
+  const autoSyncedSameDay = sessions.find(
+    (s) => s.date === form.date && s.intervalsActivityId && (s.sport ?? 'run') === 'run',
+  );
   if (autoSyncedSameDay
     && !confirm(`A run from intervals.icu was already auto-synced for ${fmtDateLong(form.date)}. Log this one too?`)) {
     return;
@@ -370,6 +398,29 @@ const recoveryLabel = { easy: 'Easy', moderate: 'Moderate', hard: 'Hard' };
 // relying on color (monotone theme) or having to read the word.
 const recoverySymbol = { easy: '○', moderate: '◐', hard: '●' };
 const typeLabel = { interval: '4x4', 'easy-run': 'Easy run', 'long-run': 'Long run' };
+
+/** The sport-appropriate pace-like metric for a session - avgPace (min/km)
+ *  for a run, avgSpeedKmh for a ride, avgPace100m for a swim, or nothing at
+ *  all for 'other' (walks, hikes, weight training, ...), which has no single
+ *  metric that makes sense across every activity intervals.icu might report.
+ *  `label` names which metric it is (for stat-tile/receipt headers); `text`
+ *  is null whenever the session has no value for that metric yet, so every
+ *  call site can fall back to its own placeholder consistently. Sessions
+ *  logged before this existed (or logged by hand, which is always a run)
+ *  default to sport 'run', matching sessionTypeOf's own legacy fallback. */
+function sessionMetric(session) {
+  const sport = session.sport ?? 'run';
+  if (sport === 'ride') {
+    return { label: 'AVG SPEED', text: session.avgSpeedKmh != null ? `${session.avgSpeedKmh}km/h` : null };
+  }
+  if (sport === 'swim') {
+    return { label: 'AVG PACE/100M', text: session.avgPace100m != null ? `${formatPaceMinKm(session.avgPace100m)}/100m` : null };
+  }
+  if (sport === 'other') {
+    return { label: null, text: null };
+  }
+  return { label: 'AVG PACE', text: session.avgPace != null ? `${formatPaceMinKm(session.avgPace)}/km` : null };
+}
 
 /** True for sessions logged before every type shared the same fields, back
  *  when "Interval (Norwegian 4x4)" had its own per-rep HR breakdown. */
@@ -399,11 +450,12 @@ function renderHistory() {
         ${s.recovery ? `<span>${recoverySymbol[s.recovery] ?? ''} ${recoveryLabel[s.recovery] ?? s.recovery}</span>` : ''}
       `;
     }
+    const metric = sessionMetric(s);
     const metaHTML = `
       ${legacyHTML}
       ${s.durationMin != null ? `<span class="mono">${s.durationMin}min</span>` : ''}
       ${s.distanceKm != null ? `<span class="mono">${s.distanceKm}km</span>` : ''}
-      ${s.avgPace != null ? `<span class="mono">${formatPaceMinKm(s.avgPace)}/km</span>` : ''}
+      ${metric.text ? `<span class="mono">${metric.text}</span>` : ''}
       ${s.avgHR != null ? `<span class="mono">avg ${s.avgHR}</span>` : ''}
       ${s.maxHR != null ? `<span class="mono">max ${s.maxHR}</span>` : ''}
       <span class="mono">RPE ${s.rpe}</span>
@@ -633,11 +685,11 @@ function renderDashboard() {
   const mileageThisWeek = weekBuckets.length ? weekBuckets[weekBuckets.length - 1].km : 0;
 
   const tiles = [
-    [String(sessions.length), 'Runs logged', true],
+    [String(sessions.length), 'Sessions logged', true],
     [String(workouts.length), 'Workouts logged', true],
     [`${mileageThisWeek} km`, 'Mileage this week', true],
     [`${volumeSince(workouts, 7, todayIso(), allExercises(), bodyweightKg())} kg`, 'Volume this week', true],
-    [daysSinceRun != null ? String(daysSinceRun) : '—', 'Days since last run', false],
+    [daysSinceRun != null ? String(daysSinceRun) : '—', 'Days since last session', false],
     [daysSinceWorkout != null ? String(daysSinceWorkout) : '—', 'Days since last workout', false],
   ];
   const plainTilesHTML = tiles.map(([value, label, accent]) => `
@@ -763,34 +815,47 @@ $('sleepDetailClose').addEventListener('click', () => {
  *  known, no fetch needed) - these are the activity's own reported
  *  distance/duration/avg pace/avg+max HR, which are more reliable than
  *  anything re-derived from the noisy raw sample stream. */
+const STAT_TILE_METRIC_LABEL = { run: 'Avg Pace', ride: 'Avg Speed', swim: 'Avg Pace/100m' };
+
 async function openActivityDetailSheet(session) {
   const s = settings.intervals;
   if (!s?.enabled || !session.intervalsActivityId) return;
+  const sport = session.sport ?? 'run';
+  const metric = sessionMetric(session);
   $('activityDetailStats').innerHTML = `
     <div class="stat-tile"><div class="stat-value mono">${session.distanceKm ?? '–'}km</div><div class="stat-label">Distance</div></div>
     <div class="stat-tile"><div class="stat-value mono">${session.durationMin ?? '–'}min</div><div class="stat-label">Duration</div></div>
-    <div class="stat-tile"><div class="stat-value mono">${session.avgPace != null ? `${formatPaceMinKm(session.avgPace)}/km` : '–'}</div><div class="stat-label">Avg Pace</div></div>
+    <div class="stat-tile"><div class="stat-value mono">${metric.text ?? '–'}</div><div class="stat-label">${STAT_TILE_METRIC_LABEL[sport] ?? 'Avg Pace'}</div></div>
     <div class="stat-tile"><div class="stat-value mono">${session.avgHR ?? '–'} / ${session.maxHR ?? '–'}</div><div class="stat-label">Avg / Max HR</div></div>
   `;
   $('scrim').hidden = false;
   $('activityDetailSheet').hidden = false;
   $('activityDetailSheet').scrollTop = 0;
+  // 'other' sports (walks, hikes, weight training, ...) have no pace/speed
+  // concept at all, so that whole chart section is skipped rather than
+  // showing an empty "Pace" chart with nothing to plot.
+  const showMetricChart = sport !== 'other';
+  $('activityPaceChartLabel').hidden = !showMetricChart;
+  $('activityPaceChartWrap').hidden = !showMetricChart;
+  if (showMetricChart) $('activityPaceChartLabel').textContent = sport === 'ride' ? 'Speed' : 'Pace';
   const loading = '<p class="chart-empty">Loading…</p>';
   $('activityZoneChartWrap').innerHTML = loading;
   $('activityHRChartWrap').innerHTML = loading;
-  $('activityPaceChartWrap').innerHTML = loading;
+  if (showMetricChart) $('activityPaceChartWrap').innerHTML = loading;
   try {
     const points = await intervalsFetchActivityStreams(session.intervalsActivityId, s.apiKey);
     const table = zoneTable(settings, settings.primaryZoneModel);
     $('activityZoneChartWrap').innerHTML = hrZoneDurationListHTML(hrZoneDurations(points, table));
     $('activityHRChartWrap').innerHTML = activityHRLineChartSVG(points, table);
-    $('activityPaceChartWrap').innerHTML = activityPaceLineChartSVG(points);
+    if (sport === 'ride') $('activityPaceChartWrap').innerHTML = activitySpeedLineChartSVG(points);
+    else if (sport === 'swim') $('activityPaceChartWrap').innerHTML = activitySwimPaceLineChartSVG(points);
+    else if (showMetricChart) $('activityPaceChartWrap').innerHTML = activityPaceLineChartSVG(points);
   } catch (err) {
     console.error('Failed to load activity streams', err);
     const failMsg = '<p class="chart-empty">Could not load activity detail from intervals.icu.</p>';
     $('activityZoneChartWrap').innerHTML = failMsg;
     $('activityHRChartWrap').innerHTML = failMsg;
-    $('activityPaceChartWrap').innerHTML = failMsg;
+    if (showMetricChart) $('activityPaceChartWrap').innerHTML = failMsg;
   }
 }
 
@@ -845,18 +910,64 @@ $('recentActivityList').addEventListener('click', (e) => {
 
 /* --------------------------------------------------------- edit sheet */
 
+/** For a run, the Session type select behaves exactly as before (editable,
+ *  Interval/Easy/Long). A synced ride/swim/other activity has no such
+ *  sub-classification to offer, so instead of leaving the select showing
+ *  a misleading default, this injects a single option carrying the synced
+ *  activity's own type label and locks the select on it. */
+function setEditTypeControl(sport, session) {
+  const select = $('editType');
+  const injected = select.querySelector('option[data-synced]');
+  if (injected) injected.remove();
+  if (sport === 'run') {
+    select.disabled = false;
+    select.value = sessionTypeOf(session);
+    return;
+  }
+  const opt = document.createElement('option');
+  opt.value = session.type ?? '';
+  opt.textContent = typeLabel[session.type] ?? session.type ?? 'Activity';
+  opt.dataset.synced = 'true';
+  select.appendChild(opt);
+  select.value = opt.value;
+  select.disabled = true;
+}
+
+const EDIT_METRIC_LABEL = { run: 'Avg pace (min/km)', ride: 'Avg speed (km/h)', swim: 'Avg pace (min/100m)' };
+
+/** The Edit sheet's one pace-like input is reused across sports rather than
+ *  giving each its own field: relabeled and repointed at the right session
+ *  property, or hidden entirely for 'other', which has no such metric. */
+function setEditMetricField(sport, session) {
+  const field = $('editAvgPaceField');
+  if (sport === 'other') {
+    field.hidden = true;
+    $('editAvgPace').value = '';
+    return;
+  }
+  field.hidden = false;
+  $('editAvgPaceLabel').textContent = EDIT_METRIC_LABEL[sport] ?? EDIT_METRIC_LABEL.run;
+  if (sport === 'ride') $('editAvgPace').value = session.avgSpeedKmh ?? '';
+  else if (sport === 'swim') $('editAvgPace').value = formatPaceMinKm(session.avgPace100m);
+  else $('editAvgPace').value = formatPaceMinKm(session.avgPace);
+}
+
 function openEditSheet(session) {
   editingId = session.id;
-  const type = sessionTypeOf(session);
+  const sport = session.sport ?? 'run';
+  editingSport = sport;
   $('editDate').value = session.date;
-  $('editType').value = type;
+  setEditTypeControl(sport, session);
   $('editDurationMin').value = session.durationMin ?? '';
-  $('editAvgPace').value = formatPaceMinKm(session.avgPace);
+  setEditMetricField(sport, session);
   $('editDistanceKm').value = session.distanceKm ?? '';
   $('editRunAvgHR').value = session.avgHR ?? '';
   $('editRunMaxHR').value = session.maxHR ?? '';
+  $('editWarmupToggleField').hidden = sport !== 'run';
+  $('editCooldownToggleField').hidden = sport !== 'run';
   populatePhaseFields('edit', 'Warmup', session.warmup);
   populatePhaseFields('edit', 'Cooldown', session.cooldown);
+  $('editDistanceHint').hidden = sport !== 'run';
   $('editRPE').value = session.rpe;
   $('editRPEOut').textContent = String(session.rpe);
   $('editVO2max').value = session.vo2max ?? '';
@@ -2066,17 +2177,20 @@ $('summarySaveRoutine').addEventListener('click', () => {
   openRoutineBuilderSheet(ids);
 });
 
-/** Builds a run's share-card data from a saved session - typeLabel reuses
- *  the same map the History list's own row labels come from, paceLabel
- *  pre-formats through block.js's own mm:ss pace parsing/formatting
- *  rather than duplicating it in shareCard.js. */
+/** Builds a session's share-card data from a saved session - typeLabel
+ *  reuses the same map (and the same raw-type fallback) the History list's
+ *  own row labels come from, and paceLabel/paceMetricLabel come from
+ *  sessionMetric so a ride's card says "AVG SPEED" and a swim's says
+ *  "AVG PACE/100M" instead of assuming every session is a run. */
 function buildRunShareCardData(session) {
+  const metric = sessionMetric(session);
   return {
-    typeLabel: typeLabel[session.type] || 'Run',
+    typeLabel: typeLabel[session.type] ?? session.type ?? 'Run',
     dateLabel: fmtDateLong(session.date),
     distanceKm: session.distanceKm ?? null,
     durationMin: session.durationMin ?? null,
-    paceLabel: session.avgPace != null ? `${formatPaceMinKm(session.avgPace)}/km` : null,
+    paceLabel: metric.text,
+    paceMetricLabel: metric.label ?? 'AVG PACE',
     avgHR: session.avgHR ?? null,
     maxHR: session.maxHR ?? null,
   };
@@ -2861,22 +2975,31 @@ function isoDateDaysAgo(days) {
 }
 
 /** Imports every not-yet-seen run out of `activities` (deduped by
- *  intervalsActivityId), returning how many were added. A date that
- *  already has a manually-logged run (no intervalsActivityId of its own)
- *  is skipped entirely, never touched - a run the user typed in by hand
- *  is never silently duplicated, overwritten, or replaced by an imported
- *  one, even if intervals.icu also has an activity for that same day.
- *  `vo2maxByDate` (optional, date -> number) fills in the watch's own
- *  VO2max estimate for that day, if any - see fetchVo2maxByDate. */
-function importNewIntervalsRunActivities(activities, vo2maxByDate = new Map()) {
+ *  intervalsActivityId), across every activity type (run, ride, swim, and
+ *  everything else - see classifyActivity in intervals.js), returning how
+ *  many were added. A date that already has a manually-logged *run* (no
+ *  intervalsActivityId of its own) skips importing a synced run for that
+ *  same date - a run the user typed in by hand is never silently
+ *  duplicated, overwritten, or replaced by an imported one - but doesn't
+ *  block a ride/swim/other activity from that same day, since manual entry
+ *  never produces anything but a run and there's no risk of double-counting
+ *  a different sport. `vo2maxByDate` (optional, date -> number) fills in
+ *  the watch's own VO2max estimate for a newly-imported run's day, if any -
+ *  see fetchVo2maxByDate; it's a running fitness metric, so it's left blank
+ *  for other sports. */
+function importNewIntervalsActivities(activities, vo2maxByDate = new Map()) {
   const existingIds = new Set(sessions.map((s) => s.intervalsActivityId).filter(Boolean));
-  const manualDates = new Set(sessions.filter((s) => !s.intervalsActivityId).map((s) => s.date));
+  const manualRunDates = new Set(
+    sessions.filter((s) => !s.intervalsActivityId && (s.sport ?? 'run') === 'run').map((s) => s.date),
+  );
   let count = 0;
   for (const activity of activities) {
-    if (!isIntervalsRunActivity(activity) || existingIds.has(activity.id)) continue;
+    if (existingIds.has(activity.id)) continue;
     const mapped = intervalsActivityToSession(activity);
-    if (manualDates.has(mapped.date)) continue;
-    if (vo2maxByDate.has(mapped.date)) mapped.vo2max = vo2maxByDate.get(mapped.date);
+    if (mapped.sport === 'run') {
+      if (manualRunDates.has(mapped.date)) continue;
+      if (vo2maxByDate.has(mapped.date)) mapped.vo2max = vo2maxByDate.get(mapped.date);
+    }
     addSession(mapped);
     count += 1;
   }
@@ -2900,12 +3023,13 @@ async function fetchVo2maxByDate(athleteId, apiKey, oldestIso) {
   }
 }
 
-/** Pulls new run activities from intervals.icu into local sessions. The
- *  first sync (no lastSyncedAt yet) backfills the last 90 days; every sync
- *  after that only asks for what's new. No OAuth here (see intervals.js) -
- *  a plain API-key GET, so unlike Strava/Google there's no token to
- *  refresh or redirect to handle, just "does the request succeed". */
-async function syncIntervalsRuns({ silent = false } = {}) {
+/** Pulls new activities of any sport from intervals.icu into local
+ *  sessions. The first sync (no lastSyncedAt yet) backfills the last 90
+ *  days; every sync after that only asks for what's new. No OAuth here
+ *  (see intervals.js) - a plain API-key GET, so unlike Strava/Google
+ *  there's no token to refresh or redirect to handle, just "does the
+ *  request succeed". */
+async function syncIntervalsActivities({ silent = false } = {}) {
   const s = settings.intervals;
   if (!s?.enabled || !s?.athleteId || !s?.apiKey) return;
   let imported = null;
@@ -2914,7 +3038,7 @@ async function syncIntervalsRuns({ silent = false } = {}) {
     const oldest = s.lastSyncedAt || isoDateDaysAgo(90);
     const activities = await intervalsListActivities(s.athleteId, s.apiKey, oldest);
     const vo2maxByDate = await fetchVo2maxByDate(s.athleteId, s.apiKey, oldest);
-    imported = importNewIntervalsRunActivities(activities, vo2maxByDate);
+    imported = importNewIntervalsActivities(activities, vo2maxByDate);
     settings = { ...settings, intervals: { ...settings.intervals, lastSyncedAt: todayIso() } };
     saveSettings(settings);
     intervalsNeedsReconnect = false;
@@ -2928,8 +3052,8 @@ async function syncIntervalsRuns({ silent = false } = {}) {
   if (silent) return;
   if (failure?.networkError) toast('Could not reach intervals.icu - check your connection', 3400);
   else if (imported == null) toast('Could not sync intervals.icu - check your Athlete ID and API Key');
-  else if (imported > 0) toast(`Imported ${imported} run${imported === 1 ? '' : 's'} from intervals.icu`);
-  else toast('No new runs to import');
+  else if (imported > 0) toast(`Imported ${imported} activit${imported === 1 ? 'y' : 'ies'} from intervals.icu`);
+  else toast('No new activities to import');
 }
 
 /** Refreshes the cached resting HR / sleep shown as Dashboard stat tiles.
@@ -2963,7 +3087,7 @@ function renderIntervalsStatus() {
     $('intervalsStatus').textContent = 'Sync failed - tap Connect to retry.';
     $('intervalsConnect').hidden = false;
   } else {
-    $('intervalsStatus').textContent = 'Connected - importing your runs automatically.';
+    $('intervalsStatus').textContent = 'Connected - importing your activities automatically.';
     $('intervalsConnect').hidden = true;
   }
 }
@@ -2986,12 +3110,12 @@ $('intervalsConnect').addEventListener('click', async () => {
     const vo2maxByDate = await fetchVo2maxByDate(athleteId, apiKey, isoDateDaysAgo(90));
     settings = { ...settings, intervals: { athleteId, apiKey, enabled: true, lastSyncedAt: todayIso() } };
     saveSettings(settings);
-    const imported = importNewIntervalsRunActivities(activities, vo2maxByDate);
+    const imported = importNewIntervalsActivities(activities, vo2maxByDate);
     intervalsNeedsReconnect = false;
     renderAll();
     renderIntervalsStatus();
     syncIntervalsWellness();
-    toast(imported > 0 ? `Connected - imported ${imported} run${imported === 1 ? '' : 's'}` : 'Connected - no runs to import yet');
+    toast(imported > 0 ? `Connected - imported ${imported} activit${imported === 1 ? 'y' : 'ies'}` : 'Connected - no activities to import yet');
   } catch (err) {
     console.error('intervals.icu connect failed', err);
     if (err.networkError) toast('Could not reach intervals.icu - check your connection', 3400);
@@ -3001,7 +3125,7 @@ $('intervalsConnect').addEventListener('click', async () => {
 });
 
 $('intervalsDisconnect').addEventListener('click', () => {
-  if (!confirm('Disconnect intervals.icu? Runs already imported stay in your history - only future auto-import stops.')) return;
+  if (!confirm('Disconnect intervals.icu? Activities already imported stay in your history - only future auto-import stops.')) return;
   intervalsNeedsReconnect = false;
   settings = { ...settings, intervals: { ...settings.intervals, enabled: false } };
   saveSettings(settings);
@@ -3010,7 +3134,7 @@ $('intervalsDisconnect').addEventListener('click', () => {
   toast('Disconnected');
 });
 
-$('intervalsSyncNow').addEventListener('click', () => { syncIntervalsRuns(); });
+$('intervalsSyncNow').addEventListener('click', () => { syncIntervalsActivities(); });
 
 /* ------------------------------------------------------------- SETTINGS */
 
@@ -3120,7 +3244,7 @@ renderAll();
 switchView('dashboard');
 resumeLiveWorkoutIfAny();
 if (settings.intervals.enabled) {
-  syncIntervalsRuns({ silent: true });
+  syncIntervalsActivities({ silent: true });
   syncIntervalsWellness();
 }
 

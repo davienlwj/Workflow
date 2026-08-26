@@ -364,6 +364,34 @@ export function activityPaceLineChartSVG(points) {
   });
 }
 
+/** @param {{t: number, paceMinKm: number|null}[]} points a ride's raw pace
+ *  stream (still computed as generic distance/time, just re-expressed as
+ *  km/h - a cyclist thinks in speed, not minutes per kilometre). Unlike
+ *  pace, higher is better, so this isn't inverted. */
+export function activitySpeedLineChartSVG(points) {
+  return denseLineChartSVG(points, {
+    emptyMessage: 'No speed data recorded for this activity.',
+    ariaLabel: 'Speed over time',
+    axisLabel: 'km/h',
+    valueOf: (p) => (p.paceMinKm > 0 ? 60 / p.paceMinKm : null),
+    fmtValue: (v) => `${Math.round(v * 10) / 10}`,
+  });
+}
+
+/** @param {{t: number, paceMinKm: number|null}[]} points a swim's raw pace
+ *  stream - swimmers think in pace per 100m, not per km, so this divides
+ *  the underlying min/km figure down by 10. */
+export function activitySwimPaceLineChartSVG(points) {
+  return denseLineChartSVG(points, {
+    emptyMessage: 'No pace data recorded for this activity.',
+    ariaLabel: 'Pace over time',
+    axisLabel: 'min/100m',
+    valueOf: (p) => (p.paceMinKm != null ? p.paceMinKm / 10 : null),
+    fmtValue: (v) => formatPaceMinKm(v),
+    invert: true,
+  });
+}
+
 /** @param {{name: string, secs: number}[]} zones this app's own HR zone
  *  table (RHR or LTHR, whichever is primary) with seconds-in-zone computed
  *  from a run's raw HR stream - see hrZoneDurations in zones.js. Rendered

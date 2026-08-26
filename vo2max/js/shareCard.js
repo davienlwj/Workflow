@@ -805,12 +805,16 @@ export async function renderPRsCard(data) {
  *   distanceKm: number|null,
  *   durationMin: number|null,
  *   paceLabel: string|null,
+ *   paceMetricLabel: string|undefined,
  *   avgHR: number|null,
  *   maxHR: number|null,
  * }} data `paceLabel` is pre-formatted (e.g. "5:15/km", via block.js's
  *   formatPaceMinKm) rather than a raw number, since that mm:ss-style
  *   parsing/formatting already lives there and belongs kept in one place
- *   - everything else here is simple enough to format inline.
+ *   - everything else here is simple enough to format inline. `paceLabel`
+ *   is null and `paceMetricLabel` says 'AVG SPEED'/'AVG PACE/100M' for a
+ *   non-run session (see sessionMetric in app.js), defaulting to 'AVG PACE'
+ *   when omitted.
  * @returns {Promise<Blob>} a transparent 1080x1920 PNG
  */
 export async function renderRunShareCard(data) {
@@ -874,7 +878,7 @@ export async function renderRunShareCard(data) {
   const hrText = data.avgHR != null || data.maxHR != null ? `${data.avgHR ?? '–'}/${data.maxHR ?? '–'}` : '–';
   const stats = [
     [data.durationMin != null ? fmtDurationMinWords(data.durationMin) : '–', 'DURATION'],
-    [data.paceLabel || '–', 'AVG PACE'],
+    [data.paceLabel || '–', data.paceMetricLabel || 'AVG PACE'],
     [hrText, 'AVG/MAX HR'],
   ];
   const colW = innerW / 3;
@@ -940,6 +944,7 @@ export async function renderWorkoutReceiptCard(data) {
  *   distanceKm: number|null,
  *   durationMin: number|null,
  *   paceLabel: string|null,
+ *   paceMetricLabel: string|undefined,
  *   avgHR: number|null,
  *   maxHR: number|null,
  * }} data same shape renderRunShareCard takes.
@@ -953,8 +958,8 @@ export async function renderRunReceiptCard(data) {
   const itemRows = [
     { label: 'DISTANCE', value: data.distanceKm != null ? `${data.distanceKm}km` : '–' },
     { label: 'DURATION', value: data.durationMin != null ? fmtDurationMinWords(data.durationMin) : '–' },
-    { label: 'AVG PACE', value: data.paceLabel || '–' },
   ];
+  if (data.paceLabel) itemRows.push({ label: data.paceMetricLabel || 'AVG PACE', value: data.paceLabel });
   if (data.avgHR != null) itemRows.push({ label: 'AVG HR', value: `${data.avgHR}bpm` });
   if (data.maxHR != null) itemRows.push({ label: 'MAX HR', value: `${data.maxHR}bpm` });
   return renderReceiptCard({

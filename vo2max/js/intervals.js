@@ -14,15 +14,49 @@
  * an individual user going through intervals.icu.
  *
  * Read-only and one-way: nothing is ever modified on intervals.icu's side,
- * only pulled in. Only run-type activities are imported - like Strava,
- * intervals.icu has no equivalent to this app's per-exercise, per-set
- * strength data, so lift workouts still need to be logged by hand. Daily
+ * only pulled in. Every activity type imports - runs, rides, swims, walks,
+ * hikes, and anything else intervals.icu reports - each classified into a
+ * coarse "sport" bucket (see classifyActivity) that drives which unit a
+ * session shows (pace for runs, speed for rides, pace/100m for swims, or
+ * just duration/distance/HR for everything else). Note this app still has
+ * no equivalent to per-exercise, per-set strength data, so a synced
+ * WeightTraining activity comes in as a plain duration+HR session, not a
+ * structured lift workout - those still need to be logged by hand. Daily
  * wellness data (resting HR, sleep) is also read-only, shown as Dashboard
  * stat tiles rather than stored as its own history.
  */
 
 const API_BASE = 'https://intervals.icu/api/v1';
 const RUN_TYPES = new Set(['Run', 'TrailRun', 'VirtualRun']);
+const RIDE_TYPES = new Set(['Ride', 'VirtualRide', 'GravelRide', 'MountainBikeRide', 'EBikeRide', 'EMountainBikeRide']);
+const SWIM_TYPES = new Set(['Swim', 'OpenWaterSwim']);
+
+// Human-readable labels for activity types outside the run bucket (which
+// keeps its own existing Interval/Easy run/Long run classification instead -
+// see classifyActivity). Anything not listed here still imports fine: it
+// just falls back to intervals.icu's own type string as the label.
+const ACTIVITY_LABELS = {
+  Ride: 'Ride',
+  VirtualRide: 'Virtual ride',
+  GravelRide: 'Gravel ride',
+  MountainBikeRide: 'Mountain bike',
+  EBikeRide: 'E-bike ride',
+  EMountainBikeRide: 'E-mountain bike',
+  Swim: 'Swim',
+  OpenWaterSwim: 'Open water swim',
+  Walk: 'Walk',
+  Hike: 'Hike',
+  Rowing: 'Rowing',
+  Elliptical: 'Elliptical',
+  WeightTraining: 'Weight training',
+  Yoga: 'Yoga',
+  Workout: 'Workout',
+  AlpineSki: 'Alpine ski',
+  NordicSki: 'Nordic ski',
+  IceSkate: 'Ice skating',
+  StairStepper: 'Stair stepper',
+  Crossfit: 'Crossfit',
+};
 
 // intervals.icu uses standard HTTP Basic Auth with the literal string
 // "API_KEY" as the username and the athlete's real key as the password -
@@ -63,8 +97,23 @@ export async function listActivities(athleteId, apiKey, oldestIso) {
   return apiGet(`/athlete/${encodeURIComponent(athleteId)}/activities?${params}`, apiKey);
 }
 
-export function isRunActivity(activity) {
-  return RUN_TYPES.has(activity.type);
+/** Coarse sport bucket + display type for an intervals.icu activity. `sport`
+ *  drives which unit a session shows (run keeps this app's original
+ *  Interval/Easy run/Long run classification and pace/km; ride gets speed
+ *  km/h; swim gets pace/100m; everything else - walks, hikes, weight
+ *  training, and any future activity type this app doesn't specifically
+ *  know about - is 'other', imported with just duration/distance/HR and no
+ *  derived pace/speed metric). `type` is what activityToSession stores as
+ *  the session's own `type` field: the existing 'easy-run' enum key for
+ *  runs (so the History list's Interval/Easy run/Long run labeling is
+ *  untouched), or a plain display string for everything else, which the
+ *  History badge already shows as-is via its `typeLabel[type] ?? type`
+ *  fallback. */
+export function classifyActivity(activity) {
+  if (RUN_TYPES.has(activity.type)) return { sport: 'run', type: 'easy-run' };
+  if (RIDE_TYPES.has(activity.type)) return { sport: 'ride', type: ACTIVITY_LABELS[activity.type] || 'Ride' };
+  if (SWIM_TYPES.has(activity.type)) return { sport: 'swim', type: ACTIVITY_LABELS[activity.type] || 'Swim' };
+  return { sport: 'other', type: ACTIVITY_LABELS[activity.type] || activity.type };
 }
 
 /** Resting HR and sleep from intervals.icu's daily wellness log, looking
@@ -157,20 +206,24 @@ export async function fetchActivityStreams(activityId, apiKey) {
   return points;
 }
 
-/** Maps an intervals.icu run activity to this app's session shape (see
- *  readSessionForm in app.js for what a manually-logged run looks like).
- *  Only distance/duration/pace/HR translate directly - RPE and session
- *  type (interval/easy/long) aren't things this data can tell us, so
- *  those get a neutral default the user can correct from the edit sheet. */
+/** Maps an intervals.icu activity of any sport to this app's session shape
+ *  (see readSessionForm in app.js for what a manually-logged run looks
+ *  like). Distance/duration/HR translate directly for every sport; the
+ *  pace-like metric is sport-specific (see classifyActivity) - avgPace
+ *  (min/km) for a run, avgSpeedKmh for a ride, avgPace100m for a swim, and
+ *  no metric at all for 'other'. RPE and (for runs) the Interval/Easy/Long
+ *  sub-classification aren't things this data can tell us, so those get a
+ *  neutral default the user can correct from the edit sheet. */
 export function activityToSession(activity) {
-  const distanceKm = activity.distance / 1000;
+  const { sport, type } = classifyActivity(activity);
+  const distanceKmRaw = activity.distance != null ? activity.distance / 1000 : null;
   const durationMin = activity.moving_time / 60;
-  return {
-    type: 'easy-run',
+  const session = {
+    sport,
+    type,
     date: (activity.start_date_local || activity.start_date).slice(0, 10),
     durationMin: Math.round(durationMin),
-    avgPace: distanceKm > 0 ? durationMin / distanceKm : null,
-    distanceKm: round2(distanceKm),
+    distanceKm: distanceKmRaw != null ? round2(distanceKmRaw) : null,
     avgHR: activity.average_heartrate != null ? Math.round(activity.average_heartrate) : null,
     maxHR: activity.max_heartrate != null ? Math.round(activity.max_heartrate) : null,
     rpe: 6,
@@ -178,4 +231,12 @@ export function activityToSession(activity) {
     notes: `Imported from intervals.icu: "${activity.name}"`,
     intervalsActivityId: activity.id,
   };
+  if (sport === 'run') {
+    session.avgPace = distanceKmRaw != null && distanceKmRaw > 0 ? durationMin / distanceKmRaw : null;
+  } else if (sport === 'ride') {
+    session.avgSpeedKmh = distanceKmRaw != null && durationMin > 0 ? round2((distanceKmRaw / durationMin) * 60) : null;
+  } else if (sport === 'swim') {
+    session.avgPace100m = distanceKmRaw != null && distanceKmRaw > 0 ? round2(durationMin / (distanceKmRaw * 10)) : null;
+  }
+  return session;
 }

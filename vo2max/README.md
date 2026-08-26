@@ -36,8 +36,8 @@ Dashboard as the place they come together.
 - **Dashboard** — a month calendar grid at the top (every day that has
   something logged shows a small icon: a run gets the running-figure glyph,
   a workout gets the dumbbell glyph, a day with both gets both), six stat
-  tiles below it (runs logged, workouts logged, mileage this week, volume
-  this week, days since your last run, days since your last workout) — plus
+  tiles below it (sessions logged, workouts logged, mileage this week, volume
+  this week, days since your last session, days since your last workout) — plus
   Resting HR and Sleep tiles once intervals.icu sync is connected (see
   below) — and a combined **recent activity** feed — the last few runs and workouts,
   newest first, each tagged with a small running-figure or dumbbell icon
@@ -99,8 +99,9 @@ Dashboard as the place they come together.
   changed it. Export/import a JSON backup (workouts included), or reset to
   defaults. A **Google Calendar sync** section (see below) automatically
   pushes every run and workout to its own dedicated calendar once connected,
-  and an **intervals.icu sync** section automatically imports your runs
-  (e.g. synced there from a Zepp-paired watch) — see below for both.
+  and an **intervals.icu sync** section automatically imports your
+  activities — runs, rides, swims, walks, hikes, and anything else it
+  reports (e.g. synced there from a Zepp-paired watch) — see below for both.
   Below that, an expandable **Zones & protocol reference**
   section: both the LTHR-based and RHR-based (Karvonen) zone tables, the
   interval target zone highlighted, and a protocol quick-reference card —
@@ -164,14 +165,23 @@ picks up wellness data like sleep and HRV too, not just workouts).
 Settings → Amazfit → sign in with Zepp) **→ this app reading intervals.icu**
 with your own free personal API key.
 
-Every new **run** synced this way gets imported automatically, checked
-each time the app is opened, complete with distance/duration/pace/HR - and
-**VO2max**, too, when your watch estimated one that day: intervals.icu's
-daily wellness log carries a VO2max reading alongside resting HR and
-sleep, and an imported run's VO2max reading field is auto-filled from it
-instead of being left for you to type in by hand. Lifts aren't covered —
+Every new **activity** synced this way gets imported automatically, checked
+each time the app is opened - not just runs, but rides, swims, walks,
+hikes, and anything else intervals.icu reports. Each comes in with
+distance/duration/HR plus whichever pace-like metric actually makes sense
+for it: pace (min/km) for a run, speed (km/h) for a ride, pace/100m for a
+swim, or just duration/distance/HR for everything else (walks, hikes,
+weight training, ...), which has no single metric that fits every possible
+activity type. Runs also get **VO2max** filled in automatically, too, when
+your watch estimated one that day: intervals.icu's daily wellness log
+carries a VO2max reading alongside resting HR and sleep, and an imported
+run's VO2max reading field is auto-filled from it instead of being left for
+you to type in by hand - VO2max is a running-specific fitness metric, so
+other sports don't get this. Structured lifts aren't covered either way —
 intervals.icu has no equivalent to this app's per-exercise, per-set
-strength data, so workouts still need to be logged by hand regardless.
+strength data, so a synced weight-training activity comes in as a plain
+duration/HR entry, and workouts with real sets and reps still need to be
+logged by hand regardless.
 
 Unlike Strava or Google, intervals.icu needs no OAuth flow and no
 backend — just a personal API key you generate yourself, so setup is a
@@ -180,44 +190,50 @@ couple of minutes:
 1. Create a free account at [intervals.icu](https://intervals.icu) if you
    don't have one, then connect your Zepp account directly: **Settings →
    Amazfit** → sign in with your Zepp login → tick the activity types you
-   want synced (Runs, at least).
+   want synced.
 2. On the same Settings page, under **Developer Settings**, generate an
    **API Key** (and note your **Athlete ID**, shown just above it, e.g.
    `i123456`).
 3. In the app: **Settings → intervals.icu sync**, paste both the Athlete ID
-   and API Key, then tap **Connect**. Your run history from the last 90
-   days imports right away; every app open after that checks for anything
-   new since the last sync. **Sync now** re-checks on demand.
+   and API Key, then tap **Connect**. Your activity history from the last
+   90 days imports right away; every app open after that checks for
+   anything new since the last sync. **Sync now** re-checks on demand.
 
-Disconnecting stops future imports but leaves already-imported runs in
+Disconnecting stops future imports but leaves already-imported activities in
 your history untouched.
 
-**No duplicates, and manual entries are never overwritten.** A date you've
-already logged a run for by hand is skipped entirely by auto-sync - it
-never gets touched, replaced, or deleted, even if intervals.icu also has an
-activity for that same day. Going the other way, if you manually log a run
-on a date that already has an auto-synced entry, the app asks first
-("A run from intervals.icu was already auto-synced for ... Log this one
-too?") so a genuine second run (e.g. a two-a-day) is still easy to add, but
-you never end up with a surprise duplicate.
+**No duplicates, and manual entries are never overwritten.** Manual entry is
+always a run (there's no manual-entry UI for other sports), so this
+protection is scoped to runs specifically: a date you've already logged a
+run for by hand is skipped entirely by auto-sync - it never gets touched,
+replaced, or deleted, even if intervals.icu also has a run for that same
+day. A synced ride, swim, or other activity on that same date still comes
+in normally, since it isn't a duplicate of anything you typed in by hand.
+Going the other way, if you manually log a run on a date that already has
+an auto-synced run, the app asks first ("A run from intervals.icu was
+already auto-synced for ... Log this one too?") so a genuine second run
+(e.g. a two-a-day) is still easy to add, but you never end up with a
+surprise duplicate.
 
 Connecting also adds **Resting HR** and **Sleep** tiles to the Dashboard,
 reading intervals.icu's daily wellness log (looking back up to a week for
 whichever value most recently showed up, since a watch doesn't always sync
-same-day) - refreshed automatically on every app open alongside the run
-sync, no separate action needed. Tiles only appear once there's actually a
-value to show; nothing changes on the Dashboard before that. Tap either
-tile to open a detail view: **Resting HR** as a line chart over Week/
-Month/Year/All, **Sleep** as a bar chart of nightly duration over Week/
-Month.
+same-day) - refreshed automatically on every app open alongside the
+activity sync, no separate action needed. Tiles only appear once there's
+actually a value to show; nothing changes on the Dashboard before that. Tap
+either tile to open a detail view: **Resting HR** as a line chart over
+Week/Month/Year/All, **Sleep** as a bar chart of nightly duration over
+Week/Month.
 
-**Per-run detail.** Open any auto-synced run from Run history and tap
-**View HR zones & graphs** to pull that specific activity's raw HR/pace
-trace from intervals.icu: a bar chart of time spent in each HR zone (using
-this app's own zone table from Settings, not intervals.icu's), a heart
-rate line graph over the run's elapsed time, and a pace line graph over the
-same. Manually-logged runs don't have this button - there's no raw stream
-data behind them to chart.
+**Per-activity detail.** Open any auto-synced activity from Run history and
+tap **View HR zones & graphs** to pull that specific activity's raw
+HR/pace trace from intervals.icu: a bar chart of time spent in each HR
+zone (using this app's own zone table from Settings, not intervals.icu's),
+a heart rate line graph over the activity's elapsed time, and a second line
+graph for whichever pace-like metric fits its sport - pace for a run,
+speed for a ride, pace/100m for a swim, or no second graph at all for
+anything else. Manually-logged runs don't have this button - there's no
+raw stream data behind them to chart.
 
 ## Zone math
 
@@ -297,8 +313,9 @@ js/chart.js                 dependency-free SVG charts: VO2max trend, mileage ba
 js/ics.js                   builds a per-session .ics file for calendar export, and the shared
                               summary/description text + event resources used by gcal.js
 js/gcal.js                  Google Identity Services auth + Calendar API calls for automatic sync
-js/intervals.js              intervals.icu API-key auth + activity fetch/mapping for run import
-                              (no backend needed - see the README's intervals.icu sync section)
+js/intervals.js              intervals.icu API-key auth + activity fetch/mapping for
+                              multi-sport import (no backend needed - see the README's
+                              intervals.icu sync section)
 js/shareCard.js               renders the three Save-PNG cards (summary/muscles/PRs) as shareable
                               transparent PNGs (canvas-drawn, no backend) - see "Share your workout" below
 js/app.js                   rendering and events
