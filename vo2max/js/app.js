@@ -97,6 +97,7 @@ let liveTimerInterval = null;
 let lastFinishedWorkout = null; // set by openWorkoutSummarySheet, read by "Save as Routine"
 let lastFinishedDurationMs = 0; // set by openWorkoutSummarySheet, read by "Save PNG"
 let lastFinishedNewPRs = []; // set by openWorkoutSummarySheet, shown in its own inline PR banner
+let lastFinishedSession = null; // set by openRunSummarySheet, read by "Save PNG"
 // #shareCardSheet's current subject - null while it's closed. `workoutsForPRs`
 // is the full workouts list PRs should be computed against: for an
 // already-saved workout that's just `workouts` (it's already in there); for
@@ -512,6 +513,57 @@ function closeLogSheet() {
 
 $('logCancel').addEventListener('click', closeLogSheet);
 
+/** A run summary's phase row - Warm up/Workout/Cool down - showing
+ *  whatever distance/pace/HR that phase has. `phase` is the
+ *  {distanceKm, avgPace, avgHR, maxHR} shape readPhaseFields/readSessionForm
+ *  produce, used as-is for warmup/cooldown and assembled from the saved
+ *  session's own top-level fields for the main Workout row. Returns '' (no
+ *  row at all) when the phase wasn't logged, e.g. Warm up/Cool down toggled
+ *  off. */
+function runSummaryPhaseRowHTML(label, phase) {
+  if (!phase) return '';
+  const parts = [
+    phase.distanceKm != null ? `${phase.distanceKm}km` : null,
+    phase.avgPace != null ? `${formatPaceMinKm(phase.avgPace)}/km` : null,
+    phase.avgHR != null ? `avg ${phase.avgHR}` : null,
+    phase.maxHR != null ? `max ${phase.maxHR}` : null,
+  ].filter(Boolean).join(' · ');
+  return `
+    <div class="summary-exercise-row">
+      <div class="summary-exercise-name">${label}</div>
+      <div class="summary-exercise-stats mono">${parts || '—'}</div>
+    </div>
+  `;
+}
+
+/** Shown right after saving a run - mirrors openWorkoutSummarySheet's
+ *  finish-workout flow. One row each for Warm up/Workout/Cool down, Warm
+ *  up and Cool down only appearing when actually carried out. */
+function openRunSummarySheet(session) {
+  lastFinishedSession = session;
+  $('runSummaryDuration').textContent = session.durationMin != null ? `${session.durationMin} min` : '—';
+  $('runSummaryPhases').innerHTML = [
+    runSummaryPhaseRowHTML('Warm up', session.warmup),
+    runSummaryPhaseRowHTML('Workout', {
+      distanceKm: session.distanceKm, avgPace: session.avgPace, avgHR: session.avgHR, maxHR: session.maxHR,
+    }),
+    runSummaryPhaseRowHTML('Cool down', session.cooldown),
+  ].join('');
+  $('scrim').hidden = false;
+  $('runSummarySheet').hidden = false;
+  $('runSummarySheet').scrollTop = 0;
+}
+
+$('runSummaryShare').addEventListener('click', () => {
+  if (!lastFinishedSession) return;
+  openRunShareCardSheet(lastFinishedSession);
+});
+
+$('runSummaryDone').addEventListener('click', () => {
+  $('scrim').hidden = true;
+  $('runSummarySheet').hidden = true;
+});
+
 $('logForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const form = readSessionForm('log');
@@ -532,7 +584,11 @@ $('logForm').addEventListener('submit', (e) => {
   syncSessionToGoogle(saved);
   closeLogSheet();
   renderAll();
-  toast('Session saved');
+  // Runs get a finish-style summary (mirrors the lift flow's
+  // openWorkoutSummarySheet); every other Session type just gets the
+  // existing plain confirmation toast.
+  if (saved.sport === 'run') openRunSummarySheet(saved);
+  else toast('Session saved');
 });
 
 /* ------------------------------------------------------------- HISTORY */
@@ -1241,6 +1297,7 @@ function closeAllSheets() {
   closeRoutineBuilderSheet();
   closeShareCardSheet();
   $('workoutSummarySheet').hidden = true;
+  $('runSummarySheet').hidden = true;
   $('restingHRDetailSheet').hidden = true;
   $('sleepDetailSheet').hidden = true;
   $('activityDetailSheet').hidden = true;
@@ -2423,11 +2480,27 @@ $('summarySaveRoutine').addEventListener('click', () => {
   openRoutineBuilderSheet(ids);
 });
 
+/** A warm up/cool down phase's distance/pace/HR, pre-formatted the same way
+ *  as the main pace-like metric (mm:ss via block.js's formatPaceMinKm kept
+ *  out of shareCard.js), or null if that phase wasn't carried out. Only
+ *  runs ever have these (see readPhaseFields), so no sport-aware branching
+ *  is needed the way sessionMetric needs for the main metric. */
+function buildRunPhaseShareData(phase) {
+  if (!phase) return null;
+  return {
+    distanceKm: phase.distanceKm ?? null,
+    paceLabel: phase.avgPace != null ? `${formatPaceMinKm(phase.avgPace)}/km` : null,
+    avgHR: phase.avgHR ?? null,
+    maxHR: phase.maxHR ?? null,
+  };
+}
+
 /** Builds a session's share-card data from a saved session - typeLabel
  *  reuses sessionBadgeLabel, the same badge text the History list's own
  *  rows show, and paceLabel/paceMetricLabel come from sessionMetric so a
  *  ride's card says "AVG SPEED" and a swim's says "AVG PACE/100M" instead
- *  of assuming every session is a run. */
+ *  of assuming every session is a run. warmup/cooldown are null unless
+ *  that phase was actually toggled on and logged. */
 function buildRunShareCardData(session) {
   const metric = sessionMetric(session);
   return {
@@ -2439,6 +2512,8 @@ function buildRunShareCardData(session) {
     paceMetricLabel: metric.label ?? 'AVG PACE',
     avgHR: session.avgHR ?? null,
     maxHR: session.maxHR ?? null,
+    warmup: buildRunPhaseShareData(session.warmup),
+    cooldown: buildRunPhaseShareData(session.cooldown),
   };
 }
 

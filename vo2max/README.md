@@ -258,10 +258,12 @@ two general-purpose ones:
 
 - **Summary** - the Strava-style stat card: workout name/date/duration/
   volume/exercise+set counts/new PRs (or, for a run, distance as the hero
-  stat plus duration/avg pace/avg-max HR). A **transparent background**
-  with only a translucent stat panel painted, so posting it as an
-  Instagram Story sticker drops it straight onto whatever photo is
-  already there, the same way Strava's own post-activity share works.
+  stat plus duration/avg pace/avg-max HR, plus a compact Warm up/Cool down
+  line each - only when that phase was actually toggled on and logged). A
+  **transparent background** with only a translucent stat panel painted,
+  so posting it as an Instagram Story sticker drops it straight onto
+  whatever photo is already there, the same way Strava's own
+  post-activity share works.
 - **Muscles** *(workout only)* - the same front/back body-diagram artwork
   used elsewhere in the app, highlighting every muscle group this
   workout's exercises targeted, each with its own name-and-percentage
@@ -272,9 +274,11 @@ two general-purpose ones:
 - **Receipt** - a torn-paper strip styled like a printed gym/running
   receipt (deliberately not transparent - a receipt is paper, not a
   sticker): logo letterhead, dashed dividers, dotted-leader line items
-  (exercises as items priced in kg for a workout; distance/duration/pace/
-  HR as the items for a run), a bold totals block, a "THANK YOU / COME
-  AGAIN" footer, and a decorative barcode.
+  (exercises as items priced in kg for a workout; a WARM UP line, then
+  distance/duration/pace/HR, then a COOL DOWN line for a run - the warm
+  up/cool down lines only appear when that phase was logged), a bold
+  totals block, a "THANK YOU / COME AGAIN" footer, and a decorative
+  barcode.
 
 Switching tabs re-renders the preview `<img>` in place (each option's PNG
 is cached the first time it's generated so re-visiting a tab is instant);
@@ -293,7 +297,13 @@ the live timer has its duration persisted (`workout.durationMs`)
 specifically so it's still available for that last case; one logged
 directly for a past date has no duration to show and the Summary/Receipt
 cards just omit that stat. For a run, the same button lives on the Edit
-session sheet (Run tab -> tap a logged session).
+session sheet (Run tab -> tap a logged session), and on the **run summary
+sheet** shown right after saving a Run from the Log form (mirroring the
+finish-workout summary above) - one row each for Warm up/Workout/Cool
+down, Warm up and Cool down only appearing when actually carried out.
+Every other Session type (Cycling, Stairmaster, ...) just gets the plain
+"Session saved" confirmation instead, since there's no equivalent
+before/after-phase structure to summarize for them.
 
 ## Layout
 

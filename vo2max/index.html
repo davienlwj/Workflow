@@ -728,6 +728,18 @@
   </div>
 </section>
 
+<!-- Run summary sheet (popup, shown right after saving a run) -->
+<section id="runSummarySheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Run summary">
+  <div class="grabber"></div>
+  <h2 class="view-title">Run complete</h2>
+  <div id="runSummaryDuration" class="summary-duration mono"></div>
+  <div id="runSummaryPhases" class="summary-exercises"></div>
+  <button type="button" id="runSummaryShare" class="ghost-btn block">Save PNG</button>
+  <div class="actions">
+    <button type="button" id="runSummaryDone" class="primary block">Done</button>
+  </div>
+</section>
+
 <!-- Save-PNG sheet (popup, preview + pick one of 3 share-card designs before saving/sharing) -->
 <section id="shareCardSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Save PNG">
   <div class="grabber"></div>

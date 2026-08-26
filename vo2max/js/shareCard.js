@@ -798,6 +798,25 @@ export async function renderPRsCard(data) {
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 
+/** A warm up/cool down phase's distance/pace/avg-HR joined into one
+ *  compact line (e.g. "1.2km · 6:30/km · avg 142"), or null if the phase
+ *  carries nothing to show - shared by the summary and receipt run cards. */
+function phaseSummaryText(phase) {
+  if (!phase) return null;
+  const parts = [
+    phase.distanceKm != null ? `${phase.distanceKm}km` : null,
+    phase.paceLabel,
+    phase.avgHR != null ? `avg ${phase.avgHR}` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
+}
+
+// Fixed per-phase row height (label line + gap + value line + gap-after),
+// shared between the measure and draw passes below so they can't drift
+// out of sync with each other.
+const PHASE_GAP_BEFORE = 32;
+const PHASE_ROW_H = 20 * 1.3 + 4 + 26 * 1.3 + 20;
+
 /**
  * @param {{
  *   typeLabel: string,
@@ -808,13 +827,17 @@ export async function renderPRsCard(data) {
  *   paceMetricLabel: string|undefined,
  *   avgHR: number|null,
  *   maxHR: number|null,
+ *   warmup: {distanceKm: number|null, paceLabel: string|null, avgHR: number|null, maxHR: number|null}|null,
+ *   cooldown: {distanceKm: number|null, paceLabel: string|null, avgHR: number|null, maxHR: number|null}|null,
  * }} data `paceLabel` is pre-formatted (e.g. "5:15/km", via block.js's
  *   formatPaceMinKm) rather than a raw number, since that mm:ss-style
  *   parsing/formatting already lives there and belongs kept in one place
  *   - everything else here is simple enough to format inline. `paceLabel`
  *   is null and `paceMetricLabel` says 'AVG SPEED'/'AVG PACE/100M' for a
  *   non-run session (see sessionMetric in app.js), defaulting to 'AVG PACE'
- *   when omitted.
+ *   when omitted. `warmup`/`cooldown` are null unless that phase was
+ *   actually toggled on and logged, in which case a compact line for each
+ *   renders below the main stat row.
  * @returns {Promise<Blob>} a transparent 1080x1920 PNG
  */
 export async function renderRunShareCard(data) {
@@ -829,6 +852,11 @@ export async function renderRunShareCard(data) {
   const logoH = 72;
   const logoW = logoH * (logo.width / logo.height);
 
+  const phases = [
+    data.warmup ? { label: 'WARM UP', text: phaseSummaryText(data.warmup) } : null,
+    data.cooldown ? { label: 'COOL DOWN', text: phaseSummaryText(data.cooldown) } : null,
+  ].filter(Boolean);
+
   const measure = () => {
     let y = 64;
     y += logoH + 40;
@@ -838,6 +866,7 @@ export async function renderRunShareCard(data) {
     y += 22 * 1.3 + 8; // "DISTANCE" label
     y += 84 * 1.15 + 40; // big distance value
     y += 44 * 1.15 + 5 + 20 * 1.2; // stat row
+    if (phases.length > 0) y += PHASE_GAP_BEFORE + phases.length * PHASE_ROW_H;
     y += 56;
     return y;
   };
@@ -887,6 +916,17 @@ export async function renderRunShareCard(data) {
     const colCx = innerX + colW * i + colW / 2;
     let sy = line(ctx, stats[i][0], colCx, statTopY, { weight: 700, size: 44, color: BRAND_ORANGE, lineHeight: 1.15 });
     line(ctx, stats[i][1], colCx, sy + 5, { weight: 700, size: 20, color: DIM, lineHeight: 1.2 });
+  }
+  y = statTopY + 44 * 1.15 + 5 + 20 * 1.2;
+
+  if (phases.length > 0) {
+    y += PHASE_GAP_BEFORE;
+    for (const { label, text } of phases) {
+      y = line(ctx, label, cx, y, { weight: 700, size: 20, color: DIM, lineHeight: 1.3 });
+      y += 4;
+      y = line(ctx, text || '–', cx, y, { weight: 700, size: 26, color: INK, lineHeight: 1.3 });
+      y += 20;
+    }
   }
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
@@ -947,7 +987,11 @@ export async function renderWorkoutReceiptCard(data) {
  *   paceMetricLabel: string|undefined,
  *   avgHR: number|null,
  *   maxHR: number|null,
- * }} data same shape renderRunShareCard takes.
+ *   warmup: {distanceKm: number|null, paceLabel: string|null, avgHR: number|null, maxHR: number|null}|null,
+ *   cooldown: {distanceKm: number|null, paceLabel: string|null, avgHR: number|null, maxHR: number|null}|null,
+ * }} data same shape renderRunShareCard takes. A logged warmup/cooldown
+ *   each get their own item row (WARM UP before the main stats, COOL DOWN
+ *   after), same as the compact line renderRunShareCard shows for them.
  * @returns {Promise<Blob>} a 1080x1920 PNG, paper receipt on transparent
  */
 export async function renderRunReceiptCard(data) {
@@ -955,13 +999,16 @@ export async function renderRunReceiptCard(data) {
     { label: 'DATE', value: data.dateLabel },
     { label: 'TYPE', value: data.typeLabel },
   ];
-  const itemRows = [
-    { label: 'DISTANCE', value: data.distanceKm != null ? `${data.distanceKm}km` : '–' },
-    { label: 'DURATION', value: data.durationMin != null ? fmtDurationMinWords(data.durationMin) : '–' },
-  ];
+  const itemRows = [];
+  const warmupText = phaseSummaryText(data.warmup);
+  if (warmupText) itemRows.push({ label: 'WARM UP', value: warmupText });
+  itemRows.push({ label: 'DISTANCE', value: data.distanceKm != null ? `${data.distanceKm}km` : '–' });
+  itemRows.push({ label: 'DURATION', value: data.durationMin != null ? fmtDurationMinWords(data.durationMin) : '–' });
   if (data.paceLabel) itemRows.push({ label: data.paceMetricLabel || 'AVG PACE', value: data.paceLabel });
   if (data.avgHR != null) itemRows.push({ label: 'AVG HR', value: `${data.avgHR}bpm` });
   if (data.maxHR != null) itemRows.push({ label: 'MAX HR', value: `${data.maxHR}bpm` });
+  const cooldownText = phaseSummaryText(data.cooldown);
+  if (cooldownText) itemRows.push({ label: 'COOL DOWN', value: cooldownText });
   return renderReceiptCard({
     subtitle: 'RUN RECEIPT',
     metaRows,
