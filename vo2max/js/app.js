@@ -71,11 +71,18 @@ let customBrands = loadCustomBrands();
 let customSessionTypes = loadCustomSessionTypes();
 let editingId = null;
 // The sport of the session currently open in the Edit sheet ('run' unless
-// it's a synced ride/swim/other activity) - readSessionForm and
-// updateComputedDistance consult this to know which fields are actually
-// live in the form, since a non-run session hides/repurposes several of
-// them (see openEditSheet).
+// it's a Cycling/Stairmaster/Elliptical/RowErg/SkiErg entry, or a legacy
+// synced swim/other activity) - readSessionForm and updateComputedDistance
+// consult this to know which fields are actually live in the form, since a
+// non-run session hides/repurposes several of them (see openEditSheet). The
+// Edit sheet's Activity select is locked (can't reclassify an existing
+// session), so this is set once when the sheet opens and never changes.
 let editingSport = 'run';
+// Same role as editingSport, for the Log sheet - but live: the Log form's
+// Activity select IS interactive (it's choosing a brand new session's
+// sport), so this changes whenever the user picks a different one (see the
+// #logType change listener below).
+let logSport = 'run';
 let workoutEditingId = null;
 let exerciseSheetId = null;
 let exDetailBrand = ''; // '' = all brands, else a brand logged for the open exercise
@@ -235,10 +242,12 @@ function numOrNull(v) {
 
 /** Distance = duration / pace, whenever both are present; otherwise left
  *  alone for manual entry. Only meaningful for a run's pace field - the
- *  Edit sheet repurposes the same input for a ride's speed or a swim's
- *  pace/100m, where this min/km formula would silently compute nonsense. */
+ *  Log/Edit sheets repurpose the same input for a ride's speed, a swim's
+ *  pace/100m, or a RowErg/SkiErg's pace/500m, where this min/km formula
+ *  would silently compute nonsense. */
 function updateComputedDistance(prefix) {
-  if (prefix === 'edit' && editingSport !== 'run') return;
+  const sport = prefix === 'edit' ? editingSport : logSport;
+  if (sport !== 'run') return;
   const duration = numOrNull($(`${prefix}DurationMin`).value);
   const pace = parsePaceMinKm($(`${prefix}AvgPace`).value);
   if (duration != null && pace != null && pace > 0) {
@@ -251,6 +260,114 @@ function updateComputedDistance(prefix) {
 
 function sessionTypeOf(session) {
   return session.type ?? 'interval';
+}
+
+const NO_METRIC_SPORTS = new Set(['other', 'stairmaster', 'elliptical']);
+const ROW_SKI = new Set(['row', 'ski']);
+const EDIT_METRIC_LABEL = {
+  run: 'Avg pace (min/km)', ride: 'Avg speed (km/h)', swim: 'Avg pace (min/100m)',
+  row: 'Avg pace (/500m)', ski: 'Avg pace (/500m)',
+};
+
+/** The Log/Edit sheets' one pace-like input is reused across sports rather
+ *  than giving each its own field: relabeled and repointed at the right
+ *  session property, or hidden entirely for a sport with no single such
+ *  metric (Stairmaster's floors climbed and Elliptical's resistance/incline/
+ *  stride rate all live in the extra-fields area instead - see below). */
+function setMetricField(prefix, sport, session) {
+  const field = $(`${prefix}AvgPaceField`);
+  if (NO_METRIC_SPORTS.has(sport)) {
+    field.hidden = true;
+    $(`${prefix}AvgPace`).value = '';
+    return;
+  }
+  field.hidden = false;
+  $(`${prefix}AvgPaceLabel`).textContent = EDIT_METRIC_LABEL[sport] ?? EDIT_METRIC_LABEL.run;
+  if (sport === 'ride') $(`${prefix}AvgPace`).value = session.avgSpeedKmh ?? '';
+  else if (sport === 'swim') $(`${prefix}AvgPace`).value = formatPaceMinKm(session.avgPace100m);
+  else if (ROW_SKI.has(sport)) $(`${prefix}AvgPace`).value = formatPaceMinKm(session.avgPace500m);
+  else $(`${prefix}AvgPace`).value = formatPaceMinKm(session.avgPace);
+}
+
+// Every other per-sport metric (beyond the shared pace-like field above)
+// renders into a generic #logExtraFields/#editExtraFields container, two
+// per row, rather than hand-building a static HTML block per sport.
+const SPORT_EXTRA_FIELDS = {
+  ride: [
+    { key: 'avgRpm', label: 'Avg cadence (RPM)' },
+    { key: 'avgPower', label: 'Avg power (W)' },
+  ],
+  row: [
+    { key: 'avgStrokeRate', label: 'Stroke rate (SPM)' },
+    { key: 'avgPower', label: 'Avg power (W)' },
+  ],
+  ski: [
+    { key: 'avgStrokeRate', label: 'Stroke rate (SPM)' },
+    { key: 'avgPower', label: 'Avg power (W)' },
+  ],
+  stairmaster: [
+    { key: 'floorsClimbed', label: 'Floors climbed' },
+    { key: 'stepRate', label: 'Step rate (steps/min)' },
+    { key: 'level', label: 'Level' },
+  ],
+  elliptical: [
+    { key: 'resistanceLevel', label: 'Resistance level' },
+    { key: 'incline', label: 'Incline (%)' },
+    { key: 'strideRate', label: 'Stride rate (SPM)' },
+  ],
+};
+
+function extraFieldsHTML(sport) {
+  const fields = SPORT_EXTRA_FIELDS[sport] || [];
+  let html = '';
+  for (let i = 0; i < fields.length; i += 2) {
+    const pair = fields.slice(i, i + 2);
+    html += `<div class="row">${pair.map((f) => `
+      <label class="field">
+        <span>${f.label}</span>
+        <input class="edit-extra-input" data-key="${f.key}" type="number" min="0">
+      </label>`).join('')}</div>`;
+  }
+  return html;
+}
+
+function setExtraFields(prefix, sport, session) {
+  const container = $(`${prefix}ExtraFields`);
+  container.innerHTML = extraFieldsHTML(sport);
+  for (const f of (SPORT_EXTRA_FIELDS[sport] || [])) {
+    const input = container.querySelector(`[data-key="${f.key}"]`);
+    if (input) input.value = session[f.key] ?? '';
+  }
+}
+
+function readExtraFields(prefix, sport) {
+  const out = {};
+  for (const f of (SPORT_EXTRA_FIELDS[sport] || [])) {
+    const input = $(`${prefix}ExtraFields`).querySelector(`[data-key="${f.key}"]`);
+    out[f.key] = input ? numOrNull(input.value) : null;
+  }
+  return out;
+}
+
+/** Shows/hides and (re)populates every sport-conditional field in the Log or
+ *  Edit sheet for the given sport - the metric field, its extras, distance
+ *  (km for most sports, m for RowErg/SkiErg, hidden entirely for
+ *  Stairmaster which uses floors climbed instead), and the warmup/cooldown
+ *  toggles (run-only). `session` is the data to populate from - {} for a
+ *  freshly reset Log form or when the user switches Activity mid-entry,
+ *  since a different sport's fields don't carry over. */
+function applySportFieldsToForm(prefix, sport, session = {}) {
+  setMetricField(prefix, sport, session);
+  setExtraFields(prefix, sport, session);
+  const isRowSki = ROW_SKI.has(sport);
+  $(`${prefix}DistanceKmField`).hidden = sport === 'stairmaster' || isRowSki;
+  $(`${prefix}DistanceMField`).hidden = !isRowSki;
+  $(`${prefix}DistanceM`).value = isRowSki && session.distanceKm != null ? Math.round(session.distanceKm * 1000) : '';
+  if (!isRowSki) $(`${prefix}DistanceKm`).value = session.distanceKm ?? '';
+  $(`${prefix}WarmupToggleField`).hidden = sport !== 'run';
+  $(`${prefix}CooldownToggleField`).hidden = sport !== 'run';
+  const hint = $(`${prefix}DistanceHint`);
+  if (hint) hint.hidden = sport !== 'run';
 }
 
 // Warm up / cool down are optional phases toggled on/off per session, each
@@ -295,10 +412,12 @@ for (const prefix of ['log', 'edit']) {
 
 function resetLogForm() {
   $('logDate').value = todayIso();
-  refreshTypeSelect($('logType'), 'interval');
+  logSport = 'run';
+  refreshActivitySelect($('logType'), 'run');
+  $('logRunTypeField').hidden = false;
+  refreshTypeSelect($('logRunType'), 'easy');
   $('logDurationMin').value = '';
-  $('logAvgPace').value = '';
-  $('logDistanceKm').value = '';
+  applySportFieldsToForm('log', 'run', {});
   $('logRunAvgHR').value = '';
   $('logRunMaxHR').value = '';
   resetPhaseFields('log', 'Warmup');
@@ -308,39 +427,53 @@ function resetLogForm() {
   $('logNotes').value = '';
 }
 
+// Picking a different Activity on the Log form re-derives which fields
+// apply and blanks them (a different sport's numbers don't carry over) -
+// the Edit sheet's Activity select is locked instead (see openEditSheet),
+// since reclassifying an *existing* session's sport is not something this
+// form supports.
+$('logType').addEventListener('change', () => {
+  logSport = $('logType').value;
+  $('logRunTypeField').hidden = logSport !== 'run';
+  if (logSport === 'run') refreshTypeSelect($('logRunType'), 'easy');
+  applySportFieldsToForm('log', logSport, {});
+});
+
 $('logDurationMin').addEventListener('input', () => updateComputedDistance('log'));
 $('logAvgPace').addEventListener('input', () => updateComputedDistance('log'));
 
 $('logRPE').addEventListener('input', () => { $('logRPEOut').textContent = $('logRPE').value; });
 
-// Every RUN session shares the same fields (duration/pace/distance/HR).
 // intervalsCompleted/intervals/recovery are deliberately left out of this
 // object rather than zeroed out: addSession simply won't have them, and
 // updateSession's patch merge (`{...existing, ...patch}`) leaves an older
 // interval session's per-rep HR breakdown untouched when it's re-saved,
 // since the edit form no longer collects or shows those fields.
 //
-// The Log form only ever creates runs (there's no manual-entry UI for other
-// sports), so it's always read as sport 'run'. The Edit form can also be
-// open on a synced ride/swim/other session, whose pace-metric fields are
-// hidden or repurposed (see openEditSheet) - editingSport says which, and
-// the patch omits whatever metric field isn't live in the form, so
-// updateSession's merge leaves the session's existing value there alone.
-// `type` is always read regardless of sport - the Session type select is a
-// free-text label the user can rename/pick for any session (see
-// typeOptionsHTML), not tied to what sport it is.
+// `sport` comes from logSport/editingSport, kept in sync with the Activity
+// select (see resetLogForm, the #logType change listener above, and
+// openEditSheet). `type` is only meaningful for a run (its Easy/Long/
+// Threshold/VO2max sub-classification, from the Run type select) - every
+// other sport's activity IS its type, so there's nothing further to store.
 function readSessionForm(prefix) {
-  const sport = prefix === 'edit' ? editingSport : 'run';
+  const sport = prefix === 'edit' ? editingSport : logSport;
   // The Log form has no VO2max field (only Edit does, for filling one in after the fact).
   const vo2maxEl = $(`${prefix}VO2max`);
+  const isRowSki = ROW_SKI.has(sport);
+  const distanceKm = sport === 'stairmaster'
+    ? null
+    : isRowSki
+      ? (numOrNull($(`${prefix}DistanceM`).value) != null ? numOrNull($(`${prefix}DistanceM`).value) / 1000 : null)
+      : numOrNull($(`${prefix}DistanceKm`).value);
   const base = {
-    type: $(`${prefix}Type`).value,
+    sport,
+    type: sport === 'run' ? $(`${prefix}RunType`).value : null,
     date: $(`${prefix}Date`).value,
     rpe: Number($(`${prefix}RPE`).value),
     vo2max: vo2maxEl ? numOrNull(vo2maxEl.value) : null,
     notes: $(`${prefix}Notes`).value.trim(),
     durationMin: numOrNull($(`${prefix}DurationMin`).value),
-    distanceKm: numOrNull($(`${prefix}DistanceKm`).value),
+    distanceKm,
     avgHR: numOrNull($(`${prefix}RunAvgHR`).value),
     maxHR: numOrNull($(`${prefix}RunMaxHR`).value),
   };
@@ -352,16 +485,11 @@ function readSessionForm(prefix) {
       cooldown: readPhaseFields(prefix, 'Cooldown'),
     };
   }
-  if (sport === 'ride') {
-    return {
-      ...base,
-      avgSpeedKmh: numOrNull($(`${prefix}AvgPace`).value),
-      avgRpm: numOrNull($(`${prefix}AvgRpm`).value),
-      avgPower: numOrNull($(`${prefix}AvgPower`).value),
-    };
-  }
+  if (sport === 'ride') return { ...base, avgSpeedKmh: numOrNull($(`${prefix}AvgPace`).value), ...readExtraFields(prefix, sport) };
   if (sport === 'swim') return { ...base, avgPace100m: parsePaceMinKm($(`${prefix}AvgPace`).value) };
-  return base; // 'other': no pace/speed metric
+  if (isRowSki) return { ...base, avgPace500m: parsePaceMinKm($(`${prefix}AvgPace`).value), ...readExtraFields(prefix, sport) };
+  if (sport === 'stairmaster' || sport === 'elliptical') return { ...base, ...readExtraFields(prefix, sport) };
+  return base; // legacy 'other'
 }
 
 /** Opens the Log session popup for a given date (from a calendar day). */
@@ -409,30 +537,79 @@ const recoveryLabel = { easy: 'Easy', moderate: 'Moderate', hard: 'Hard' };
 // A filled-vs-outline glyph so recovery intensity reads at a glance without
 // relying on color (monotone theme) or having to read the word.
 const recoverySymbol = { easy: '○', moderate: '◐', hard: '●' };
-const typeLabel = { interval: '4x4', 'easy-run': 'Easy run', 'long-run': 'Long run' };
+// interval/easy-run/long-run are legacy keys (every run's type before the
+// Easy/Long/Threshold/VO2max split existed) - kept mapped rather than
+// migrated so old sessions keep displaying correctly without a migration
+// step. "Interval (Norwegian 4x4)" was always this app's VO2max-intensity
+// protocol, hence the relabel.
+const typeLabel = {
+  interval: 'VO2max', 'easy-run': 'Easy', 'long-run': 'Long',
+  easy: 'Easy', long: 'Long', threshold: 'Threshold', vo2max: 'VO2max',
+};
 
-// The Session type dropdown's built-in presets (long-form labels, distinct
-// from typeLabel's short badge text above) plus any custom types the user
-// has added - a session's `type` is really just a free-text label at this
-// point (typeLabel[type] ?? type already falls back to it verbatim), so
-// this select works the same way for every sport: pick a preset, pick a
-// custom one you added before, or add a new one on the spot.
-const TYPE_PRESETS = [
-  { value: 'interval', label: 'Interval (Norwegian 4x4)' },
-  { value: 'easy-run', label: 'Easy run' },
-  { value: 'long-run', label: 'Long run' },
+// The Session type select is really an Activity picker: one fixed entry per
+// machine this app knows how to log, each driving which fields
+// applySportFieldsToForm shows (see SPORT_EXTRA_FIELDS etc. below). Runs get
+// a second, further pick (Run type - see RUN_TYPE_PRESETS) since "Run" alone
+// isn't specific enough to categorize a training log by.
+const ACTIVITY_OPTIONS = [
+  { value: 'run', label: 'Run' },
+  { value: 'ride', label: 'Cycling' },
+  { value: 'stairmaster', label: 'Stairmaster' },
+  { value: 'elliptical', label: 'Elliptical' },
+  { value: 'row', label: 'RowErg' },
+  { value: 'ski', label: 'SkiErg' },
+];
+// swim/other aren't offered as a new selection (no manual-entry metrics
+// defined for them) but can still exist on old intervals.icu-synced
+// sessions from before auto-sync was scoped back down to runs only, so they
+// still need a label for the badge/legacy-select-option fallback.
+const ACTIVITY_LABEL = {
+  ...Object.fromEntries(ACTIVITY_OPTIONS.map((a) => [a.value, a.label])),
+  swim: 'Swim', other: 'Activity',
+};
+
+/** The Activity select's full option list - the fixed presets, plus (only
+ *  when the session's own sport isn't one of them - e.g. a legacy synced
+ *  swim) one extra option so opening the sheet never silently misrepresents
+ *  what it is. */
+function activityOptionsHTML(selectedSport) {
+  const known = new Set(ACTIVITY_OPTIONS.map((a) => a.value));
+  const presetHTML = ACTIVITY_OPTIONS
+    .map((a) => `<option value="${a.value}"${a.value === selectedSport ? ' selected' : ''}>${a.label}</option>`)
+    .join('');
+  const extraHTML = selectedSport && !known.has(selectedSport)
+    ? `<option value="${selectedSport}" selected>${ACTIVITY_LABEL[selectedSport] ?? selectedSport}</option>`
+    : '';
+  return `${presetHTML}${extraHTML}`;
+}
+
+function refreshActivitySelect(select, sport) {
+  select.innerHTML = activityOptionsHTML(sport);
+  select.value = sport;
+}
+
+// A run's own sub-classification, kept as a separate pick from the Activity
+// select above (see RUN_TYPE_PRESETS) since "Run" alone isn't specific
+// enough to categorize a training log by. Grown the same way machine
+// brands are: presets, then any custom types the user has added, then a
+// trailing "+ Add type…".
+const RUN_TYPE_PRESETS = [
+  { value: 'easy', label: 'Easy' },
+  { value: 'long', label: 'Long' },
+  { value: 'threshold', label: 'Threshold' },
+  { value: 'vo2max', label: 'VO2max' },
 ];
 
-/** Builds a Session type <select>'s full option list: presets, then any
- *  custom types, then a trailing "+ Add type…" option - mirrors
- *  brandOptionsHTML's shape below. `selected` is shown pre-selected even if
- *  it isn't (yet) one of those - e.g. a freshly-synced ride's own type
- *  ("Ride") - so opening the sheet never silently jumps to a different
- *  value. */
+/** Builds a Run type <select>'s full option list: presets, then any custom
+ *  types, then a trailing "+ Add type…" option - mirrors brandOptionsHTML's
+ *  shape below. `selected` is shown pre-selected even if it isn't (yet) one
+ *  of those - e.g. a legacy 'interval' session - using its display label
+ *  when known (typeLabel) so a legacy value never shows its raw stored key. */
 function typeOptionsHTML(selected) {
-  const presetValues = new Set(TYPE_PRESETS.map((t) => t.value));
+  const presetValues = new Set(RUN_TYPE_PRESETS.map((t) => t.value));
   const customs = customSessionTypes.filter((t) => !presetValues.has(t));
-  const presetHTML = TYPE_PRESETS
+  const presetHTML = RUN_TYPE_PRESETS
     .map((t) => `<option value="${t.value}"${t.value === selected ? ' selected' : ''}>${t.label}</option>`)
     .join('');
   const customHTML = customs
@@ -440,14 +617,14 @@ function typeOptionsHTML(selected) {
     .join('');
   const knownValues = new Set([...presetValues, ...customs]);
   const extraHTML = selected && !knownValues.has(selected)
-    ? `<option value="${escapeHTML(selected)}" selected>${escapeHTML(selected)}</option>`
+    ? `<option value="${escapeHTML(selected)}" selected>${escapeHTML(typeLabel[selected] ?? selected)}</option>`
     : '';
   return `${presetHTML}${customHTML}${extraHTML}<option value="__add__">+ Add type…</option>`;
 }
 
-/** Rebuilds a Session type select's options and selects `value`, tracking
- *  it in data-confirmed so wireTypeSelectAddFlow can revert to it if the
- *  user opens "+ Add type…" and then cancels. */
+/** Rebuilds a Run type select's options and selects `value`, tracking it in
+ *  data-confirmed so wireTypeSelectAddFlow can revert to it if the user
+ *  opens "+ Add type…" and then cancels. */
 function refreshTypeSelect(select, value) {
   select.innerHTML = typeOptionsHTML(value);
   select.value = value;
@@ -463,28 +640,29 @@ function wireTypeSelectAddFlow(select) {
       select.dataset.confirmed = select.value;
       return;
     }
-    const name = window.prompt('New session type name:')?.trim();
+    const name = window.prompt('New run type name:')?.trim();
     if (name) {
       addCustomSessionType(name);
       customSessionTypes = loadCustomSessionTypes();
       refreshTypeSelect(select, name);
     } else {
-      refreshTypeSelect(select, select.dataset.confirmed || 'interval');
+      refreshTypeSelect(select, select.dataset.confirmed || 'easy');
     }
   });
 }
-wireTypeSelectAddFlow($('logType'));
-wireTypeSelectAddFlow($('editType'));
+wireTypeSelectAddFlow($('logRunType'));
+wireTypeSelectAddFlow($('editRunType'));
 
-/** The sport-appropriate pace-like metric for a session - avgPace (min/km)
- *  for a run, avgSpeedKmh for a ride, avgPace100m for a swim, or nothing at
- *  all for 'other' (walks, hikes, weight training, ...), which has no single
- *  metric that makes sense across every activity intervals.icu might report.
- *  `label` names which metric it is (for stat-tile/receipt headers); `text`
- *  is null whenever the session has no value for that metric yet, so every
- *  call site can fall back to its own placeholder consistently. Sessions
- *  logged before this existed (or logged by hand, which is always a run)
- *  default to sport 'run', matching sessionTypeOf's own legacy fallback. */
+/** The sport-appropriate headline metric for a session - avgPace (min/km)
+ *  for a run, avgSpeedKmh for a ride, avgPace100m for a swim,
+ *  avgPace500m for RowErg/SkiErg, floors climbed for Stairmaster, or
+ *  nothing for elliptical/'other' (a legacy synced activity type), which
+ *  have no single number that stands in for the whole session the way
+ *  distance/pace does elsewhere. `label` names which metric it is (for
+ *  stat-tile/receipt headers); `text` is null whenever the session has no
+ *  value for that metric yet, so every call site can fall back to its own
+ *  placeholder consistently. Sessions logged before this existed default to
+ *  sport 'run', matching sessionTypeOf's own legacy fallback. */
 function sessionMetric(session) {
   const sport = session.sport ?? 'run';
   if (sport === 'ride') {
@@ -493,7 +671,13 @@ function sessionMetric(session) {
   if (sport === 'swim') {
     return { label: 'AVG PACE/100M', text: session.avgPace100m != null ? `${formatPaceMinKm(session.avgPace100m)}/100m` : null };
   }
-  if (sport === 'other') {
+  if (sport === 'row' || sport === 'ski') {
+    return { label: 'AVG PACE/500M', text: session.avgPace500m != null ? `${formatPaceMinKm(session.avgPace500m)}/500m` : null };
+  }
+  if (sport === 'stairmaster') {
+    return { label: 'FLOORS', text: session.floorsClimbed != null ? `${session.floorsClimbed} floors` : null };
+  }
+  if (sport === 'elliptical' || sport === 'other') {
     return { label: null, text: null };
   }
   return { label: 'AVG PACE', text: session.avgPace != null ? `${formatPaceMinKm(session.avgPace)}/km` : null };
@@ -505,6 +689,21 @@ function hasLegacyIntervalData(s) {
   return Boolean(s.intervalsCompleted) || Boolean((s.intervals || []).length);
 }
 
+/** The History/Dashboard badge text for a session: its Run type (Easy/Long/
+ *  Threshold/VO2max, or a custom one) for a run, or its own Activity label
+ *  otherwise - preferring a legacy synced session's specific stored `type`
+ *  string (e.g. "Gravel ride") over the generic Activity label when both
+ *  exist, since that detail was worth keeping when it was originally
+ *  synced. */
+function sessionBadgeLabel(session) {
+  const sport = session.sport ?? 'run';
+  if (sport === 'run') {
+    const t = sessionTypeOf(session);
+    return typeLabel[t] ?? t;
+  }
+  return session.type || ACTIVITY_LABEL[sport] || 'Activity';
+}
+
 function renderHistory() {
   const list = $('historyList');
   const sorted = [...sessions].sort((a, b) => b.date.localeCompare(a.date));
@@ -512,8 +711,7 @@ function renderHistory() {
   $('historyEmpty').hidden = sorted.length > 0;
 
   for (const s of sorted) {
-    const type = sessionTypeOf(s);
-    const badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
+    const badgeHTML = `<span class="pill pill-type">${sessionBadgeLabel(s)}</span>`;
     let legacyHTML = '';
     if (hasLegacyIntervalData(s)) {
       const avgs = (s.intervals || []).map((iv) => iv.avgHR).filter((v) => v != null);
@@ -535,6 +733,12 @@ function renderHistory() {
       ${metric.text ? `<span class="mono">${metric.text}</span>` : ''}
       ${s.avgRpm != null ? `<span class="mono">${s.avgRpm}rpm</span>` : ''}
       ${s.avgPower != null ? `<span class="mono">${s.avgPower}W</span>` : ''}
+      ${s.avgStrokeRate != null ? `<span class="mono">${s.avgStrokeRate}spm</span>` : ''}
+      ${s.stepRate != null ? `<span class="mono">${s.stepRate} steps/min</span>` : ''}
+      ${s.level != null ? `<span class="mono">Lvl ${s.level}</span>` : ''}
+      ${s.resistanceLevel != null ? `<span class="mono">Resist ${s.resistanceLevel}</span>` : ''}
+      ${s.incline != null ? `<span class="mono">${s.incline}% incline</span>` : ''}
+      ${s.strideRate != null ? `<span class="mono">${s.strideRate}spm</span>` : ''}
       ${s.avgHR != null ? `<span class="mono">avg ${s.avgHR}</span>` : ''}
       ${s.maxHR != null ? `<span class="mono">max ${s.maxHR}</span>` : ''}
       <span class="mono">RPE ${s.rpe}</span>
@@ -641,7 +845,7 @@ function renderCalDayPanel() {
       ${day.workouts.map((w) => calDayWorkoutSummaryHTML(w)).join('')}
     ` : ''}
     <div class="cal-day-actions">
-      <button type="button" id="calLogRunBtn" class="ghost-btn">+ Log run</button>
+      <button type="button" id="calLogRunBtn" class="ghost-btn">+ Log session</button>
       <button type="button" id="calLogWorkoutBtn" class="ghost-btn">+ Log workout</button>
     </div>
   `;
@@ -692,8 +896,7 @@ $('calDaySheetClose').addEventListener('click', closeCalDaySheet);
 /** A compact {badgeHTML, metaHTML} summary of one session — shared by the
  *  calendar day panel and the dashboard's recent-activity feed. */
 function sessionCompactSummary(s) {
-  const type = sessionTypeOf(s);
-  const badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
+  const badgeHTML = `<span class="pill pill-type">${sessionBadgeLabel(s)}</span>`;
   let metaHTML;
   if (hasLegacyIntervalData(s)) {
     const avgs = (s.intervals || []).map((iv) => iv.avgHR).filter((v) => v != null);
@@ -989,44 +1192,24 @@ $('recentActivityList').addEventListener('click', (e) => {
 
 /* --------------------------------------------------------- edit sheet */
 
-const EDIT_METRIC_LABEL = { run: 'Avg pace (min/km)', ride: 'Avg speed (km/h)', swim: 'Avg pace (min/100m)' };
-
-/** The Edit sheet's one pace-like input is reused across sports rather than
- *  giving each its own field: relabeled and repointed at the right session
- *  property, or hidden entirely for 'other', which has no such metric. */
-function setEditMetricField(sport, session) {
-  const field = $('editAvgPaceField');
-  if (sport === 'other') {
-    field.hidden = true;
-    $('editAvgPace').value = '';
-    return;
-  }
-  field.hidden = false;
-  $('editAvgPaceLabel').textContent = EDIT_METRIC_LABEL[sport] ?? EDIT_METRIC_LABEL.run;
-  if (sport === 'ride') $('editAvgPace').value = session.avgSpeedKmh ?? '';
-  else if (sport === 'swim') $('editAvgPace').value = formatPaceMinKm(session.avgPace100m);
-  else $('editAvgPace').value = formatPaceMinKm(session.avgPace);
-}
-
 function openEditSheet(session) {
   editingId = session.id;
   const sport = session.sport ?? 'run';
   editingSport = sport;
   $('editDate').value = session.date;
-  refreshTypeSelect($('editType'), session.type ?? 'interval');
+  // The Activity select just shows what this session is - reclassifying an
+  // existing session's sport isn't supported, so it's locked. The Run type
+  // select underneath it (Easy/Long/Threshold/VO2max) stays fully editable.
+  refreshActivitySelect($('editType'), sport);
+  $('editType').disabled = true;
+  $('editRunTypeField').hidden = sport !== 'run';
+  if (sport === 'run') refreshTypeSelect($('editRunType'), session.type ?? 'interval');
   $('editDurationMin').value = session.durationMin ?? '';
-  setEditMetricField(sport, session);
-  $('editDistanceKm').value = session.distanceKm ?? '';
+  applySportFieldsToForm('edit', sport, session);
   $('editRunAvgHR').value = session.avgHR ?? '';
   $('editRunMaxHR').value = session.maxHR ?? '';
-  $('editRideExtraFields').hidden = sport !== 'ride';
-  $('editAvgRpm').value = session.avgRpm ?? '';
-  $('editAvgPower').value = session.avgPower ?? '';
-  $('editWarmupToggleField').hidden = sport !== 'run';
-  $('editCooldownToggleField').hidden = sport !== 'run';
   populatePhaseFields('edit', 'Warmup', session.warmup);
   populatePhaseFields('edit', 'Cooldown', session.cooldown);
-  $('editDistanceHint').hidden = sport !== 'run';
   $('editRPE').value = session.rpe;
   $('editRPEOut').textContent = String(session.rpe);
   $('editVO2max').value = session.vo2max ?? '';
@@ -2237,14 +2420,14 @@ $('summarySaveRoutine').addEventListener('click', () => {
 });
 
 /** Builds a session's share-card data from a saved session - typeLabel
- *  reuses the same map (and the same raw-type fallback) the History list's
- *  own row labels come from, and paceLabel/paceMetricLabel come from
- *  sessionMetric so a ride's card says "AVG SPEED" and a swim's says
- *  "AVG PACE/100M" instead of assuming every session is a run. */
+ *  reuses sessionBadgeLabel, the same badge text the History list's own
+ *  rows show, and paceLabel/paceMetricLabel come from sessionMetric so a
+ *  ride's card says "AVG SPEED" and a swim's says "AVG PACE/100M" instead
+ *  of assuming every session is a run. */
 function buildRunShareCardData(session) {
   const metric = sessionMetric(session);
   return {
-    typeLabel: typeLabel[session.type] ?? session.type ?? 'Run',
+    typeLabel: sessionBadgeLabel(session),
     dateLabel: fmtDateLong(session.date),
     distanceKm: session.distanceKm ?? null,
     durationMin: session.durationMin ?? null,
@@ -3033,19 +3216,18 @@ function isoDateDaysAgo(days) {
   return d.toISOString().slice(0, 10);
 }
 
-/** Imports every not-yet-seen run out of `activities` (deduped by
- *  intervalsActivityId), across every activity type (run, ride, swim, and
- *  everything else - see classifyActivity in intervals.js), returning how
- *  many were added. A date that already has a manually-logged *run* (no
- *  intervalsActivityId of its own) skips importing a synced run for that
- *  same date - a run the user typed in by hand is never silently
- *  duplicated, overwritten, or replaced by an imported one - but doesn't
- *  block a ride/swim/other activity from that same day, since manual entry
- *  never produces anything but a run and there's no risk of double-counting
- *  a different sport. `vo2maxByDate` (optional, date -> number) fills in
- *  the watch's own VO2max estimate for a newly-imported run's day, if any -
- *  see fetchVo2maxByDate; it's a running fitness metric, so it's left blank
- *  for other sports. */
+/** Imports every not-yet-seen RUN out of `activities` (deduped by
+ *  intervalsActivityId), returning how many were added. Only runs auto-sync
+ *  - cycling, stairmaster, elliptical, rowing, skiing, and anything else
+ *  intervals.icu might report are logged by hand instead (see the Session
+ *  type picker), so a non-run activity is classified (via classifyActivity
+ *  in intervals.js) just to filter it back out here. A date that already
+ *  has a manually-logged run (no intervalsActivityId of its own) skips
+ *  importing a synced run for that same date - a run the user typed in by
+ *  hand is never silently duplicated, overwritten, or replaced by an
+ *  imported one. `vo2maxByDate` (optional, date -> number) fills in the
+ *  watch's own VO2max estimate for a newly-imported run's day, if any - see
+ *  fetchVo2maxByDate. */
 function importNewIntervalsActivities(activities, vo2maxByDate = new Map()) {
   const existingIds = new Set(sessions.map((s) => s.intervalsActivityId).filter(Boolean));
   const manualRunDates = new Set(
@@ -3055,10 +3237,9 @@ function importNewIntervalsActivities(activities, vo2maxByDate = new Map()) {
   for (const activity of activities) {
     if (existingIds.has(activity.id)) continue;
     const mapped = intervalsActivityToSession(activity);
-    if (mapped.sport === 'run') {
-      if (manualRunDates.has(mapped.date)) continue;
-      if (vo2maxByDate.has(mapped.date)) mapped.vo2max = vo2maxByDate.get(mapped.date);
-    }
+    if (mapped.sport !== 'run') continue;
+    if (manualRunDates.has(mapped.date)) continue;
+    if (vo2maxByDate.has(mapped.date)) mapped.vo2max = vo2maxByDate.get(mapped.date);
     addSession(mapped);
     count += 1;
   }
@@ -3082,9 +3263,9 @@ async function fetchVo2maxByDate(athleteId, apiKey, oldestIso) {
   }
 }
 
-/** Pulls new activities of any sport from intervals.icu into local
- *  sessions. The first sync (no lastSyncedAt yet) backfills the last 90
- *  days; every sync after that only asks for what's new. No OAuth here
+/** Pulls new runs from intervals.icu into local sessions. The first sync
+ *  (no lastSyncedAt yet) backfills the last 90 days; every sync after that
+ *  only asks for what's new. No OAuth here
  *  (see intervals.js) - a plain API-key GET, so unlike Strava/Google
  *  there's no token to refresh or redirect to handle, just "does the
  *  request succeed". */
@@ -3111,8 +3292,8 @@ async function syncIntervalsActivities({ silent = false } = {}) {
   if (silent) return;
   if (failure?.networkError) toast('Could not reach intervals.icu - check your connection', 3400);
   else if (imported == null) toast('Could not sync intervals.icu - check your Athlete ID and API Key');
-  else if (imported > 0) toast(`Imported ${imported} activit${imported === 1 ? 'y' : 'ies'} from intervals.icu`);
-  else toast('No new activities to import');
+  else if (imported > 0) toast(`Imported ${imported} run${imported === 1 ? '' : 's'} from intervals.icu`);
+  else toast('No new runs to import');
 }
 
 /** Refreshes the cached resting HR / sleep shown as Dashboard stat tiles.
@@ -3146,7 +3327,7 @@ function renderIntervalsStatus() {
     $('intervalsStatus').textContent = 'Sync failed - tap Connect to retry.';
     $('intervalsConnect').hidden = false;
   } else {
-    $('intervalsStatus').textContent = 'Connected - importing your activities automatically.';
+    $('intervalsStatus').textContent = 'Connected - importing your runs automatically.';
     $('intervalsConnect').hidden = true;
   }
 }
@@ -3174,7 +3355,7 @@ $('intervalsConnect').addEventListener('click', async () => {
     renderAll();
     renderIntervalsStatus();
     syncIntervalsWellness();
-    toast(imported > 0 ? `Connected - imported ${imported} activit${imported === 1 ? 'y' : 'ies'}` : 'Connected - no activities to import yet');
+    toast(imported > 0 ? `Connected - imported ${imported} run${imported === 1 ? '' : 's'}` : 'Connected - no runs to import yet');
   } catch (err) {
     console.error('intervals.icu connect failed', err);
     if (err.networkError) toast('Could not reach intervals.icu - check your connection', 3400);
@@ -3184,7 +3365,7 @@ $('intervalsConnect').addEventListener('click', async () => {
 });
 
 $('intervalsDisconnect').addEventListener('click', () => {
-  if (!confirm('Disconnect intervals.icu? Activities already imported stay in your history - only future auto-import stops.')) return;
+  if (!confirm('Disconnect intervals.icu? Runs already imported stay in your history - only future auto-import stops.')) return;
   intervalsNeedsReconnect = false;
   settings = { ...settings, intervals: { ...settings.intervals, enabled: false } };
   saveSettings(settings);
