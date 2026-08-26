@@ -40,7 +40,7 @@ import {
 } from './exercises.js';
 import { muscleDiagramHTML } from './muscleDiagram.js';
 import {
-  renderWorkoutShareCard, renderMuscleBalanceCard, renderPRsCard, renderRunShareCard,
+  renderWorkoutShareCard, renderMuscleBalanceCard, renderPRsCard, renderRunShareCard, renderRunZonesCard,
   renderWorkoutReceiptCard, renderRunReceiptCard,
 } from './shareCard.js';
 import {
@@ -104,7 +104,7 @@ let lastFinishedSession = null; // set by openRunSummarySheet, read by "Save PNG
 // a still-running live session it's `workouts` plus a synthetic in-progress
 // record, so "new PR" framing reflects today's not-yet-saved sets too.
 let shareCardContext = null; // { workout, workoutsForPRs, durationMs, newPRs }
-let shareCardOption = 'summary'; // 'summary' | 'muscle' | 'prs' - which tab is showing
+let shareCardOption = 'summary'; // 'summary' | 'muscle' | 'prs' | 'zones' | 'receipt' - which tab is showing
 let shareCardBlobs = {}; // rendered-PNG cache for the currently open sheet, keyed by option
 let shareCardObjectUrl = null; // the preview <img>'s current blob: URL, revoked on tab switch/close
 let routineSelectedIds = []; // exercise ids chosen so far in the open routine builder
@@ -2546,16 +2546,39 @@ function buildRunShareCardData(session) {
   };
 }
 
+/** Fetches a synced run's raw HR stream from intervals.icu for the Zones
+ *  card's graph, alongside this app's own zone table (whichever model is
+ *  primary in Settings) - null/null for a manually-logged run (no
+ *  intervalsActivityId) or if the fetch fails, so the card just skips its
+ *  graph section rather than erroring the whole preview. */
+async function runHRZoneStream(session) {
+  const s = settings.intervals;
+  if (!s?.enabled || !session.intervalsActivityId) return { hrStream: null, zoneTable: null };
+  try {
+    const points = await intervalsFetchActivityStreams(session.intervalsActivityId, s.apiKey);
+    return { hrStream: points, zoneTable: zoneTable(settings, settings.primaryZoneModel) };
+  } catch (err) {
+    console.error('Failed to load HR stream for zones card', err);
+    return { hrStream: null, zoneTable: null };
+  }
+}
+
 /** Builds and caches (per #shareCardSheet visit) the PNG blob for the
  *  currently open subject - a run session or a workout, each offering a
- *  Summary/Receipt design plus (workout only) Muscles/PRs - see
- *  shareCardContext and #shareCardTabs' data-kinds. */
+ *  Summary/Zones/Receipt design (workout: Summary/Muscles/PRs/Receipt) -
+ *  see shareCardContext and #shareCardTabs' data-kinds. */
 async function buildShareCardBlob(option) {
   if (shareCardBlobs[option]) return shareCardBlobs[option];
   let blob;
   if (shareCardContext.kind === 'run') {
-    const data = buildRunShareCardData(shareCardContext.session);
-    blob = option === 'receipt' ? await renderRunReceiptCard(data) : await renderRunShareCard(data);
+    const session = shareCardContext.session;
+    const data = buildRunShareCardData(session);
+    if (option === 'zones') {
+      const { hrStream, zoneTable: zt } = await runHRZoneStream(session);
+      blob = await renderRunZonesCard({ ...data, hrStream, zoneTable: zt });
+    } else {
+      blob = option === 'receipt' ? await renderRunReceiptCard(data) : await renderRunShareCard(data);
+    }
   } else {
     const { workout, workoutsForPRs, durationMs, newPRs } = shareCardContext;
     if (option === 'muscle') {
@@ -2714,7 +2737,7 @@ $('shareCardSave').addEventListener('click', async () => {
   try {
     const blob = await buildShareCardBlob(shareCardOption);
     const date = shareCardContext.kind === 'run' ? shareCardContext.session.date : shareCardContext.workout.date;
-    const suffix = { summary: 'summary', muscle: 'muscles', prs: 'prs', receipt: 'receipt' }[shareCardOption];
+    const suffix = { summary: 'summary', muscle: 'muscles', prs: 'prs', zones: 'zones', receipt: 'receipt' }[shareCardOption];
     const file = new File([blob], `hybrd-${shareCardContext.kind}-${date}-${suffix}.png`, { type: 'image/png' });
     if (navigator.canShare?.({ files: [file] })) {
       await navigator.share({ files: [file], title: shareCardContext.kind === 'run' ? 'Run' : 'Workout' });

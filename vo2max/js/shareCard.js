@@ -912,6 +912,90 @@ const PHASE_ROW_H = 20 * 1.3 + 4 + 26 * 1.3 + 20;
  *   renders below the main stat row.
  * @returns {Promise<Blob>} a transparent 1080x1920 PNG
  */
+// Fixed left-to-right colors for the Z1..Z5 bands on the HR zone graph
+// below - independent of which zone model's names are in play (LTHR's
+// "Efficient fat burning" vs RHR's "Zone 2" are still just band index 1),
+// since both models' tables are always exactly 5 zones, low to high.
+const ZONE_COLORS = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444'];
+const ZONE_CHART_H = 320;
+
+/** Bucket-averages a raw HR stream down to at most `maxPoints` samples -
+ *  the same downsampling denseLineChartSVG does in chart.js, just
+ *  re-implemented here since this card draws to a <canvas> instead of
+ *  building an SVG string. Null-HR samples are dropped first. */
+function downsampleHR(points, maxPoints = 300) {
+  const pts = points.filter((p) => p.hr != null);
+  if (pts.length <= maxPoints) return pts;
+  const bucketSize = Math.ceil(pts.length / maxPoints);
+  const bucketed = [];
+  for (let i = 0; i < pts.length; i += bucketSize) {
+    const slice = pts.slice(i, i + bucketSize);
+    const avgHR = slice.reduce((sum, p) => sum + p.hr, 0) / slice.length;
+    bucketed.push({ t: slice[slice.length - 1].t, hr: avgHR });
+  }
+  return bucketed;
+}
+
+/** Draws an HR-over-time line into a fixed `w`x`h` chart area at (x, y),
+ *  with each of `zoneTable`'s 5 zones rendered as a translucent band
+ *  behind the line plus a small "Z1".."Z5" label at its left edge - the
+ *  same zone math (zones.js's zoneTable) the app's own Activity Detail
+ *  chart uses, just drawn as filled bands here instead of SVG threshold
+ *  lines. `points` is already downsampled and filtered to non-null hr. */
+function drawZoneChart(ctx, points, zoneTable, x, y, w, h) {
+  const dataMin = Math.min(...points.map((p) => p.hr));
+  const dataMax = Math.max(...points.map((p) => p.hr));
+  const yLow = Math.min(zoneTable[0].bpmLow, dataMin);
+  const yHigh = Math.max(zoneTable[zoneTable.length - 1].bpmHigh, dataMax);
+  const span = Math.max(yHigh - yLow, 1);
+  const yFor = (bpm) => y + h - ((bpm - yLow) / span) * h;
+
+  ctx.save();
+  roundRect(ctx, x, y, w, h, 16);
+  ctx.clip();
+
+  ctx.globalAlpha = 0.16;
+  zoneTable.forEach((z, i) => {
+    const bandTop = yFor(z.bpmHigh);
+    const bandBottom = yFor(z.bpmLow);
+    ctx.fillStyle = ZONE_COLORS[i] ?? ZONE_COLORS[ZONE_COLORS.length - 1];
+    ctx.fillRect(x, bandTop, w, Math.max(bandBottom - bandTop, 1));
+  });
+  ctx.globalAlpha = 1;
+
+  const minT = points[0].t;
+  const maxT = points[points.length - 1].t;
+  const tSpan = Math.max(maxT - minT, 1);
+  const xFor = (t) => x + ((t - minT) / tSpan) * w;
+
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    const px = xFor(p.t);
+    const py = yFor(p.hr);
+    // A gap of more than 2 minutes between (already-downsampled) points
+    // means the recording was paused or dropped for a stretch - break the
+    // line there instead of drawing a misleading straight connector across it.
+    const gap = i > 0 && p.t - points[i - 1].t > 120;
+    if (i === 0 || gap) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  });
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 3;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  zoneTable.forEach((z, i) => {
+    const midY = (yFor(z.bpmHigh) + yFor(z.bpmLow)) / 2;
+    if (midY < y || midY > y + h) return;
+    ctx.font = font(700, 16);
+    ctx.fillStyle = ZONE_COLORS[i] ?? ZONE_COLORS[ZONE_COLORS.length - 1];
+    ctx.fillText(`Z${i + 1}`, x + 10, midY);
+  });
+}
+
 export async function renderRunShareCard(data) {
   await ensureFontLoaded();
   const logo = await loadImage('./icons/logo-header.png');
@@ -1000,6 +1084,143 @@ export async function renderRunShareCard(data) {
       y += 20;
     }
   }
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+}
+
+/**
+ * @param {{
+ *   typeLabel: string,
+ *   dateLabel: string,
+ *   distanceKm: number|null,
+ *   durationMin: number|null,
+ *   paceLabel: string|null,
+ *   paceMetricLabel: string|undefined,
+ *   avgHR: number|null,
+ *   maxHR: number|null,
+ *   warmup: {distanceKm: number|null, paceLabel: string|null, avgHR: number|null, maxHR: number|null}|null,
+ *   cooldown: {distanceKm: number|null, paceLabel: string|null, avgHR: number|null, maxHR: number|null}|null,
+ *   hrStream: {t: number, hr: number|null}[]|null,
+ *   zoneTable: {bpmLow: number, bpmHigh: number}[]|null,
+ * }} data everything but `hrStream`/`zoneTable` is identical in shape to
+ *   renderRunShareCard's data - this card always shows the run's details
+ *   (distance/duration/pace/HR/warm up/cool down). The HR zone graph
+ *   section below that only renders when `hrStream` has a real raw
+ *   time-series (an intervals.icu-synced run) - a manually-logged run only
+ *   has single avg/max HR numbers per phase, nothing to plot a line from,
+ *   so that section is skipped entirely rather than showing an empty chart.
+ * @returns {Promise<Blob>} a transparent 1080x1920 PNG
+ */
+export async function renderRunZonesCard(data) {
+  await ensureFontLoaded();
+  const logo = await loadImage('./icons/logo-header.png');
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  const logoH = 72;
+  const logoW = logoH * (logo.width / logo.height);
+
+  const phases = [
+    data.warmup ? { label: 'WARM UP', text: phaseSummaryText(data.warmup) } : null,
+    data.cooldown ? { label: 'COOL DOWN', text: phaseSummaryText(data.cooldown) } : null,
+  ].filter(Boolean);
+
+  const hrPts = data.hrStream && data.zoneTable ? downsampleHR(data.hrStream) : [];
+  const hasZoneChart = hrPts.length > 1;
+
+  const measure = () => {
+    let y = 64;
+    y += logoH + 40;
+    y += 26 * 1.3 + 16; // "RUN DETAILS"
+    y += 46 * 1.25 + 12; // type label
+    y += 26 * 1.3 + 40; // date
+    y += 44 * 1.15 + 5 + 20 * 1.2 + 40; // stat row 1 (distance/duration/pace)
+    y += 44 * 1.15 + 5 + 20 * 1.2; // stat row 2 (avg/max HR)
+    if (phases.length > 0) y += PHASE_GAP_BEFORE + phases.length * PHASE_ROW_H;
+    if (hasZoneChart) {
+      y += 32;
+      y += 22 * 1.3 + 16; // "HEART RATE ZONES" label
+      y += ZONE_CHART_H + 24;
+    }
+    y += 56;
+    return y;
+  };
+  const contentH = measure();
+  const panelX = PAD_X;
+  const panelW = W - PAD_X * 2;
+  const innerX = panelX + 56;
+  const innerW = panelW - 112;
+  const panelH = Math.min(contentH, H - 160);
+  const panelY = (H - panelH) / 2;
+
+  ctx.fillStyle = PANEL_FILL;
+  ctx.strokeStyle = PANEL_BORDER;
+  ctx.lineWidth = 2;
+  roundRect(ctx, panelX, panelY, panelW, panelH, 40);
+  ctx.fill();
+  ctx.stroke();
+
+  const cx = W / 2;
+  let y = panelY + 64;
+
+  ctx.drawImage(logo, cx - logoW / 2, y, logoW, logoH);
+  y += logoH + 40;
+
+  y = line(ctx, 'RUN DETAILS', cx, y, { weight: 700, size: 26, color: DIM, lineHeight: 1.3 });
+  y += 16;
+  y = line(ctx, data.typeLabel, cx, y, { weight: 700, size: 46, color: INK, lineHeight: 1.25 });
+  y += 12;
+  y = line(ctx, data.dateLabel, cx, y, { weight: 400, size: 26, color: DIM, lineHeight: 1.3 });
+  y += 40;
+
+  const distanceText = data.distanceKm != null ? `${data.distanceKm}km` : '–';
+  const stats1 = [
+    [distanceText, 'DISTANCE'],
+    [data.durationMin != null ? fmtDurationMinWords(data.durationMin) : '–', 'DURATION'],
+    [data.paceLabel || '–', data.paceMetricLabel || 'AVG PACE'],
+  ];
+  const colW = innerW / 3;
+  let statTopY = y;
+  for (let i = 0; i < stats1.length; i++) {
+    const colCx = innerX + colW * i + colW / 2;
+    const sy = line(ctx, stats1[i][0], colCx, statTopY, { weight: 700, size: 44, color: BRAND_ORANGE, lineHeight: 1.15 });
+    line(ctx, stats1[i][1], colCx, sy + 5, { weight: 700, size: 20, color: DIM, lineHeight: 1.2 });
+  }
+  y = statTopY + 44 * 1.15 + 5 + 20 * 1.2 + 40;
+
+  const stats2 = [
+    [data.avgHR != null ? String(data.avgHR) : '–', 'AVG HR'],
+    [data.maxHR != null ? String(data.maxHR) : '–', 'MAX HR'],
+  ];
+  const colW2 = innerW / 2;
+  statTopY = y;
+  for (let i = 0; i < stats2.length; i++) {
+    const colCx = innerX + colW2 * i + colW2 / 2;
+    const sy = line(ctx, stats2[i][0], colCx, statTopY, { weight: 700, size: 44, color: BRAND_ORANGE, lineHeight: 1.15 });
+    line(ctx, stats2[i][1], colCx, sy + 5, { weight: 700, size: 20, color: DIM, lineHeight: 1.2 });
+  }
+  y = statTopY + 44 * 1.15 + 5 + 20 * 1.2;
+
+  if (phases.length > 0) {
+    y += PHASE_GAP_BEFORE;
+    for (const { label, text } of phases) {
+      y = line(ctx, label, cx, y, { weight: 700, size: 20, color: DIM, lineHeight: 1.3 });
+      y += 4;
+      y = line(ctx, text || '–', cx, y, { weight: 700, size: 26, color: INK, lineHeight: 1.3 });
+      y += 20;
+    }
+  }
+
+  if (hasZoneChart) {
+    y += 32;
+    y = line(ctx, 'HEART RATE ZONES', cx, y, { weight: 700, size: 22, color: DIM, lineHeight: 1.3 });
+    y += 16;
+    drawZoneChart(ctx, hrPts, data.zoneTable, innerX, y, innerW, ZONE_CHART_H);
+    y += ZONE_CHART_H + 24;
+  }
+
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 

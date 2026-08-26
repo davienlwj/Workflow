@@ -253,8 +253,8 @@ the defaults in this app.
 A **Save PNG** button opens a preview sheet offering shareable 1080×1920
 PNGs, each drawn entirely client-side on a `<canvas>` (no backend, no
 third-party image service). A tab picker at the top of the sheet only
-shows the designs that apply - a workout gets all four, a run gets the
-two general-purpose ones:
+shows the designs that apply - a workout gets Summary/Muscles/PRs/Receipt,
+a run gets Summary/Zones/Receipt:
 
 - **Summary** - the Strava-style stat card: workout name/date/duration/
   volume/exercise+set counts/new PRs (or, for a run, distance as the hero
@@ -271,6 +271,15 @@ two general-purpose ones:
 - **PRs** *(workout only)* - every exercise this workout touched, its
   all-time best weight and estimated 1RM, with a "NEW" badge on whichever
   one this workout actually just beat.
+- **Zones** *(run only)* - the run's full details (distance/duration/avg
+  pace/avg+max HR, plus Warm up/Cool down lines when logged) and, below
+  that, an HR-over-time line graph with the Z1-Z5 heart-rate zones drawn
+  as colored bands behind it - the same zone table (LTHR or RHR, whichever
+  model is primary in Settings) the in-app Activity Detail chart uses. The
+  graph only appears for a run synced from intervals.icu, since that's the
+  only source with a raw HR-over-time stream to plot; a manually-logged
+  run (only single avg/max HR numbers, no time series) still gets the
+  details section, just without a graph beneath it.
 - **Receipt** - a torn-paper strip styled like a printed gym/running
   receipt (deliberately not transparent - a receipt is paper, not a
   sticker): logo letterhead, dashed dividers, dotted-leader line items
@@ -324,8 +333,8 @@ js/gcal.js                  Google Identity Services auth + Calendar API calls f
 js/intervals.js              intervals.icu API-key auth + activity fetch/mapping for run
                               import (no backend needed - see the README's intervals.icu
                               sync section)
-js/shareCard.js               renders the three Save-PNG cards (summary/muscles/PRs) as shareable
-                              transparent PNGs (canvas-drawn, no backend) - see "Share your workout" below
+js/shareCard.js               renders the Save-PNG cards (summary/muscles/PRs/zones/receipt) as
+                              shareable PNGs (canvas-drawn, no backend) - see "Share your workout" below
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/icon-source.png        the orange wordmark logo the app icons are built from
