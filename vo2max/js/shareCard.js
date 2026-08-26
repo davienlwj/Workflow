@@ -959,6 +959,22 @@ function drawZoneChart(ctx, points, zoneTable, x, y, w, h) {
   const tSpan = Math.max(maxT - minT, 1);
   const xFor = (t) => x + ((t - minT) / tSpan) * w;
 
+  // A dotted line at each zone's lower bpm threshold, spanning the chart -
+  // gives the line something to read against without the heavy colored
+  // bands this used to have.
+  ctx.strokeStyle = LINE;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([2, 5]);
+  zoneTable.forEach((z) => {
+    const ly = yFor(z.bpmLow);
+    if (ly < y || ly > y + h) return;
+    ctx.beginPath();
+    ctx.moveTo(x, ly);
+    ctx.lineTo(x + w, ly);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
   ctx.beginPath();
   points.forEach((p, i) => {
     const px = xFor(p.t);
