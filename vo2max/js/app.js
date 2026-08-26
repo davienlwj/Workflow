@@ -3503,7 +3503,34 @@ if (bootSplash) {
 }
 
 if ('serviceWorker' in navigator) {
+  // 'controllerchange' also fires once on a page's very first-ever
+  // activation (uncontrolled -> controlled), not just on a genuine version
+  // swap - reloading for that case would be pointless (there's no newer
+  // content to pick up) and, worse, would land mid-boot on a first visit.
+  // Only a page that was *already* controlled by some service worker
+  // before this event is a real "a new version just took over" signal.
+  const hadController = Boolean(navigator.serviceWorker.controller);
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      // Force an update check on every load rather than waiting on the
+      // browser's own heuristic - iOS home-screen installs in particular
+      // can go a long time (sometimes indefinitely, until reinstalled)
+      // between automatic checks, leaving the app stuck on an old version
+      // even after a force-quit and relaunch.
+      reg.update().catch(() => {});
+    }).catch(() => {});
+  });
+
+  // sw.js calls skipWaiting()/clients.claim(), so a new service worker
+  // taking control of an already-controlled page means a fresh version
+  // just installed - reload once so it's actually applied immediately
+  // instead of leaving this page running on the stale JS/CSS it already
+  // loaded until the next full relaunch.
+  let refreshingForNewVersion = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || refreshingForNewVersion) return;
+    refreshingForNewVersion = true;
+    window.location.reload();
   });
 }
