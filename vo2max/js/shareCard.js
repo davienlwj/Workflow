@@ -912,10 +912,10 @@ const PHASE_ROW_H = 20 * 1.3 + 4 + 26 * 1.3 + 20;
  *   renders below the main stat row.
  * @returns {Promise<Blob>} a transparent 1080x1920 PNG
  */
-// Fixed left-to-right colors for the Z1..Z5 bands on the HR zone graph
-// below - independent of which zone model's names are in play (LTHR's
-// "Efficient fat burning" vs RHR's "Zone 2" are still just band index 1),
-// since both models' tables are always exactly 5 zones, low to high.
+// Fixed colors for the Z1..Z5 labels on the HR zone graph below -
+// independent of which zone model's names are in play (LTHR's "Efficient
+// fat burning" vs RHR's "Zone 2" are still just label index 1), since both
+// models' tables are always exactly 5 zones, low to high.
 const ZONE_COLORS = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444'];
 const ZONE_CHART_H = 320;
 
@@ -937,11 +937,11 @@ function downsampleHR(points, maxPoints = 300) {
 }
 
 /** Draws an HR-over-time line into a fixed `w`x`h` chart area at (x, y),
- *  with each of `zoneTable`'s 5 zones rendered as a translucent band
- *  behind the line plus a small "Z1".."Z5" label at its left edge - the
- *  same zone math (zones.js's zoneTable) the app's own Activity Detail
- *  chart uses, just drawn as filled bands here instead of SVG threshold
- *  lines. `points` is already downsampled and filtered to non-null hr. */
+ *  bordered like the rest of the card (no colored fill - just the line
+ *  plus a small "Z1".."Z5" label at each zone's left edge, positioned at
+ *  that zone's vertical midpoint) - the same zone math (zones.js's
+ *  zoneTable) the app's own Activity Detail chart uses. `points` is
+ *  already downsampled and filtered to non-null hr. */
 function drawZoneChart(ctx, points, zoneTable, x, y, w, h) {
   const dataMin = Math.min(...points.map((p) => p.hr));
   const dataMax = Math.max(...points.map((p) => p.hr));
@@ -953,15 +953,6 @@ function drawZoneChart(ctx, points, zoneTable, x, y, w, h) {
   ctx.save();
   roundRect(ctx, x, y, w, h, 16);
   ctx.clip();
-
-  ctx.globalAlpha = 0.16;
-  zoneTable.forEach((z, i) => {
-    const bandTop = yFor(z.bpmHigh);
-    const bandBottom = yFor(z.bpmLow);
-    ctx.fillStyle = ZONE_COLORS[i] ?? ZONE_COLORS[ZONE_COLORS.length - 1];
-    ctx.fillRect(x, bandTop, w, Math.max(bandBottom - bandTop, 1));
-  });
-  ctx.globalAlpha = 1;
 
   const minT = points[0].t;
   const maxT = points[points.length - 1].t;
@@ -984,6 +975,11 @@ function drawZoneChart(ctx, points, zoneTable, x, y, w, h) {
   ctx.lineJoin = 'round';
   ctx.stroke();
   ctx.restore();
+
+  ctx.strokeStyle = PANEL_BORDER;
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, x, y, w, h, 16);
+  ctx.stroke();
 
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';

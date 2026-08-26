@@ -273,9 +273,10 @@ a run gets Summary/Zones/Receipt:
   one this workout actually just beat.
 - **Zones** *(run only)* - the run's full details (distance/duration/avg
   pace/avg+max HR, plus Warm up/Cool down lines when logged) and, below
-  that, an HR-over-time line graph with the Z1-Z5 heart-rate zones drawn
-  as colored bands behind it - the same zone table (LTHR or RHR, whichever
-  model is primary in Settings) the in-app Activity Detail chart uses. The
+  that, an HR-over-time line graph bordered like the rest of the card, with
+  a small colored "Z1".."Z5" label marking each heart-rate zone's position
+  alongside the line - the same zone table (LTHR or RHR, whichever model
+  is primary in Settings) the in-app Activity Detail chart uses. The
   graph only appears for a run synced from intervals.icu, since that's the
   only source with a raw HR-over-time stream to plot; a manually-logged
   run (only single avg/max HR numbers, no time series) still gets the
