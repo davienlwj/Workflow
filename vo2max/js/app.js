@@ -366,6 +366,10 @@ function applySportFieldsToForm(prefix, sport, session = {}) {
   if (!isRowSki) $(`${prefix}DistanceKm`).value = session.distanceKm ?? '';
   $(`${prefix}WarmupToggleField`).hidden = sport !== 'run';
   $(`${prefix}CooldownToggleField`).hidden = sport !== 'run';
+  // "Workout" labels the main block distinguishing it from the optional
+  // Warm up/Cool down phases above and below it - only meaningful when
+  // those phases are actually offered, i.e. for a run.
+  $(`${prefix}WorkoutLabel`).hidden = sport !== 'run';
   const hint = $(`${prefix}DistanceHint`);
   if (hint) hint.hidden = sport !== 'run';
 }
