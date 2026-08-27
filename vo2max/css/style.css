@@ -968,11 +968,6 @@ button { font-family: var(--font-mono); }
 .cal-cell.selected .glyph-icon { color: var(--bg); }
 .cal-cell.today .glyph-icon { color: #ffffff; }
 
-/* A planned (not yet logged) run/workout gets the same glyph, just faded -
-   a "ghost" of the solid icon a completed one gets, so the calendar and
-   legend read as one consistent icon system rather than needing new art. */
-.glyph-planned { opacity: 0.4; }
-
 .cal-legend {
   display: flex;
   gap: 16px;
@@ -991,6 +986,14 @@ button { font-family: var(--font-mono); }
    than the runner's, so it reads smaller at the same box size - bump it up
    to match the run icon's visual weight. */
 .cal-legend-item .glyph-workout { width: 16px; height: 16px; }
+
+/* A planned (not yet logged) run/workout gets the same glyph, just light
+   grey instead of brand orange - reads as a "ghost" of the solid icon a
+   completed one gets, so the calendar and legend stay one consistent
+   icon system rather than needing new art. Placed after every other
+   .glyph-icon color rule above (same specificity, so source order
+   decides) so it wins regardless of which cell state it's drawn on. */
+.glyph-icon.glyph-planned { color: #b3b3b3; }
 
 .cal-day-panel {
   display: flex;

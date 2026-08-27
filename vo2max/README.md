@@ -60,8 +60,9 @@ Dashboard as the place they come together.
   same growable Easy/Long/Threshold/VO2max list runs are logged with) and
   an optional target distance; a workout plan optionally picks one of your
   saved Routines. A planned day gets the same running-figure/dumbbell
-  glyph as a logged one, just faded, both on the calendar grid and in that
-  day's **Planned** section — where each entry has a **Start** action (tap
+  glyph as a logged one, just light grey instead of brand orange, both on
+  the calendar grid and in that day's **Planned** section — where each
+  entry has a **Start** action (tap
   the row) that jumps straight into the real Log/Workout form, pre-filled
   with the plan's details (a routine's exercises pre-load exactly like
   picking that routine from *Start Workout* already does), plus a small ✕
