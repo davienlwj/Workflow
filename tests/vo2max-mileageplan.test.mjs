@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_PLAN_WEEKS, DEFAULT_RACE, defaultMileagePlan, currentWeekIndex, weekDateRange, weekProgress, daysUntilRace,
+  weeksNeededForRace, resizeWeeks,
 } from '../vo2max/js/mileagePlan.js';
 
 const plan = {
@@ -96,4 +97,57 @@ test('daysUntilRace is null when no race date is set', () => {
   assert.equal(daysUntilRace(null), null);
   assert.equal(daysUntilRace({ date: '' }), null);
   assert.equal(daysUntilRace(DEFAULT_RACE), null);
+});
+
+test('weeksNeededForRace spans from week 1\'s Monday through the race week', () => {
+  assert.equal(weeksNeededForRace('2026-08-31', '2026-08-31'), 1); // race in week 1 itself
+  assert.equal(weeksNeededForRace('2026-08-31', '2026-09-06'), 1); // still week 1 (Sunday)
+  assert.equal(weeksNeededForRace('2026-08-31', '2026-09-07'), 2); // week 2's Monday
+  assert.equal(weeksNeededForRace('2026-08-31', '2026-09-13'), 2); // week 2's Sunday
+  assert.equal(weeksNeededForRace('2026-08-31', '2026-09-14'), 3); // week 3
+});
+
+test('weeksNeededForRace floors at 1 when the race is before/at week 1 start', () => {
+  assert.equal(weeksNeededForRace('2026-08-31', '2026-08-24'), 1); // a week before start
+});
+
+test('weeksNeededForRace normalizes non-Monday inputs to their own week', () => {
+  assert.equal(weeksNeededForRace('2026-09-02', '2026-09-02'), 1); // both mid-week, same week
+  assert.equal(weeksNeededForRace('2026-09-02', '2026-09-08'), 2); // race the following Tuesday
+});
+
+test('weeksNeededForRace is null when either date is missing', () => {
+  assert.equal(weeksNeededForRace('', '2026-09-07'), null);
+  assert.equal(weeksNeededForRace('2026-08-31', ''), null);
+  assert.equal(weeksNeededForRace(null, null), null);
+});
+
+test('resizeWeeks returns the input as-is when already the right length', () => {
+  const weeks = [{ totalKm: 10, longRunKm: 3, note: '' }];
+  assert.equal(resizeWeeks(weeks, 1), weeks);
+});
+
+test('resizeWeeks truncates the tail when shrinking', () => {
+  const weeks = [
+    { totalKm: 10, longRunKm: 3, note: 'a' },
+    { totalKm: 12, longRunKm: 4, note: 'b' },
+    { totalKm: 14, longRunKm: 5, note: 'c' },
+  ];
+  assert.deepEqual(resizeWeeks(weeks, 2), [weeks[0], weeks[1]]);
+});
+
+test('resizeWeeks appends copies of the last week (blank note) when growing', () => {
+  const weeks = [{ totalKm: 10, longRunKm: 3, note: 'taper' }];
+  const result = resizeWeeks(weeks, 3);
+  assert.equal(result.length, 3);
+  assert.deepEqual(result[0], weeks[0]);
+  assert.deepEqual(result[1], { totalKm: 10, longRunKm: 3, note: '' });
+  assert.deepEqual(result[2], { totalKm: 10, longRunKm: 3, note: '' });
+});
+
+test('resizeWeeks growing from empty produces zeroed weeks', () => {
+  assert.deepEqual(resizeWeeks([], 2), [
+    { totalKm: 0, longRunKm: 0, note: '' },
+    { totalKm: 0, longRunKm: 0, note: '' },
+  ]);
 });

@@ -11,7 +11,9 @@ import {
   loadPlannedActivities, addOrReplacePlannedActivity, deletePlannedActivity,
   exportAll, importAll,
 } from './store.js';
-import { currentWeekIndex, weekProgress, daysUntilRace } from './mileagePlan.js';
+import {
+  currentWeekIndex, weekProgress, daysUntilRace, weeksNeededForRace, resizeWeeks,
+} from './mileagePlan.js';
 import { lthrZoneTable, rhrZoneTable, zoneTable, hrZoneDurations } from './zones.js';
 import {
   todayIso, fmtDateLong, fmtElapsed,
@@ -1586,6 +1588,33 @@ function renderMileagePlanRows() {
   $('mileagePlanWeekRows').innerHTML = mileagePlan.weeks.map((w, i) => mileagePlanRowHTML(i, w)).join('');
 }
 
+/** The week rows' current on-screen values (not necessarily saved yet) -
+ *  shared between the submit handler and syncWeekCountToRace below so a
+ *  resize never clobbers whatever the user has already typed into a row. */
+function readWeekRowsFromDOM() {
+  return [...$('mileagePlanWeekRows').querySelectorAll('.mileage-plan-row')].map((row) => ({
+    totalKm: Number(row.querySelector('.mp-total').value) || 0,
+    longRunKm: Number(row.querySelector('.mp-longrun').value) || 0,
+    note: row.querySelector('.mp-note').value.trim(),
+  }));
+}
+
+/** Grows/shrinks the week rows to exactly span from Week 1's start date
+ *  through the race week, whenever both dates are set - a no-op if either
+ *  is blank (nothing to size against) or the count's already right. Wired
+ *  to both date fields' change events (live, while editing) and to the
+ *  sheet's own open (self-heals a plan saved before this existed, or
+ *  edited outside the sheet). Not re-run on submit - once sized, a manual
+ *  +Add/✕ override is left standing until a date actually changes again. */
+function syncWeekCountToRace() {
+  const target = weeksNeededForRace($('mileagePlanStartDate').value, $('mileagePlanRaceDate').value);
+  if (target == null) return;
+  const current = readWeekRowsFromDOM();
+  if (current.length === target) return;
+  mileagePlan.weeks = resizeWeeks(current, target);
+  renderMileagePlanRows();
+}
+
 function openMileagePlanEditSheet() {
   const race = mileagePlan.race;
   $('mileagePlanRaceName').value = race.name || '';
@@ -1596,6 +1625,7 @@ function openMileagePlanEditSheet() {
   $('mileagePlanRaceNotes').value = race.notes || '';
   $('mileagePlanStartDate').value = mileagePlan.startDate;
   renderMileagePlanRows();
+  syncWeekCountToRace();
   $('scrim').hidden = false;
   $('mileagePlanEditSheet').hidden = false;
   $('mileagePlanEditSheet').scrollTop = 0;
@@ -1608,6 +1638,8 @@ function closeMileagePlanEditSheet() {
 
 $('mileagePlanEditBtn').addEventListener('click', openMileagePlanEditSheet);
 $('mileagePlanEditCancel').addEventListener('click', closeMileagePlanEditSheet);
+$('mileagePlanStartDate').addEventListener('change', syncWeekCountToRace);
+$('mileagePlanRaceDate').addEventListener('change', syncWeekCountToRace);
 
 $('mileagePlanAddWeek').addEventListener('click', () => {
   const last = mileagePlan.weeks[mileagePlan.weeks.length - 1];
@@ -1628,11 +1660,7 @@ $('mileagePlanEditForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const startDate = $('mileagePlanStartDate').value;
   if (!startDate) return;
-  const weeks = [...$('mileagePlanWeekRows').querySelectorAll('.mileage-plan-row')].map((row) => ({
-    totalKm: Number(row.querySelector('.mp-total').value) || 0,
-    longRunKm: Number(row.querySelector('.mp-longrun').value) || 0,
-    note: row.querySelector('.mp-note').value.trim(),
-  }));
+  const weeks = readWeekRowsFromDOM();
   if (weeks.length === 0) { toast('Add at least one week'); return; }
   const race = {
     name: $('mileagePlanRaceName').value.trim(),

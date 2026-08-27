@@ -74,6 +74,34 @@ export function daysUntilRace(race, now = new Date()) {
   return Math.round((toDate(race.date) - today) / DAY_MS);
 }
 
+/** How many Monday-start weeks a plan needs to run from `startDate`'s week
+ *  through the week containing `raceDate` (inclusive), so the plan's last
+ *  week is always the race week - null if either date is missing (nothing
+ *  to size against), floored at 1 (a race date before/inside week 1 still
+ *  gets a 1-week plan rather than a nonsensical zero/negative one). */
+export function weeksNeededForRace(startDate, raceDate) {
+  if (!startDate || !raceDate) return null;
+  const startMonday = startOfWeek(toDate(startDate));
+  const raceMonday = startOfWeek(toDate(raceDate));
+  const diffWeeks = Math.round((raceMonday - startMonday) / (DAY_MS * 7));
+  return Math.max(diffWeeks + 1, 1);
+}
+
+/** Grows/shrinks `weeks` to exactly `targetCount` entries - shrinking just
+ *  drops the tail, growing appends copies of the last week's targets (blank
+ *  note) so new weeks aren't just zeros, the same default a manual "+ Add
+ *  week" uses. Already-fine-length input is returned as-is. */
+export function resizeWeeks(weeks, targetCount) {
+  if (weeks.length === targetCount) return weeks;
+  if (weeks.length > targetCount) return weeks.slice(0, targetCount);
+  const grown = [...weeks];
+  const last = grown[grown.length - 1];
+  while (grown.length < targetCount) {
+    grown.push({ totalKm: last?.totalKm ?? 0, longRunKm: last?.longRunKm ?? 0, note: '' });
+  }
+  return grown;
+}
+
 /** Index into `plan.weeks` for the Monday-start week containing `now`, or
  *  null if that's before the plan starts or after its last week ends. */
 export function currentWeekIndex(plan, now = new Date()) {

@@ -103,7 +103,15 @@ Dashboard as the place they come together.
   with the race fields, then the plan's start date (the Monday Week 1
   begins) and one compact row per week (total km / long run km / note),
   each removable, plus **+ Add week** to extend the plan — so the number
-  of weeks, and every week's targets, are fully yours to adjust. The
+  of weeks, and every week's targets, are fully yours to adjust. Setting
+  (or changing) either the race date or the start date automatically
+  grows or shrinks the week rows so the plan's last week always lands on
+  race week — shrinking keeps the earlier weeks' values as-is and just
+  drops the tail, growing copies the last existing week's targets onto
+  the new ones (blank note) rather than starting them at zero. That only
+  fires when a date field itself changes (and once, self-healing, when
+  you open the sheet) — a manual +Add/✕ afterward stands as-is until a
+  date changes again, never silently overwritten on save. The
   mileage plan defaults to a 13-week build → peak → taper template
   starting the following Monday the first time you open the app (every
   number in it is just a starting point); the race fields start blank and
