@@ -10,7 +10,7 @@ import {
   loadMileagePlan, saveMileagePlan,
   exportAll, importAll,
 } from './store.js';
-import { currentWeekIndex, weekProgress } from './mileagePlan.js';
+import { currentWeekIndex, weekProgress, daysUntilRace } from './mileagePlan.js';
 import { lthrZoneTable, rhrZoneTable, zoneTable, hrZoneDurations } from './zones.js';
 import {
   todayIso, fmtDateLong, fmtElapsed,
@@ -50,7 +50,9 @@ import {
   loggedExerciseIds, daysSinceLastWorkout, volumeSince,
   muscleSetBreakdown, muscleSetBreakdownDetailed, workoutSummaryByExercise,
 } from './workout.js';
-import { runIconSVG, dumbbellIconSVG, swapIconSVG } from './icons.js';
+import {
+  runIconSVG, dumbbellIconSVG, swapIconSVG, raceFlagIconSVG,
+} from './icons.js';
 
 let settings = loadSettings();
 
@@ -856,13 +858,15 @@ function activityByDate() {
   return map;
 }
 
-$('calLegend').innerHTML = `
-  <span class="cal-legend-item">${runIconSVG()}<span>Run</span></span>
-  <span class="cal-legend-item">${dumbbellIconSVG()}<span>Workout</span></span>
-`;
-
 function renderCalendar() {
   const byDate = activityByDate();
+  const raceDate = mileagePlan.race?.date || null;
+
+  $('calLegend').innerHTML = `
+    <span class="cal-legend-item">${runIconSVG()}<span>Run</span></span>
+    <span class="cal-legend-item">${dumbbellIconSVG()}<span>Workout</span></span>
+    ${raceDate ? `<span class="cal-legend-item">${raceFlagIconSVG()}<span>Race day</span></span>` : ''}
+  `;
 
   $('calMonthLabel').textContent = new Date(calYear, calMonth, 1)
     .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -879,12 +883,13 @@ function renderCalendar() {
     const day = byDate.get(iso);
     const hasRun = Boolean(day && day.sessions.length);
     const hasWorkout = Boolean(day && day.workouts.length);
+    const isRaceDay = iso === raceDate;
     const classes = ['cal-cell'];
-    if (hasRun || hasWorkout) classes.push('has-activity');
+    if (hasRun || hasWorkout || isRaceDay) classes.push('has-activity');
     if (iso === todayIsoStr) classes.push('today');
     if (iso === calSelectedDate) classes.push('selected');
-    const iconsHTML = (hasRun || hasWorkout)
-      ? `<span class="cal-icons">${hasRun ? runIconSVG() : ''}${hasWorkout ? dumbbellIconSVG() : ''}</span>`
+    const iconsHTML = (hasRun || hasWorkout || isRaceDay)
+      ? `<span class="cal-icons">${hasRun ? runIconSVG() : ''}${hasWorkout ? dumbbellIconSVG() : ''}${isRaceDay ? raceFlagIconSVG() : ''}</span>`
       : '';
     html += `<button type="button" class="${classes.join(' ')}" data-date="${iso}">
       <span>${d}</span>
@@ -907,6 +912,10 @@ function renderCalDayPanel() {
       <div class="cal-day-section-label">${dumbbellIconSVG()}<span>Workouts</span></div>
       ${day.workouts.map((w) => calDayWorkoutSummaryHTML(w)).join('')}
     ` : ''}
+    ${calSelectedDate === mileagePlan.race?.date ? `
+      <div class="cal-day-section-label">${raceFlagIconSVG()}<span>Race day</span></div>
+      <button type="button" class="cal-day-item" data-race="1">${escapeHTML(mileagePlan.race.name || 'Target race')}</button>
+    ` : ''}
     <div class="cal-day-actions">
       <button type="button" id="calLogRunBtn" class="ghost-btn">+ Log session</button>
       <button type="button" id="calLogWorkoutBtn" class="ghost-btn">+ Log workout</button>
@@ -923,6 +932,10 @@ function renderCalDayPanel() {
       const w = workouts.find((x) => x.id === btn.dataset.workoutId);
       if (w) { closeCalDaySheet(); openWorkoutEditSheet(w); }
     });
+  });
+  panel.querySelector('.cal-day-item[data-race]')?.addEventListener('click', () => {
+    closeCalDaySheet();
+    openMileagePlanEditSheet();
   });
   $('calLogRunBtn').addEventListener('click', () => {
     const iso = calSelectedDate;
@@ -1408,18 +1421,49 @@ function renderRunTab() {
   $('mileageTotal').textContent = `${totalMileage(sessions)} km total`;
   $('mileageChartWrap').innerHTML = mileageBarChartSVG(mileageBuckets(sessions, mileageScope));
 
-  renderMileagePlanCard();
+  renderRacesCard();
 }
 
-/** The Run tab's Mileage plan card - a minimalist progress bar for the
- *  current plan week (completed vs target km, dynamically recomputed from
- *  actually-logged runs), or a plain status line before the plan starts /
+/** The Run tab's target-race line: name/date/countdown plus whichever of
+ *  location/distance/goal time/notes were actually filled in - empty
+ *  fields are just omitted rather than shown blank. Returns a "no race
+ *  set" prompt when the plan has no race date at all. */
+function raceInfoHTML() {
+  const race = mileagePlan.race;
+  if (!race?.date && !race?.name) {
+    return '<p class="mileage-plan-empty-state">No target race set yet — tap Edit to add one.</p>';
+  }
+  const days = daysUntilRace(race);
+  const countdown = days == null ? '' : days > 0 ? `${days} day${days === 1 ? '' : 's'} to go`
+    : days === 0 ? 'Race day!' : `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ago`;
+  const details = [
+    race.location ? escapeHTML(race.location) : null,
+    race.distanceKm != null ? `${race.distanceKm}km` : null,
+    race.goalTime ? `Goal ${escapeHTML(race.goalTime)}` : null,
+  ].filter(Boolean).join(' · ');
+  return `
+    <div class="mileage-plan-head">
+      <span class="mileage-plan-week mono">${escapeHTML(race.name || 'Target race')}</span>
+      ${countdown ? `<span class="mileage-plan-note">${countdown}</span>` : ''}
+    </div>
+    ${race.date ? `<div class="mileage-plan-longrun">${fmtDateLong(race.date)}</div>` : ''}
+    ${details ? `<div class="mileage-plan-longrun">${details}</div>` : ''}
+    ${race.notes ? `<div class="mileage-plan-longrun">${escapeHTML(race.notes)}</div>` : ''}
+  `;
+}
+
+/** The Run tab's Races card: the target race's details up top, then (under
+ *  the "Mileage plan" sub-label) a minimalist progress bar for the current
+ *  plan week - completed vs target km, dynamically recomputed from
+ *  actually-logged runs - or a plain status line before the plan starts /
  *  after its last week ends, since there's no week to show a bar for then. */
-function renderMileagePlanCard() {
+function renderRacesCard() {
+  $('raceInfoBlock').innerHTML = raceInfoHTML();
+
   const idx = currentWeekIndex(mileagePlan);
   if (idx == null) {
     const today = todayIso();
-    $('mileagePlanCard').innerHTML = today < mileagePlan.startDate
+    $('mileagePlanProgress').innerHTML = today < mileagePlan.startDate
       ? (() => {
         const first = mileagePlan.weeks[0];
         return `<p class="mileage-plan-empty-state">Plan starts <strong>${fmtDateLong(mileagePlan.startDate)}</strong> — Week 1 target: <strong>${first?.totalKm ?? 0}km</strong>, long run <strong>${first?.longRunKm ?? 0}km</strong>.</p>`;
@@ -1428,7 +1472,7 @@ function renderMileagePlanCard() {
     return;
   }
   const p = weekProgress(mileagePlan, sessions, idx);
-  $('mileagePlanCard').innerHTML = `
+  $('mileagePlanProgress').innerHTML = `
     <div class="mileage-plan-head">
       <span class="mileage-plan-week mono">Week ${p.week} of ${p.totalWeeks}</span>
       ${p.note ? `<span class="mileage-plan-note">${escapeHTML(p.note)}</span>` : ''}
@@ -1457,6 +1501,13 @@ function renderMileagePlanRows() {
 }
 
 function openMileagePlanEditSheet() {
+  const race = mileagePlan.race;
+  $('mileagePlanRaceName').value = race.name || '';
+  $('mileagePlanRaceDate').value = race.date || '';
+  $('mileagePlanRaceDistance').value = race.distanceKm ?? '';
+  $('mileagePlanRaceLocation').value = race.location || '';
+  $('mileagePlanRaceGoalTime').value = race.goalTime || '';
+  $('mileagePlanRaceNotes').value = race.notes || '';
   $('mileagePlanStartDate').value = mileagePlan.startDate;
   renderMileagePlanRows();
   $('scrim').hidden = false;
@@ -1497,11 +1548,21 @@ $('mileagePlanEditForm').addEventListener('submit', (e) => {
     note: row.querySelector('.mp-note').value.trim(),
   }));
   if (weeks.length === 0) { toast('Add at least one week'); return; }
-  mileagePlan = { startDate, weeks };
+  const race = {
+    name: $('mileagePlanRaceName').value.trim(),
+    date: $('mileagePlanRaceDate').value,
+    location: $('mileagePlanRaceLocation').value.trim(),
+    distanceKm: $('mileagePlanRaceDistance').value ? Number($('mileagePlanRaceDistance').value) : null,
+    goalTime: $('mileagePlanRaceGoalTime').value.trim(),
+    notes: $('mileagePlanRaceNotes').value.trim(),
+  };
+  mileagePlan = { startDate, weeks, race };
   saveMileagePlan(mileagePlan);
   closeMileagePlanEditSheet();
-  renderMileagePlanCard();
-  toast('Mileage plan saved');
+  renderRacesCard();
+  renderCalendar();
+  if (calSelectedDate) renderCalDayPanel();
+  toast('Races saved');
 });
 
 $('startRunBtn').addEventListener('click', () => openLogSheet(todayIso()));

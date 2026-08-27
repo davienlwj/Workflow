@@ -5,7 +5,7 @@
  * of silently losing data.
  */
 
-import { defaultMileagePlan } from './mileagePlan.js';
+import { defaultMileagePlan, DEFAULT_RACE } from './mileagePlan.js';
 
 const SETTINGS_KEY = 'vo2max.settings.v1';
 const SESSIONS_KEY = 'vo2max.sessions.v1';
@@ -326,7 +326,7 @@ export function loadMileagePlan() {
     if (!raw) return defaultMileagePlan();
     const parsed = JSON.parse(raw);
     if (!parsed?.startDate || !Array.isArray(parsed.weeks)) return defaultMileagePlan();
-    return parsed;
+    return { ...parsed, race: { ...DEFAULT_RACE, ...(parsed.race || {}) } };
   } catch {
     return defaultMileagePlan();
   }

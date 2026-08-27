@@ -35,7 +35,10 @@ Dashboard as the place they come together.
 
 - **Dashboard** — a month calendar grid at the top (every day that has
   something logged shows a small icon: a run gets the running-figure glyph,
-  a workout gets the dumbbell glyph, a day with both gets both), six stat
+  a workout gets the dumbbell glyph, a day with both gets both — plus, if
+  the Run tab's Races card has a target race date set, that day gets a
+  flag glyph, set automatically the moment you save the race's date, no
+  separate step), six stat
   tiles below it (sessions logged, workouts logged, mileage this week, volume
   this week, days since your last session, days since your last workout) — plus
   Resting HR and Sleep tiles once intervals.icu sync is connected (see
@@ -46,7 +49,9 @@ Dashboard as the place they come together.
   edit or delete it), plus **+ Log run** and **+ Log workout** actions that
   open the respective log popup pre-filled with that date — this is the
   only place logging happens for a specific day; Run and Workout's own
-  *+ Log* buttons always default to today.
+  *+ Log* buttons always default to today. The race day's popup instead
+  shows a **Race day** row naming the target race — tap it to jump
+  straight to the Races edit sheet.
 - **Run** — the cardio detail view: sessions logged, average session HR,
   days since your last session, a VO2max trend chart labeling each point
   with its exact value, a total-mileage bar chart filterable by
@@ -65,20 +70,27 @@ Dashboard as the place they come together.
   quality) still display and export to `.ics` correctly; editing one keeps
   that history intact even though the edit form itself no longer shows
   those fields.
-  Below the log button, a **Mileage plan** card tracks a weekly
-  distance-goal plan against your actually-logged runs: a minimalist
-  progress bar for the current week (km completed vs. that week's target,
-  with km remaining alongside it) plus its long run target and a phase
+  Below the log button, a **Races** card holds your target race's details
+  plus a weekly mileage plan building toward it. The top half is the race
+  itself — name, date (with a live day-count: "N days to go" / "Race day!"
+  / "N days ago"), location, distance, goal time and notes, any of which
+  can be left blank; that date is also what puts the flag glyph on the
+  Dashboard calendar (see above). Below a **Mileage plan** sub-heading, a
+  minimalist progress bar tracks the current week of a distance-goal plan
+  against your actually-logged runs: km completed vs. that week's target
+  (with km remaining alongside it) plus its long run target and a phase
   note (Build/Deload/Peak/Taper/Race week), all recomputed live from
   whichever runs you've logged this week. Before the plan's first week
   starts it shows a "Plan starts …" preview instead of a bar; after its
   last week ends it just says the plan is complete. **Edit** opens a sheet
-  with the start date (the Monday Week 1 begins) and one compact row per
-  week (total km / long run km / note), each removable, plus **+ Add
-  week** to extend the plan — so the number of weeks, and every week's
-  targets, are fully yours to adjust. Defaults to a 13-week build → peak →
-  taper template starting the following Monday the first time you open
-  the app; every number in it is just a starting point.
+  with the race fields, then the plan's start date (the Monday Week 1
+  begins) and one compact row per week (total km / long run km / note),
+  each removable, plus **+ Add week** to extend the plan — so the number
+  of weeks, and every week's targets, are fully yours to adjust. The
+  mileage plan defaults to a 13-week build → peak → taper template
+  starting the following Monday the first time you open the app (every
+  number in it is just a starting point); the race fields start blank and
+  are never guessed at.
 - **Workout** — the strength detail view: workouts logged, this week's
   total volume, days since your last workout, a muscle-balance radar chart
   (sets logged, filterable to week/month/year/all, rolled up into 9 general
@@ -343,7 +355,7 @@ js/mileagePlan.js            weekly mileage-goal plan math (current week, progre
                               runs) — pure functions of plan + sessions + "now"
 js/exercises.js              the built-in exercise library (name, equipment, muscles) and the radar chart's muscle-group rollup
 js/muscleDiagram.js          stacks the muscle-diagram image assets for an exercise's muscles
-js/icons.js                  the running-figure / dumbbell pictograms (calendar, recent activity)
+js/icons.js                  the running-figure / dumbbell / race-flag pictograms (calendar, recent activity)
 js/chart.js                 dependency-free SVG charts: VO2max trend, mileage bars, exercise progress
 js/ics.js                   builds a per-session .ics file for calendar export, and the shared
                               summary/description text + event resources used by gcal.js

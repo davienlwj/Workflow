@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_PLAN_WEEKS, defaultMileagePlan, currentWeekIndex, weekDateRange, weekProgress,
+  DEFAULT_PLAN_WEEKS, DEFAULT_RACE, defaultMileagePlan, currentWeekIndex, weekDateRange, weekProgress, daysUntilRace,
 } from '../vo2max/js/mileagePlan.js';
 
 const plan = {
@@ -19,6 +19,8 @@ test('defaultMileagePlan starts on the Monday after "now" and carries the 13-wee
   assert.equal(p.weeks.length, 13);
   assert.deepEqual(p.weeks[0], DEFAULT_PLAN_WEEKS[0]);
   assert.notEqual(p.weeks, DEFAULT_PLAN_WEEKS); // a copy, not the shared const
+  assert.deepEqual(p.race, DEFAULT_RACE); // no race guessed at - blank until the user fills it in
+  assert.notEqual(p.race, DEFAULT_RACE); // a copy, not the shared const
 });
 
 test('defaultMileagePlan rolls to the next Monday even when "now" already is one', () => {
@@ -81,4 +83,17 @@ test('weekProgress caps remaining at 0 and percent at 100 once the target is bea
 
 test('weekProgress returns null for an out-of-range week index', () => {
   assert.equal(weekProgress(plan, [], 99), null);
+});
+
+test('daysUntilRace counts whole days from today to the race date', () => {
+  const now = new Date('2026-08-27T15:30:00'); // mid-afternoon, shouldn't matter
+  assert.equal(daysUntilRace({ date: '2026-08-27' }, now), 0); // race day itself
+  assert.equal(daysUntilRace({ date: '2026-09-06' }, now), 10); // in the future
+  assert.equal(daysUntilRace({ date: '2026-08-17' }, now), -10); // in the past
+});
+
+test('daysUntilRace is null when no race date is set', () => {
+  assert.equal(daysUntilRace(null), null);
+  assert.equal(daysUntilRace({ date: '' }), null);
+  assert.equal(daysUntilRace(DEFAULT_RACE), null);
 });

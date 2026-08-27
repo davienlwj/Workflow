@@ -46,12 +46,32 @@ export const DEFAULT_PLAN_WEEKS = [
   { totalKm: 11, longRunKm: 21.1, note: 'Race week' },
 ];
 
+/** Empty race details - filled in by the user via the plan's edit sheet,
+ *  never guessed at (a plan doesn't necessarily target a specific race, and
+ *  even one that does shouldn't have its date invented for it). */
+export const DEFAULT_RACE = {
+  name: '', date: '', location: '', distanceKm: null, goalTime: '', notes: '',
+};
+
 /** A fresh plan starting the Monday after `now` (i.e. "next week") - only
  *  used the very first time, before the user has ever saved one. */
 export function defaultMileagePlan(now = new Date()) {
   const nextMonday = startOfWeek(now);
   nextMonday.setDate(nextMonday.getDate() + 7);
-  return { startDate: toISO(nextMonday), weeks: DEFAULT_PLAN_WEEKS.map((w) => ({ ...w })) };
+  return {
+    startDate: toISO(nextMonday),
+    weeks: DEFAULT_PLAN_WEEKS.map((w) => ({ ...w })),
+    race: { ...DEFAULT_RACE },
+  };
+}
+
+/** Whole days from today to `race.date` (negative once the race is past,
+ *  0 on race day), or null if no race date has been set. */
+export function daysUntilRace(race, now = new Date()) {
+  if (!race?.date) return null;
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  return Math.round((toDate(race.date) - today) / DAY_MS);
 }
 
 /** Index into `plan.weeks` for the Monday-start week containing `now`, or

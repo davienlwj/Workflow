@@ -597,6 +597,17 @@ button { font-family: var(--font-mono); }
 
 .mileage-plan-empty-state strong { color: var(--ink); }
 
+.mileage-plan-sublabel {
+  margin: 14px 0 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+}
+
 /* Edit-plan sheet: one compact row per week - unlabeled inputs (a week
    number prefix plus placeholder text stands in for labels) so 13+ rows
    stay scannable instead of each carrying three full label/field pairs. */

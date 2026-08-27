@@ -82,10 +82,14 @@
     <button type="button" id="startRunBtn" class="primary block">+ Log session</button>
 
     <div class="section-title-row">
-      <h2 class="section-title">Mileage plan</h2>
+      <h2 class="section-title">Races</h2>
       <button type="button" id="mileagePlanEditBtn" class="ghost-btn small">Edit</button>
     </div>
-    <div id="mileagePlanCard" class="mileage-plan-card"></div>
+    <div id="racesCard" class="mileage-plan-card">
+      <div id="raceInfoBlock"></div>
+      <div class="mileage-plan-sublabel">Mileage plan</div>
+      <div id="mileagePlanProgress"></div>
+    </div>
 
     <h2 class="section-title">VO<sub>2</sub>max trend</h2>
     <div id="chartWrap" class="chart-wrap"></div>
@@ -746,11 +750,42 @@
   </div>
 </section>
 
-<!-- Edit mileage plan sheet (popup, opened from the Run tab's Mileage plan card) -->
-<section id="mileagePlanEditSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Edit mileage plan">
+<!-- Edit races/mileage-plan sheet (popup, opened from the Run tab's Races card) -->
+<section id="mileagePlanEditSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Edit races">
   <div class="grabber"></div>
-  <h2 class="view-title">Edit mileage plan</h2>
+  <h2 class="view-title">Edit races</h2>
   <form id="mileagePlanEditForm" class="form">
+    <p class="field-section-label">Target race</p>
+    <label class="field">
+      <span>Race name</span>
+      <input id="mileagePlanRaceName" type="text" placeholder="e.g. City Half Marathon">
+    </label>
+    <div class="row">
+      <label class="field">
+        <span>Date</span>
+        <input id="mileagePlanRaceDate" type="date">
+      </label>
+      <label class="field">
+        <span>Distance (km)</span>
+        <input id="mileagePlanRaceDistance" type="number" step="0.1" min="0">
+      </label>
+    </div>
+    <div class="row">
+      <label class="field">
+        <span>Location</span>
+        <input id="mileagePlanRaceLocation" type="text" placeholder="e.g. Singapore">
+      </label>
+      <label class="field">
+        <span>Goal time</span>
+        <input id="mileagePlanRaceGoalTime" type="text" placeholder="e.g. 1:45:00">
+      </label>
+    </div>
+    <label class="field">
+      <span>Notes <em>(optional)</em></span>
+      <input id="mileagePlanRaceNotes" type="text" placeholder="e.g. Boston qualifier attempt">
+    </label>
+
+    <p class="field-section-label">Mileage plan</p>
     <label class="field mileage-plan-start-row">
       <span>Start date (Monday of Week 1)</span>
       <input id="mileagePlanStartDate" type="date" required>
