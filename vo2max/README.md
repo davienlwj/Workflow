@@ -65,6 +65,20 @@ Dashboard as the place they come together.
   quality) still display and export to `.ics` correctly; editing one keeps
   that history intact even though the edit form itself no longer shows
   those fields.
+  Below the log button, a **Mileage plan** card tracks a weekly
+  distance-goal plan against your actually-logged runs: a minimalist
+  progress bar for the current week (km completed vs. that week's target,
+  with km remaining alongside it) plus its long run target and a phase
+  note (Build/Deload/Peak/Taper/Race week), all recomputed live from
+  whichever runs you've logged this week. Before the plan's first week
+  starts it shows a "Plan starts …" preview instead of a bar; after its
+  last week ends it just says the plan is complete. **Edit** opens a sheet
+  with the start date (the Monday Week 1 begins) and one compact row per
+  week (total km / long run km / note), each removable, plus **+ Add
+  week** to extend the plan — so the number of weeks, and every week's
+  targets, are fully yours to adjust. Defaults to a 13-week build → peak →
+  taper template starting the following Monday the first time you open
+  the app; every number in it is just a starting point.
 - **Workout** — the strength detail view: workouts logged, this week's
   total volume, days since your last workout, a muscle-balance radar chart
   (sets logged, filterable to week/month/year/all, rolled up into 9 general
@@ -325,6 +339,8 @@ js/store.js                 localStorage CRUD for settings, sessions, workouts a
 js/zones.js                 zone tables, computed from settings
 js/block.js                 cardio progress stats — pure functions
 js/workout.js                strength progress stats — PRs, last-performance, volume; pure functions
+js/mileagePlan.js            weekly mileage-goal plan math (current week, progress vs. logged
+                              runs) — pure functions of plan + sessions + "now"
 js/exercises.js              the built-in exercise library (name, equipment, muscles) and the radar chart's muscle-group rollup
 js/muscleDiagram.js          stacks the muscle-diagram image assets for an exercise's muscles
 js/icons.js                  the running-figure / dumbbell pictograms (calendar, recent activity)

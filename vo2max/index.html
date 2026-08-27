@@ -81,6 +81,12 @@
 
     <button type="button" id="startRunBtn" class="primary block">+ Log session</button>
 
+    <div class="section-title-row">
+      <h2 class="section-title">Mileage plan</h2>
+      <button type="button" id="mileagePlanEditBtn" class="ghost-btn small">Edit</button>
+    </div>
+    <div id="mileagePlanCard" class="mileage-plan-card"></div>
+
     <h2 class="section-title">VO<sub>2</sub>max trend</h2>
     <div id="chartWrap" class="chart-wrap"></div>
 
@@ -738,6 +744,24 @@
   <div class="actions">
     <button type="button" id="runSummaryDone" class="primary block">Done</button>
   </div>
+</section>
+
+<!-- Edit mileage plan sheet (popup, opened from the Run tab's Mileage plan card) -->
+<section id="mileagePlanEditSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Edit mileage plan">
+  <div class="grabber"></div>
+  <h2 class="view-title">Edit mileage plan</h2>
+  <form id="mileagePlanEditForm" class="form">
+    <label class="field mileage-plan-start-row">
+      <span>Start date (Monday of Week 1)</span>
+      <input id="mileagePlanStartDate" type="date" required>
+    </label>
+    <div id="mileagePlanWeekRows" class="mileage-plan-rows"></div>
+    <button type="button" id="mileagePlanAddWeek" class="ghost-btn block">+ Add week</button>
+    <div class="actions">
+      <button type="button" id="mileagePlanEditCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
 </section>
 
 <!-- Save-PNG sheet (popup, preview + pick one of 3 share-card designs before saving/sharing) -->

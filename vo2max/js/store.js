@@ -5,6 +5,8 @@
  * of silently losing data.
  */
 
+import { defaultMileagePlan } from './mileagePlan.js';
+
 const SETTINGS_KEY = 'vo2max.settings.v1';
 const SESSIONS_KEY = 'vo2max.sessions.v1';
 const WORKOUTS_KEY = 'vo2max.workouts.v1';
@@ -13,6 +15,7 @@ const LIVE_WORKOUT_KEY = 'vo2max.liveWorkout.v1';
 const ROUTINES_KEY = 'vo2max.routines.v1';
 const CUSTOM_BRANDS_KEY = 'vo2max.customBrands.v1';
 const CUSTOM_SESSION_TYPES_KEY = 'vo2max.customSessionTypes.v1';
+const MILEAGE_PLAN_KEY = 'vo2max.mileagePlan.v1';
 
 export const DEFAULT_SETTINGS = {
   theme: 'light', // 'light' | 'dark'
@@ -313,6 +316,26 @@ export function clearLiveWorkout() {
   localStorage.removeItem(LIVE_WORKOUT_KEY);
 }
 
+/** The weekly mileage-goal plan (total km + long run km + note per week,
+ *  anchored to a Monday start date) - see mileagePlan.js for the pure math
+ *  built on top of this. Defaults to a fresh plan starting next Monday the
+ *  first time this is read, same as any other first-run default. */
+export function loadMileagePlan() {
+  try {
+    const raw = localStorage.getItem(MILEAGE_PLAN_KEY);
+    if (!raw) return defaultMileagePlan();
+    const parsed = JSON.parse(raw);
+    if (!parsed?.startDate || !Array.isArray(parsed.weeks)) return defaultMileagePlan();
+    return parsed;
+  } catch {
+    return defaultMileagePlan();
+  }
+}
+
+export function saveMileagePlan(plan) {
+  localStorage.setItem(MILEAGE_PLAN_KEY, JSON.stringify(plan));
+}
+
 export function exportAll() {
   return JSON.stringify({
     settings: loadSettings(),
@@ -322,6 +345,7 @@ export function exportAll() {
     routines: loadRoutines(),
     customBrands: loadCustomBrands(),
     customSessionTypes: loadCustomSessionTypes(),
+    mileagePlan: loadMileagePlan(),
     exportedAt: new Date().toISOString(),
   }, null, 2);
 }
@@ -335,4 +359,5 @@ export function importAll(json) {
   if (Array.isArray(data.routines)) saveRoutines(data.routines);
   if (Array.isArray(data.customBrands)) saveCustomBrands(data.customBrands);
   if (Array.isArray(data.customSessionTypes)) saveCustomSessionTypes(data.customSessionTypes);
+  if (data.mileagePlan?.startDate && Array.isArray(data.mileagePlan.weeks)) saveMileagePlan(data.mileagePlan);
 }

@@ -7,8 +7,10 @@ import {
   loadRoutines, addRoutine, updateRoutine, deleteRoutine,
   loadCustomBrands, addCustomBrand,
   loadCustomSessionTypes, addCustomSessionType,
+  loadMileagePlan, saveMileagePlan,
   exportAll, importAll,
 } from './store.js';
+import { currentWeekIndex, weekProgress } from './mileagePlan.js';
 import { lthrZoneTable, rhrZoneTable, zoneTable, hrZoneDurations } from './zones.js';
 import {
   todayIso, fmtDateLong, fmtElapsed,
@@ -69,6 +71,7 @@ let customExercises = loadCustomExercises();
 let routines = loadRoutines();
 let customBrands = loadCustomBrands();
 let customSessionTypes = loadCustomSessionTypes();
+let mileagePlan = loadMileagePlan();
 let editingId = null;
 // The sport of the session currently open in the Edit sheet ('run' unless
 // it's a Cycling/Stairmaster/Elliptical/RowErg/SkiErg entry, or a legacy
@@ -1298,6 +1301,7 @@ function closeAllSheets() {
   closeShareCardSheet();
   $('workoutSummarySheet').hidden = true;
   $('runSummarySheet').hidden = true;
+  $('mileagePlanEditSheet').hidden = true;
   $('restingHRDetailSheet').hidden = true;
   $('sleepDetailSheet').hidden = true;
   $('activityDetailSheet').hidden = true;
@@ -1403,7 +1407,102 @@ function renderRunTab() {
 
   $('mileageTotal').textContent = `${totalMileage(sessions)} km total`;
   $('mileageChartWrap').innerHTML = mileageBarChartSVG(mileageBuckets(sessions, mileageScope));
+
+  renderMileagePlanCard();
 }
+
+/** The Run tab's Mileage plan card - a minimalist progress bar for the
+ *  current plan week (completed vs target km, dynamically recomputed from
+ *  actually-logged runs), or a plain status line before the plan starts /
+ *  after its last week ends, since there's no week to show a bar for then. */
+function renderMileagePlanCard() {
+  const idx = currentWeekIndex(mileagePlan);
+  if (idx == null) {
+    const today = todayIso();
+    $('mileagePlanCard').innerHTML = today < mileagePlan.startDate
+      ? (() => {
+        const first = mileagePlan.weeks[0];
+        return `<p class="mileage-plan-empty-state">Plan starts <strong>${fmtDateLong(mileagePlan.startDate)}</strong> — Week 1 target: <strong>${first?.totalKm ?? 0}km</strong>, long run <strong>${first?.longRunKm ?? 0}km</strong>.</p>`;
+      })()
+      : `<p class="mileage-plan-empty-state">${mileagePlan.weeks.length}-week plan complete — tap Edit to add more weeks.</p>`;
+    return;
+  }
+  const p = weekProgress(mileagePlan, sessions, idx);
+  $('mileagePlanCard').innerHTML = `
+    <div class="mileage-plan-head">
+      <span class="mileage-plan-week mono">Week ${p.week} of ${p.totalWeeks}</span>
+      ${p.note ? `<span class="mileage-plan-note">${escapeHTML(p.note)}</span>` : ''}
+    </div>
+    <div class="mileage-plan-bar-track"><div class="mileage-plan-bar-fill" style="width:${p.pct}%"></div></div>
+    <div class="mileage-plan-bar-labels">
+      <span class="mono"><strong>${p.completedKm}</strong> / ${p.totalKm}km</span>
+      <span class="mono">${p.remainingKm}km left</span>
+    </div>
+    <div class="mileage-plan-longrun">Long run target <strong class="mono">${p.longRunKm}km</strong></div>
+  `;
+}
+
+function mileagePlanRowHTML(index, week) {
+  return `<div class="mileage-plan-row" data-index="${index}">
+    <span class="mileage-plan-row-num mono">W${index + 1}</span>
+    <input type="number" step="0.1" min="0" class="mileage-plan-input mp-total" placeholder="Total km" value="${week.totalKm ?? ''}">
+    <input type="number" step="0.1" min="0" class="mileage-plan-input mp-longrun" placeholder="Long run km" value="${week.longRunKm ?? ''}">
+    <input type="text" class="mileage-plan-input mp-note" placeholder="Note" value="${escapeHTML(week.note ?? '')}">
+    <button type="button" class="mileage-plan-row-remove" aria-label="Remove week ${index + 1}">✕</button>
+  </div>`;
+}
+
+function renderMileagePlanRows() {
+  $('mileagePlanWeekRows').innerHTML = mileagePlan.weeks.map((w, i) => mileagePlanRowHTML(i, w)).join('');
+}
+
+function openMileagePlanEditSheet() {
+  $('mileagePlanStartDate').value = mileagePlan.startDate;
+  renderMileagePlanRows();
+  $('scrim').hidden = false;
+  $('mileagePlanEditSheet').hidden = false;
+  $('mileagePlanEditSheet').scrollTop = 0;
+}
+
+function closeMileagePlanEditSheet() {
+  $('scrim').hidden = true;
+  $('mileagePlanEditSheet').hidden = true;
+}
+
+$('mileagePlanEditBtn').addEventListener('click', openMileagePlanEditSheet);
+$('mileagePlanEditCancel').addEventListener('click', closeMileagePlanEditSheet);
+
+$('mileagePlanAddWeek').addEventListener('click', () => {
+  const last = mileagePlan.weeks[mileagePlan.weeks.length - 1];
+  mileagePlan.weeks.push({ totalKm: last?.totalKm ?? 0, longRunKm: last?.longRunKm ?? 0, note: '' });
+  renderMileagePlanRows();
+});
+
+$('mileagePlanWeekRows').addEventListener('click', (e) => {
+  const btn = e.target.closest('.mileage-plan-row-remove');
+  if (!btn) return;
+  const row = btn.closest('.mileage-plan-row');
+  const index = Number(row.dataset.index);
+  mileagePlan.weeks.splice(index, 1);
+  renderMileagePlanRows();
+});
+
+$('mileagePlanEditForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const startDate = $('mileagePlanStartDate').value;
+  if (!startDate) return;
+  const weeks = [...$('mileagePlanWeekRows').querySelectorAll('.mileage-plan-row')].map((row) => ({
+    totalKm: Number(row.querySelector('.mp-total').value) || 0,
+    longRunKm: Number(row.querySelector('.mp-longrun').value) || 0,
+    note: row.querySelector('.mp-note').value.trim(),
+  }));
+  if (weeks.length === 0) { toast('Add at least one week'); return; }
+  mileagePlan = { startDate, weeks };
+  saveMileagePlan(mileagePlan);
+  closeMileagePlanEditSheet();
+  renderMileagePlanCard();
+  toast('Mileage plan saved');
+});
 
 $('startRunBtn').addEventListener('click', () => openLogSheet(todayIso()));
 
