@@ -14,10 +14,10 @@ const plan = {
   ],
 };
 
-test('defaultMileagePlan starts on the Monday after "now" and carries the 13-week table', () => {
+test('defaultMileagePlan starts on the Monday after "now" and carries the 22-week table', () => {
   const p = defaultMileagePlan(new Date('2026-08-27T09:00:00')); // a Thursday
   assert.equal(p.startDate, '2026-08-31'); // the following Monday
-  assert.equal(p.weeks.length, 13);
+  assert.equal(p.weeks.length, 22);
   assert.deepEqual(p.weeks[0], DEFAULT_PLAN_WEEKS[0]);
   assert.notEqual(p.weeks, DEFAULT_PLAN_WEEKS); // a copy, not the shared const
   assert.deepEqual(p.race, DEFAULT_RACE); // no race guessed at - blank until the user fills it in

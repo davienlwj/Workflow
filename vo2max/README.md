@@ -111,11 +111,21 @@ Dashboard as the place they come together.
   the new ones (blank note) rather than starting them at zero. That only
   fires when a date field itself changes (and once, self-healing, when
   you open the sheet) — a manual +Add/✕ afterward stands as-is until a
-  date changes again, never silently overwritten on save. The
-  mileage plan defaults to a 13-week build → peak → taper template
-  starting the following Monday the first time you open the app (every
-  number in it is just a starting point); the race fields start blank and
-  are never guessed at.
+  date changes again, never silently overwritten on save. A **Training
+  guide** accordion below the progress bar documents the source 22-week
+  plan's method in full — each phase's weekly session mix (how many easy
+  runs, tempo runs, intervals, and the long run, plus what each one is
+  for) and its target mileage split (% of the week that should be long
+  run / easy / tempo / intervals), plus the standalone notes (starting
+  base, peak long run being 17–18km rather than the full 21.1km, the
+  25–28% quality-work ceiling, and why cutback weeks aren't optional) -
+  fixed reference text, not tied to whatever numbers you've actually
+  typed into your own weeks. The mileage plan itself defaults to (and the
+  edit sheet's **Load default 22-week plan** button can reset it back to)
+  that same 22-week Base → Build → Peak → Taper → Race template, starting
+  the following Monday the first time you open the app; every number in
+  it is just a starting point, and the race fields start blank and are
+  never guessed at.
 - **Workout** — the strength detail view: workouts logged, this week's
   total volume, days since your last workout, a muscle-balance radar chart
   (sets logged, filterable to week/month/year/all, rolled up into 9 general

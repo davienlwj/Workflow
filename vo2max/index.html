@@ -89,6 +89,10 @@
       <div id="raceInfoBlock"></div>
       <div class="mileage-plan-sublabel">Mileage plan</div>
       <div id="mileagePlanProgress"></div>
+      <details class="settings-details mileage-plan-guide">
+        <summary class="section-title">Training guide</summary>
+        <div id="trainingGuideBody" class="settings-details-body"></div>
+      </details>
     </div>
 
     <h2 class="section-title">VO<sub>2</sub>max trend</h2>
@@ -792,6 +796,7 @@
     </label>
     <div id="mileagePlanWeekRows" class="mileage-plan-rows"></div>
     <button type="button" id="mileagePlanAddWeek" class="ghost-btn block">+ Add week</button>
+    <button type="button" id="mileagePlanLoadDefault" class="ghost-btn block">Load default 22-week plan</button>
     <div class="actions">
       <button type="button" id="mileagePlanEditCancel" class="ghost-btn">Cancel</button>
       <button type="submit" class="primary">Save</button>

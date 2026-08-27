@@ -608,6 +608,60 @@ button { font-family: var(--font-mono); }
   color: var(--dim);
 }
 
+/* The Races card's "Training guide" - a .settings-details block nested
+   inside a card that already has its own edge padding/background, so its
+   own margin/background are zeroed and it spans full width instead of
+   compounding the outer padding. */
+.mileage-plan-guide {
+  margin: 14px 0 0;
+  background: transparent;
+}
+
+.mileage-plan-guide .settings-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.phase-guide-block + .phase-guide-block {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.phase-guide-sessions {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.phase-guide-goal {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--dim);
+}
+
+.phase-guide-split {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.phase-guide-notes {
+  margin: 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--dim);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* Edit-plan sheet: one compact row per week - unlabeled inputs (a week
    number prefix plus placeholder text stands in for labels) so 13+ rows
    stay scannable instead of each carrying three full label/field pairs. */

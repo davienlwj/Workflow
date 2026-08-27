@@ -13,6 +13,7 @@ import {
 } from './store.js';
 import {
   currentWeekIndex, weekProgress, daysUntilRace, weeksNeededForRace, resizeWeeks,
+  DEFAULT_PLAN_WEEKS, PHASE_GUIDE, PHASE_GUIDE_NOTES,
 } from './mileagePlan.js';
 import { lthrZoneTable, rhrZoneTable, zoneTable, hrZoneDurations } from './zones.js';
 import {
@@ -1516,6 +1517,27 @@ function renderRunTab() {
  *  location/distance/goal time/notes were actually filled in - empty
  *  fields are just omitted rather than shown blank. Returns a "no race
  *  set" prompt when the plan has no race date at all. */
+/** Static reference content behind the default plan's numbers (session
+ *  types + mileage split per phase, plus a few standalone notes) - fixed
+ *  text, independent of whatever the user's own weeks actually say, so
+ *  it's rendered once at load rather than on every renderRacesCard(). */
+function trainingGuideHTML() {
+  const phasesHTML = PHASE_GUIDE.map((p) => `
+    <div class="phase-guide-block">
+      <div class="mileage-plan-head">
+        <span class="mileage-plan-week mono">${escapeHTML(p.phase)}</span>
+        <span class="mileage-plan-note">${escapeHTML(p.weeks)}${p.runsPerWeek ? ` — ${escapeHTML(p.runsPerWeek)}` : ''}</span>
+      </div>
+      <ul class="phase-guide-sessions">${p.sessions.map((s) => `<li>${escapeHTML(s)}</li>`).join('')}</ul>
+      ${p.goal ? `<p class="phase-guide-goal">${escapeHTML(p.goal)}</p>` : ''}
+      ${p.split ? `<p class="phase-guide-split mono">Long ${p.split.longRun} · Easy ${p.split.easy} · Tempo ${p.split.tempo} · Intervals ${p.split.intervals}</p>` : ''}
+    </div>
+  `).join('');
+  const notesHTML = `<ul class="phase-guide-notes">${PHASE_GUIDE_NOTES.map((n) => `<li>${escapeHTML(n)}</li>`).join('')}</ul>`;
+  return `${phasesHTML}${notesHTML}`;
+}
+$('trainingGuideBody').innerHTML = trainingGuideHTML();
+
 function raceInfoHTML() {
   const race = mileagePlan.race;
   if (!race?.date && !race?.name) {
@@ -1644,6 +1666,12 @@ $('mileagePlanRaceDate').addEventListener('change', syncWeekCountToRace);
 $('mileagePlanAddWeek').addEventListener('click', () => {
   const last = mileagePlan.weeks[mileagePlan.weeks.length - 1];
   mileagePlan.weeks.push({ totalKm: last?.totalKm ?? 0, longRunKm: last?.longRunKm ?? 0, note: '' });
+  renderMileagePlanRows();
+});
+
+$('mileagePlanLoadDefault').addEventListener('click', () => {
+  if (!confirm('Replace all current weeks with the default 22-week half-marathon plan? Your start date and race details are left as they are.')) return;
+  mileagePlan.weeks = DEFAULT_PLAN_WEEKS.map((w) => ({ ...w }));
   renderMileagePlanRows();
 });
 
