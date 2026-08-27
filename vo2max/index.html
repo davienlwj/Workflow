@@ -799,6 +799,52 @@
   </form>
 </section>
 
+<!-- Plan a run sheet (popup, opened from a calendar day's "+ Plan run") -->
+<section id="planRunSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Plan a run">
+  <div class="grabber"></div>
+  <h2 class="view-title">Plan a run</h2>
+  <div id="planRunDate" class="cal-day-panel-date mono"></div>
+  <form id="planRunForm" class="form">
+    <label class="field">
+      <span>Run type</span>
+      <select id="planRunType"></select>
+    </label>
+    <label class="field">
+      <span>Target distance (km) <em>(optional)</em></span>
+      <input id="planRunDistance" type="number" step="0.1" min="0">
+    </label>
+    <label class="field">
+      <span>Note <em>(optional)</em></span>
+      <input id="planRunNote" type="text" placeholder="e.g. easy shakeout">
+    </label>
+    <div class="actions">
+      <button type="button" id="planRunCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" class="primary">Save plan</button>
+    </div>
+  </form>
+</section>
+
+<!-- Plan a workout sheet (popup, opened from a calendar day's "+ Plan workout") -->
+<section id="planWorkoutSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Plan a workout">
+  <div class="grabber"></div>
+  <h2 class="view-title">Plan a workout</h2>
+  <div id="planWorkoutDate" class="cal-day-panel-date mono"></div>
+  <form id="planWorkoutForm" class="form">
+    <label class="field">
+      <span>Routine <em>(optional)</em></span>
+      <select id="planWorkoutRoutine"><option value="">No routine — start blank</option></select>
+    </label>
+    <label class="field">
+      <span>Note <em>(optional)</em></span>
+      <input id="planWorkoutNote" type="text" placeholder="e.g. focus on legs">
+    </label>
+    <div class="actions">
+      <button type="button" id="planWorkoutCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" class="primary">Save plan</button>
+    </div>
+  </form>
+</section>
+
 <!-- Save-PNG sheet (popup, preview + pick one of 3 share-card designs before saving/sharing) -->
 <section id="shareCardSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Save PNG">
   <div class="grabber"></div>

@@ -8,6 +8,7 @@ import {
   loadCustomBrands, addCustomBrand,
   loadCustomSessionTypes, addCustomSessionType,
   loadMileagePlan, saveMileagePlan,
+  loadPlannedActivities, addOrReplacePlannedActivity, deletePlannedActivity,
   exportAll, importAll,
 } from './store.js';
 import { currentWeekIndex, weekProgress, daysUntilRace } from './mileagePlan.js';
@@ -74,6 +75,15 @@ let routines = loadRoutines();
 let customBrands = loadCustomBrands();
 let customSessionTypes = loadCustomSessionTypes();
 let mileagePlan = loadMileagePlan();
+let plannedActivities = loadPlannedActivities();
+let planTargetDate = null; // the date #planRunSheet/#planWorkoutSheet is currently editing a plan for
+// Set right before opening the real Log/Workout form from a planned
+// entry's "Start" - the plan is only actually deleted once that real
+// entry is saved (not the moment Start is tapped), so abandoning the
+// form without saving leaves the plan intact. See startRunFromPlan/
+// startWorkoutFromPlan and their respective save/cancel handlers.
+let pendingRunPlanId = null;
+let pendingWorkoutPlanId = null;
 let editingId = null;
 // The sport of the session currently open in the Edit sheet ('run' unless
 // it's a Cycling/Stairmaster/Elliptical/RowErg/SkiErg entry, or a legacy
@@ -512,6 +522,7 @@ function openLogSheet(dateIso) {
 }
 
 function closeLogSheet() {
+  pendingRunPlanId = null;
   $('scrim').hidden = true;
   $('logSheet').hidden = true;
 }
@@ -587,6 +598,11 @@ $('logForm').addEventListener('submit', (e) => {
   const saved = addSession(form);
   sessions = loadSessions();
   syncSessionToGoogle(saved);
+  if (pendingRunPlanId) {
+    deletePlannedActivity(pendingRunPlanId);
+    pendingRunPlanId = null;
+    plannedActivities = loadPlannedActivities();
+  }
   closeLogSheet();
   renderAll();
   // Runs get a finish-style summary (mirrors the lift flow's
@@ -858,14 +874,27 @@ function activityByDate() {
   return map;
 }
 
+/** Planned runs/workouts, keyed by date, each as { run, lift } (either may
+ *  be undefined) - at most one of each per date, see addOrReplacePlannedActivity. */
+function plannedByDate() {
+  const map = new Map();
+  for (const p of plannedActivities) {
+    if (!map.has(p.date)) map.set(p.date, {});
+    map.get(p.date)[p.kind] = p;
+  }
+  return map;
+}
+
 function renderCalendar() {
   const byDate = activityByDate();
+  const planned = plannedByDate();
   const raceDate = mileagePlan.race?.date || null;
 
   $('calLegend').innerHTML = `
     <span class="cal-legend-item">${runIconSVG()}<span>Run</span></span>
     <span class="cal-legend-item">${dumbbellIconSVG()}<span>Workout</span></span>
     ${raceDate ? `<span class="cal-legend-item">${raceFlagIconSVG()}<span>Race day</span></span>` : ''}
+    ${plannedActivities.length > 0 ? `<span class="cal-legend-item">${runIconSVG('glyph-planned')}<span>Planned</span></span>` : ''}
   `;
 
   $('calMonthLabel').textContent = new Date(calYear, calMonth, 1)
@@ -881,15 +910,20 @@ function renderCalendar() {
   for (let d = 1; d <= daysInMonth; d++) {
     const iso = isoOf(calYear, calMonth, d);
     const day = byDate.get(iso);
+    const plan = planned.get(iso);
     const hasRun = Boolean(day && day.sessions.length);
     const hasWorkout = Boolean(day && day.workouts.length);
+    // A plan stops showing on the calendar once the real thing it was
+    // planning is actually logged - it's fulfilled, not still upcoming.
+    const plannedRun = Boolean(plan?.run) && !hasRun;
+    const plannedWorkout = Boolean(plan?.lift) && !hasWorkout;
     const isRaceDay = iso === raceDate;
     const classes = ['cal-cell'];
-    if (hasRun || hasWorkout || isRaceDay) classes.push('has-activity');
+    if (hasRun || hasWorkout || isRaceDay || plannedRun || plannedWorkout) classes.push('has-activity');
     if (iso === todayIsoStr) classes.push('today');
     if (iso === calSelectedDate) classes.push('selected');
-    const iconsHTML = (hasRun || hasWorkout || isRaceDay)
-      ? `<span class="cal-icons">${hasRun ? runIconSVG() : ''}${hasWorkout ? dumbbellIconSVG() : ''}${isRaceDay ? raceFlagIconSVG() : ''}</span>`
+    const iconsHTML = (hasRun || hasWorkout || isRaceDay || plannedRun || plannedWorkout)
+      ? `<span class="cal-icons">${hasRun ? runIconSVG() : plannedRun ? runIconSVG('glyph-planned') : ''}${hasWorkout ? dumbbellIconSVG() : plannedWorkout ? dumbbellIconSVG('glyph-planned') : ''}${isRaceDay ? raceFlagIconSVG() : ''}</span>`
       : '';
     html += `<button type="button" class="${classes.join(' ')}" data-date="${iso}">
       <span>${d}</span>
@@ -899,8 +933,25 @@ function renderCalendar() {
   $('calGrid').innerHTML = html;
 }
 
+/** One planned run/lift row in the day panel: a "Start" button (opens the
+ *  real Log/Workout form pre-filled, see startRunFromPlan/
+ *  startWorkoutFromPlan) plus a small ✕ to drop the plan without starting it. */
+function plannedRowHTML(plan) {
+  const label = plan.kind === 'run'
+    ? [typeLabel[plan.runType] ?? plan.runType, plan.targetDistanceKm != null ? `${plan.targetDistanceKm}km` : null].filter(Boolean).join(' · ')
+    : (routines.find((r) => r.id === plan.routineId)?.name ?? 'Workout (no routine)');
+  const noteSuffix = plan.note ? ` — ${escapeHTML(plan.note)}` : '';
+  return `<div class="cal-day-item cal-planned-item">
+    <button type="button" class="cal-planned-start" data-plan-id="${plan.id}">${escapeHTML(label)}${noteSuffix}</button>
+    <button type="button" class="cal-planned-remove" data-plan-id="${plan.id}" aria-label="Remove plan">✕</button>
+  </div>`;
+}
+
 function renderCalDayPanel() {
   const day = activityByDate().get(calSelectedDate) || { sessions: [], workouts: [] };
+  const plan = plannedByDate().get(calSelectedDate) || {};
+  const showPlannedRun = Boolean(plan.run) && day.sessions.length === 0;
+  const showPlannedWorkout = Boolean(plan.lift) && day.workouts.length === 0;
   const panel = $('calDayPanel');
   panel.innerHTML = `
     <div class="cal-day-panel-date mono">${fmtDateLong(calSelectedDate)}</div>
@@ -912,11 +963,18 @@ function renderCalDayPanel() {
       <div class="cal-day-section-label">${dumbbellIconSVG()}<span>Workouts</span></div>
       ${day.workouts.map((w) => calDayWorkoutSummaryHTML(w)).join('')}
     ` : ''}
+    ${(showPlannedRun || showPlannedWorkout) ? `
+      <div class="cal-day-section-label">${runIconSVG('glyph-planned')}<span>Planned</span></div>
+      ${showPlannedRun ? plannedRowHTML(plan.run) : ''}
+      ${showPlannedWorkout ? plannedRowHTML(plan.lift) : ''}
+    ` : ''}
     ${calSelectedDate === mileagePlan.race?.date ? `
       <div class="cal-day-section-label">${raceFlagIconSVG()}<span>Race day</span></div>
       <button type="button" class="cal-day-item" data-race="1">${escapeHTML(mileagePlan.race.name || 'Target race')}</button>
     ` : ''}
     <div class="cal-day-actions">
+      ${day.sessions.length === 0 && !showPlannedRun ? '<button type="button" id="calPlanRunBtn" class="ghost-btn">+ Plan run</button>' : ''}
+      ${day.workouts.length === 0 && !showPlannedWorkout ? '<button type="button" id="calPlanWorkoutBtn" class="ghost-btn">+ Plan workout</button>' : ''}
       <button type="button" id="calLogRunBtn" class="ghost-btn">+ Log session</button>
       <button type="button" id="calLogWorkoutBtn" class="ghost-btn">+ Log workout</button>
     </div>
@@ -936,6 +994,32 @@ function renderCalDayPanel() {
   panel.querySelector('.cal-day-item[data-race]')?.addEventListener('click', () => {
     closeCalDaySheet();
     openMileagePlanEditSheet();
+  });
+  panel.querySelectorAll('.cal-planned-start').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const p = plannedActivities.find((x) => x.id === btn.dataset.planId);
+      if (!p) return;
+      closeCalDaySheet();
+      if (p.kind === 'run') startRunFromPlan(p); else startWorkoutFromPlan(p);
+    });
+  });
+  panel.querySelectorAll('.cal-planned-remove').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      deletePlannedActivity(btn.dataset.planId);
+      plannedActivities = loadPlannedActivities();
+      renderCalendar();
+      renderCalDayPanel();
+    });
+  });
+  $('calPlanRunBtn')?.addEventListener('click', () => {
+    const iso = calSelectedDate;
+    closeCalDaySheet();
+    openPlanRunSheet(iso);
+  });
+  $('calPlanWorkoutBtn')?.addEventListener('click', () => {
+    const iso = calSelectedDate;
+    closeCalDaySheet();
+    openPlanWorkoutSheet(iso);
   });
   $('calLogRunBtn').addEventListener('click', () => {
     const iso = calSelectedDate;
@@ -1315,6 +1399,8 @@ function closeAllSheets() {
   $('workoutSummarySheet').hidden = true;
   $('runSummarySheet').hidden = true;
   $('mileagePlanEditSheet').hidden = true;
+  $('planRunSheet').hidden = true;
+  $('planWorkoutSheet').hidden = true;
   $('restingHRDetailSheet').hidden = true;
   $('sleepDetailSheet').hidden = true;
   $('activityDetailSheet').hidden = true;
@@ -1564,6 +1650,100 @@ $('mileagePlanEditForm').addEventListener('submit', (e) => {
   if (calSelectedDate) renderCalDayPanel();
   toast('Races saved');
 });
+
+/* ---------------------------------------------------- plan a run/workout */
+
+function openPlanRunSheet(dateIso) {
+  planTargetDate = dateIso;
+  $('planRunDate').textContent = fmtDateLong(dateIso);
+  refreshTypeSelect($('planRunType'), 'easy');
+  $('planRunDistance').value = '';
+  $('planRunNote').value = '';
+  $('scrim').hidden = false;
+  $('planRunSheet').hidden = false;
+  $('planRunSheet').scrollTop = 0;
+}
+
+function closePlanRunSheet() {
+  $('scrim').hidden = true;
+  $('planRunSheet').hidden = true;
+}
+
+$('planRunCancel').addEventListener('click', closePlanRunSheet);
+wireTypeSelectAddFlow($('planRunType'));
+
+$('planRunForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  addOrReplacePlannedActivity({
+    date: planTargetDate,
+    kind: 'run',
+    runType: $('planRunType').value,
+    targetDistanceKm: $('planRunDistance').value ? Number($('planRunDistance').value) : null,
+    note: $('planRunNote').value.trim(),
+  });
+  plannedActivities = loadPlannedActivities();
+  closePlanRunSheet();
+  renderCalendar();
+  toast('Run planned');
+});
+
+function openPlanWorkoutSheet(dateIso) {
+  planTargetDate = dateIso;
+  $('planWorkoutDate').textContent = fmtDateLong(dateIso);
+  $('planWorkoutRoutine').innerHTML = '<option value="">No routine — start blank</option>'
+    + routines.map((r) => `<option value="${r.id}">${escapeHTML(r.name)}</option>`).join('');
+  $('planWorkoutNote').value = '';
+  $('scrim').hidden = false;
+  $('planWorkoutSheet').hidden = false;
+  $('planWorkoutSheet').scrollTop = 0;
+}
+
+function closePlanWorkoutSheet() {
+  $('scrim').hidden = true;
+  $('planWorkoutSheet').hidden = true;
+}
+
+$('planWorkoutCancel').addEventListener('click', closePlanWorkoutSheet);
+
+$('planWorkoutForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  addOrReplacePlannedActivity({
+    date: planTargetDate,
+    kind: 'lift',
+    routineId: $('planWorkoutRoutine').value || null,
+    note: $('planWorkoutNote').value.trim(),
+  });
+  plannedActivities = loadPlannedActivities();
+  closePlanWorkoutSheet();
+  renderCalendar();
+  toast('Workout planned');
+});
+
+/** "Start" on a planned run: opens the real Log session form for that date,
+ *  pre-filled with the plan's run type/distance. The plan itself isn't
+ *  deleted yet - only once that form is actually saved (see the logForm
+ *  submit handler) - so backing out without saving leaves it intact. */
+function startRunFromPlan(plan) {
+  openLogSheet(plan.date);
+  if (plan.runType) $('logRunType').value = plan.runType;
+  if (plan.targetDistanceKm != null) $('logDistanceKm').value = plan.targetDistanceKm;
+  pendingRunPlanId = plan.id;
+}
+
+/** "Start" on a planned workout: opens the real Workout form for that date
+ *  (the live flow if it's today, the plain instant form otherwise),
+ *  pre-loaded with the planned routine's exercises if one was picked. Same
+ *  not-deleted-until-actually-saved rule as startRunFromPlan above. */
+function startWorkoutFromPlan(plan) {
+  const exerciseIds = plan.routineId ? (routines.find((r) => r.id === plan.routineId)?.exerciseIds || []) : [];
+  if (plan.date === todayIso()) {
+    if (liveSession) { toast('Finish or cancel your live workout first'); return; }
+    openLiveWorkoutSheet(exerciseIds);
+  } else {
+    openWorkoutSheet(plan.date, exerciseIds);
+  }
+  pendingWorkoutPlanId = plan.id;
+}
 
 $('startRunBtn').addEventListener('click', () => openLogSheet(todayIso()));
 
@@ -2045,7 +2225,10 @@ function readWorkoutForm() {
 }
 
 /** Opens the workout sheet blank, for logging a new workout (defaults to today). */
-function openWorkoutSheet(dateIso) {
+/** @param {string[]} [exerciseIds] pre-load these exercises (one empty set
+ *  each) instead of starting blank - used when starting from a planned
+ *  routine (see startWorkoutFromPlan). */
+function openWorkoutSheet(dateIso, exerciseIds = []) {
   if (liveSession) { toast('Finish or cancel your live workout first'); return; }
   workoutEditingId = null;
   pairingSourceBlock = null;
@@ -2053,7 +2236,7 @@ function openWorkoutSheet(dateIso) {
   $('woDate').value = dateIso || todayIso();
   $('woName').value = '';
   $('woNotes').value = '';
-  $('woExerciseList').innerHTML = '';
+  $('woExerciseList').innerHTML = exerciseIds.map((id) => exerciseBlockHTML(id, [{}])).join('');
   $('woPicker').hidden = true;
   $('woDelete').hidden = true;
   $('woSaveRoutine').hidden = true;
@@ -2182,6 +2365,10 @@ function discardLiveWorkout() {
   clearLiveWorkout();
   hideLiveMiniBar();
   workoutEditingId = null;
+  // A no-op if finishLiveWorkout already cleared this on save; on a true
+  // cancel (the only other caller) it means nothing was actually logged,
+  // so the plan this session may have started from is left intact.
+  pendingWorkoutPlanId = null;
   $('scrim').hidden = true;
   $('workoutSheet').hidden = true;
   $('workoutSheet').classList.remove('live-mode');
@@ -2930,6 +3117,11 @@ function finishLiveWorkout(data) {
   workouts = loadWorkouts();
   const newPRs = newPRsInWorkout(workouts, saved, allExercises(), bodyweightKg());
   syncWorkoutToGoogle(saved);
+  if (pendingWorkoutPlanId) {
+    deletePlannedActivity(pendingWorkoutPlanId);
+    pendingWorkoutPlanId = null;
+    plannedActivities = loadPlannedActivities();
+  }
   discardLiveWorkout();
   renderAll();
   openWorkoutSummarySheet(saved, durationMs, newPRs);
@@ -2970,6 +3162,7 @@ $('woCancel').addEventListener('click', () => {
     toast('Workout cancelled');
     return;
   }
+  pendingWorkoutPlanId = null;
   closeWorkoutSheet();
 });
 
@@ -3000,6 +3193,11 @@ $('workoutForm').addEventListener('submit', (e) => {
     if (newPRs.length > 0) toast(newPRToastMessage(newPRs), 3400);
     else toast('Workout saved');
     syncWorkoutToGoogle(saved);
+    if (pendingWorkoutPlanId) {
+      deletePlannedActivity(pendingWorkoutPlanId);
+      pendingWorkoutPlanId = null;
+      plannedActivities = loadPlannedActivities();
+    }
   }
   closeWorkoutSheet();
   renderAll();

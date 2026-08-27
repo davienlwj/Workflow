@@ -914,6 +914,11 @@ button { font-family: var(--font-mono); }
 .cal-cell.selected .glyph-icon { color: var(--bg); }
 .cal-cell.today .glyph-icon { color: #ffffff; }
 
+/* A planned (not yet logged) run/workout gets the same glyph, just faded -
+   a "ghost" of the solid icon a completed one gets, so the calendar and
+   legend read as one consistent icon system rather than needing new art. */
+.glyph-planned { opacity: 0.4; }
+
 .cal-legend {
   display: flex;
   gap: 16px;
@@ -974,10 +979,39 @@ button { font-family: var(--font-mono); }
 
 .cal-day-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 4px;
 }
-.cal-day-actions .ghost-btn { flex: 1; }
+.cal-day-actions .ghost-btn { flex: 1 1 120px; }
+
+/* A planned run/workout row - same card as .cal-day-item, but its content
+   is two separate actions (Start, and a small ✕ to drop the plan) rather
+   than the whole row being one tap target like a logged session/workout's
+   row is. */
+.cal-planned-item { cursor: default; }
+
+.cal-planned-start {
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.cal-planned-remove {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: var(--dim);
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px;
+  cursor: pointer;
+}
 
 /* --------------------------------------------------------------- history */
 

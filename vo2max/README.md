@@ -52,6 +52,23 @@ Dashboard as the place they come together.
   *+ Log* buttons always default to today. The race day's popup instead
   shows a **Race day** row naming the target race — tap it to jump
   straight to the Races edit sheet.
+
+  A day can also be **pre-planned** ahead of time instead of (or before)
+  actually logging it: the day popup's **+ Plan run** / **+ Plan workout**
+  buttons (shown whenever that kind hasn't been logged or planned for that
+  day yet) open a small form — a run plan picks a run type (reusing the
+  same growable Easy/Long/Threshold/VO2max list runs are logged with) and
+  an optional target distance; a workout plan optionally picks one of your
+  saved Routines. A planned day gets the same running-figure/dumbbell
+  glyph as a logged one, just faded, both on the calendar grid and in that
+  day's **Planned** section — where each entry has a **Start** action (tap
+  the row) that jumps straight into the real Log/Workout form, pre-filled
+  with the plan's details (a routine's exercises pre-load exactly like
+  picking that routine from *Start Workout* already does), plus a small ✕
+  to drop the plan without logging anything. The plan itself is only
+  cleared once that real entry is actually saved — backing out of the
+  pre-filled form without saving leaves it exactly as it was, so a plan
+  never gets silently lost to a half-started log.
 - **Run** — the cardio detail view: sessions logged, average session HR,
   days since your last session, a VO2max trend chart labeling each point
   with its exact value, a total-mileage bar chart filterable by
@@ -347,7 +364,8 @@ before/after-phase structure to summarize for them.
 ```
 index.html                  markup and the four popup sheets (log/edit session, log/edit workout, exercise progress)
 css/style.css               the whole light theme
-js/store.js                 localStorage CRUD for settings, sessions, workouts and custom exercises
+js/store.js                 localStorage CRUD for settings, sessions, workouts, custom exercises,
+                              the mileage/races plan, and planned (not-yet-logged) runs/workouts
 js/zones.js                 zone tables, computed from settings
 js/block.js                 cardio progress stats — pure functions
 js/workout.js                strength progress stats — PRs, last-performance, volume; pure functions
