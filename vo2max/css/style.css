@@ -816,13 +816,19 @@ button.mileage-plan-row-open {
 .chart-dot-baseline { fill: var(--ink); stroke: var(--ink); }
 .chart-bar { fill: var(--accent-dim); stroke: var(--accent); stroke-width: 1; }
 
-/* Run tab only: the VO2max trend chart's point marker and the mileage
-   bar chart's bars get the brand orange, matching the rest of the app's
-   orange accents. */
-#chartWrap .chart-dot { fill: #FF6C2D; stroke: #FF6C2D; }
-#chartWrap .chart-value-label, #mileageChartWrap .chart-value-label { fill: #FF6C2D; }
-#mileageChartWrap .chart-bar { fill: #FF6C2D; stroke: #FF6C2D; }
+/* Run tab only: the mileage trend chart's dots, line and value labels get
+   the brand orange, matching the rest of the app's orange accents. */
+#mileageChartWrap .chart-dot { fill: #FF6C2D; stroke: #FF6C2D; }
+#mileageChartWrap .chart-line { stroke: #FF6C2D; }
+#mileageChartWrap .chart-value-label { fill: #FF6C2D; }
 .chart-empty { color: var(--dimmer); font-size: 14px; text-align: center; padding: 40px 0; }
+
+.mileage-total-footer {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--dim);
+  text-align: right;
+}
 .chart-radar-fill { fill: var(--accent); fill-opacity: 0.12; stroke: none; }
 /* Muscle balance radar's axis labels, data shape (fill/outline) and point
    markers get the brand orange - the percentage under each label

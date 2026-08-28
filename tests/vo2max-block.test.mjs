@@ -1,16 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  daysSinceLastSession, averageSessionHR, vo2maxSeries,
+  daysSinceLastSession, averageSessionHR,
   mileageBuckets, totalMileage,
   parsePaceMinKm, formatPaceMinKm,
 } from '../vo2max/js/block.js';
-
-const settings = {
-  baselineDate: '2026-08-01',
-  baselineVO2max: 46,
-  protocol: { reps: 4, freqPerWeek: 2 },
-};
 
 test('parsePaceMinKm reads "m:ss" pace text into decimal minutes/km', () => {
   assert.equal(parsePaceMinKm('5:25'), 5 + 25 / 60);
@@ -71,15 +65,6 @@ test('averageSessionHR pools both the unified field and legacy per-interval read
   assert.equal(averageSessionHR(sessions), 150);
 });
 
-test('vo2maxSeries starts with baseline and includes only sessions with a reading', () => {
-  const sessions = [
-    { date: '2026-08-20', vo2max: 47 },
-    { date: '2026-08-10', vo2max: null },
-  ];
-  const series = vo2maxSeries(settings, sessions);
-  assert.deepEqual(series.map((p) => p.date), ['2026-08-01', '2026-08-20']);
-  assert.equal(series[0].label, 'Baseline');
-});
 
 test('mileageBuckets(week) sums distance within each Monday-start week, ignoring non-run sessions', () => {
   const now = new Date('2026-08-19T00:00:00'); // Wednesday

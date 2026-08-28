@@ -77,15 +77,6 @@ export function averageSessionHR(sessions) {
   return Math.round(all.reduce((sum, v) => sum + v, 0) / all.length);
 }
 
-/** VO2max readings over time, baseline first, for the trend chart. */
-export function vo2maxSeries(settings, sessions) {
-  const points = [{ date: settings.baselineDate, value: settings.baselineVO2max, label: 'Baseline' }];
-  sessions
-    .filter((s) => s.vo2max != null)
-    .forEach((s) => points.push({ date: s.date, value: s.vo2max, label: null }));
-  return points.sort((a, b) => a.date.localeCompare(b.date));
-}
-
 function round1(n) {
   return Math.round(n * 10) / 10;
 }

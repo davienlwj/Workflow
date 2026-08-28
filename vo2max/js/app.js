@@ -19,12 +19,12 @@ import {
 import { lthrZoneTable, rhrZoneTable, zoneTable, hrZoneDurations } from './zones.js';
 import {
   todayIso, fmtDateLong, fmtElapsed,
-  daysSinceLastSession, averageSessionHR, vo2maxSeries,
+  daysSinceLastSession, averageSessionHR,
   mileageBuckets, totalMileage,
   parsePaceMinKm, formatPaceMinKm,
 } from './block.js';
 import {
-  vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG, exerciseVolumeSVG, muscleRadarSVG,
+  mileageTrendSVG, exerciseProgressSVG, exerciseVolumeSVG, muscleRadarSVG,
   restingHRTrendSVG, sleepBarChartSVG,
   activityHRLineChartSVG, activityPaceLineChartSVG, activitySpeedLineChartSVG, activitySwimPaceLineChartSVG,
   hrZoneDurationListHTML,
@@ -1507,10 +1507,8 @@ function renderRunTab() {
     </div>
   `).join('');
 
-  $('chartWrap').innerHTML = vo2maxTrendSVG(vo2maxSeries(settings, sessions));
-
+  $('mileageChartWrap').innerHTML = mileageTrendSVG(mileageBuckets(sessions, mileageScope));
   $('mileageTotal').textContent = `${totalMileage(sessions)} km total`;
-  $('mileageChartWrap').innerHTML = mileageBarChartSVG(mileageBuckets(sessions, mileageScope));
 
   renderRacesCard();
 }
@@ -1916,7 +1914,7 @@ $('mileageScope').addEventListener('click', (e) => {
   $('mileageScope').querySelectorAll('.scope').forEach((b) => {
     b.setAttribute('aria-selected', String(b === btn));
   });
-  $('mileageChartWrap').innerHTML = mileageBarChartSVG(mileageBuckets(sessions, mileageScope));
+  $('mileageChartWrap').innerHTML = mileageTrendSVG(mileageBuckets(sessions, mileageScope));
 });
 
 /* -------------------------------------------------------------- WORKOUT */

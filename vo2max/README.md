@@ -71,9 +71,10 @@ Dashboard as the place they come together.
   pre-filled form without saving leaves it exactly as it was, so a plan
   never gets silently lost to a half-started log.
 - **Run** — the cardio detail view: sessions logged, average session HR,
-  days since your last session, a VO2max trend chart labeling each point
-  with its exact value, a total-mileage bar chart filterable by
-  week/month/year, and the full chronological session list (tap one to edit
+  days since your last session, a total-mileage scatter-and-line chart
+  filterable by week/month/year (each point labeled with its exact km, the
+  running total shown below the chart), and the full chronological session
+  list (tap one to edit
   or delete it — *Add to Calendar* there downloads a standard `.ics` file
   for that session that Apple Calendar, Google Calendar, or Outlook can all
   import directly). *+ Log run* opens the same popup as the Dashboard
@@ -402,7 +403,7 @@ js/mileagePlan.js            weekly mileage-goal plan math (current week, progre
 js/exercises.js              the built-in exercise library (name, equipment, muscles) and the radar chart's muscle-group rollup
 js/muscleDiagram.js          stacks the muscle-diagram image assets for an exercise's muscles
 js/icons.js                  the running-figure / dumbbell / race-flag pictograms (calendar, recent activity)
-js/chart.js                 dependency-free SVG charts: VO2max trend, mileage bars, exercise progress
+js/chart.js                 dependency-free SVG charts: mileage trend, exercise progress
 js/ics.js                   builds a per-session .ics file for calendar export, and the shared
                               summary/description text + event resources used by gcal.js
 js/gcal.js                  Google Identity Services auth + Calendar API calls for automatic sync
