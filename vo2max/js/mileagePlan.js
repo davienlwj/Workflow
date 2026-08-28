@@ -125,6 +125,60 @@ export const PHASE_GUIDE_NOTES = [
   'Weeks 4, 8, 12, and 16 are recovery/cutback weeks - non-negotiable, not optional. Volume without recovery is how injuries happen, not how fitness is built.',
 ];
 
+/** Default Easy/Tempo/Intervals percentages (of a week's *total* km) per
+ *  phase, as whole-number midpoints of PHASE_GUIDE's ranges above - e.g.
+ *  Base's Easy 47-50% -> 48. Long run isn't here: it's already its own
+ *  directly-editable km field on every week (weekProgress's longRunKm),
+ *  so it stays that single source of truth rather than also becoming a
+ *  percentage: weekSessionKm below just reports it (and its % of total)
+ *  as read-only context alongside the three that are percentage-driven.
+ *  A phase with no keyed entry (a custom note, or "Race week", which the
+ *  source plan gives no numeric split for) falls back to a neutral
+ *  all-easy split via defaultSplitsForWeek. */
+const DEFAULT_SPLIT_BY_PHASE = {
+  Base: { easyPct: 48, tempoPct: 14, intervalsPct: 0 },
+  Build: { easyPct: 39, tempoPct: 12, intervalsPct: 12 },
+  Peak: { easyPct: 37, tempoPct: 13, intervalsPct: 13 },
+  Taper: { easyPct: 46, tempoPct: 13, intervalsPct: 0 },
+};
+
+/** The phase-default Easy/Tempo/Intervals split for a week's `note` (its
+ *  phase name, e.g. "Base (cutback)" - the cutback suffix is stripped
+ *  before looking it up, since a cutback week is still that same phase). */
+export function defaultSplitsForWeek(note) {
+  const phase = (note || '').replace(/\s*\(cutback\)\s*$/i, '').trim();
+  return { ...(DEFAULT_SPLIT_BY_PHASE[phase] || { easyPct: 50, tempoPct: 0, intervalsPct: 0 }) };
+}
+
+/** A week's Easy/Tempo/Intervals split - whatever the user has explicitly
+ *  saved on it (`week.splits`), or the phase default otherwise. Every
+ *  saved plan's weeks (including ones from before this existed) work
+ *  through this rather than needing a data migration. */
+export function weekSplits(week) {
+  return week?.splits || defaultSplitsForWeek(week?.note);
+}
+
+/** Km for each session type in a week: the long run as already-recorded
+ *  (plus what % of the week's total that is, for context), and Easy/
+ *  Tempo/Intervals computed from the week's total km times its split
+ *  percentages (own or phase-default - see weekSplits). Editing the
+ *  split percentages and re-deriving km from them, rather than the other
+ *  way around, is exactly what lets the UI recompute live as those
+ *  percentages change. */
+export function weekSessionKm(week) {
+  const totalKm = week?.totalKm ?? 0;
+  const longRunKm = week?.longRunKm ?? 0;
+  const { easyPct, tempoPct, intervalsPct } = weekSplits(week);
+  const round1 = (n) => Math.round(n * 10) / 10;
+  return {
+    longRunKm: round1(longRunKm),
+    longRunPct: totalKm > 0 ? Math.round((longRunKm / totalKm) * 100) : 0,
+    easyKm: round1((totalKm * easyPct) / 100),
+    tempoKm: round1((totalKm * tempoPct) / 100),
+    intervalsKm: round1((totalKm * intervalsPct) / 100),
+  };
+}
+
 /** Empty race details - filled in by the user via the plan's edit sheet,
  *  never guessed at (a plan doesn't necessarily target a specific race, and
  *  even one that does shouldn't have its date invented for it). */

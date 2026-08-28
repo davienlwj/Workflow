@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_PLAN_WEEKS, DEFAULT_RACE, defaultMileagePlan, currentWeekIndex, weekDateRange, weekProgress, daysUntilRace,
-  weeksNeededForRace, resizeWeeks,
+  weeksNeededForRace, resizeWeeks, defaultSplitsForWeek, weekSplits, weekSessionKm,
 } from '../vo2max/js/mileagePlan.js';
 
 const plan = {
@@ -150,4 +150,52 @@ test('resizeWeeks growing from empty produces zeroed weeks', () => {
     { totalKm: 0, longRunKm: 0, note: '' },
     { totalKm: 0, longRunKm: 0, note: '' },
   ]);
+});
+
+test('defaultSplitsForWeek looks up the phase, stripping a "(cutback)" suffix', () => {
+  assert.deepEqual(defaultSplitsForWeek('Base'), { easyPct: 48, tempoPct: 14, intervalsPct: 0 });
+  assert.deepEqual(defaultSplitsForWeek('Base (cutback)'), { easyPct: 48, tempoPct: 14, intervalsPct: 0 });
+  assert.deepEqual(defaultSplitsForWeek('Build'), { easyPct: 39, tempoPct: 12, intervalsPct: 12 });
+  assert.deepEqual(defaultSplitsForWeek('Peak'), { easyPct: 37, tempoPct: 13, intervalsPct: 13 });
+  assert.deepEqual(defaultSplitsForWeek('Taper'), { easyPct: 46, tempoPct: 13, intervalsPct: 0 });
+});
+
+test('defaultSplitsForWeek falls back to a neutral all-easy split for an unknown phase', () => {
+  assert.deepEqual(defaultSplitsForWeek('Race week'), { easyPct: 50, tempoPct: 0, intervalsPct: 0 });
+  assert.deepEqual(defaultSplitsForWeek(''), { easyPct: 50, tempoPct: 0, intervalsPct: 0 });
+  assert.deepEqual(defaultSplitsForWeek(undefined), { easyPct: 50, tempoPct: 0, intervalsPct: 0 });
+});
+
+test('weekSplits prefers a week\'s own saved splits over the phase default', () => {
+  const custom = { easyPct: 60, tempoPct: 10, intervalsPct: 5 };
+  assert.deepEqual(weekSplits({ note: 'Base', splits: custom }), custom);
+});
+
+test('weekSplits falls back to the phase default when a week has no splits saved', () => {
+  assert.deepEqual(weekSplits({ note: 'Build' }), { easyPct: 39, tempoPct: 12, intervalsPct: 12 });
+  assert.deepEqual(weekSplits(null), { easyPct: 50, tempoPct: 0, intervalsPct: 0 });
+});
+
+test('weekSessionKm derives each session type\'s km from total km x its split percentage', () => {
+  const week = { totalKm: 30, longRunKm: 12, note: 'Build' };
+  const km = weekSessionKm(week);
+  assert.equal(km.longRunKm, 12);
+  assert.equal(km.longRunPct, 40); // 12/30
+  assert.equal(km.easyKm, 11.7); // 30 * 39%
+  assert.equal(km.tempoKm, 3.6); // 30 * 12%
+  assert.equal(km.intervalsKm, 3.6); // 30 * 12%
+});
+
+test('weekSessionKm uses a week\'s own custom splits when present', () => {
+  const week = { totalKm: 20, longRunKm: 8, note: 'Base', splits: { easyPct: 30, tempoPct: 20, intervalsPct: 10 } };
+  const km = weekSessionKm(week);
+  assert.equal(km.easyKm, 6);
+  assert.equal(km.tempoKm, 4);
+  assert.equal(km.intervalsKm, 2);
+});
+
+test('weekSessionKm handles a zero-total week without dividing by zero', () => {
+  const km = weekSessionKm({ totalKm: 0, longRunKm: 0, note: 'Base' });
+  assert.equal(km.longRunPct, 0);
+  assert.equal(km.easyKm, 0);
 });

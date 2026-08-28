@@ -96,15 +96,24 @@ Dashboard as the place they come together.
   Dashboard calendar (see above). Below a **Mileage plan** sub-heading, a
   minimalist progress bar tracks the current week of a distance-goal plan
   against your actually-logged runs: km completed vs. that week's target
-  (with km remaining alongside it) plus its long run target and a phase
-  note (Build/Deload/Peak/Taper/Race week), all recomputed live from
-  whichever runs you've logged this week. Before the plan's first week
+  (with km remaining alongside it), a phase note (Build/Deload/Peak/Taper/
+  Race week), and a per-run-type breakdown below the bar (Long run/Easy/
+  Tempo/Intervals, whichever of those actually have km) - all recomputed
+  live from whichever runs you've logged this week. Before the plan's first week
   starts it shows a "Plan starts …" preview instead of a bar; after its
   last week ends it just says the plan is complete. **Edit** opens a sheet
   with the race fields, then the plan's start date (the Monday Week 1
   begins) and one compact row per week (total km / long run km / note),
   each removable, plus **+ Add week** to extend the plan — so the number
-  of weeks, and every week's targets, are fully yours to adjust. Setting
+  of weeks, and every week's targets, are fully yours to adjust. Tapping a
+  week's number (e.g. "W1") opens that week's own run-type breakdown -
+  Easy/Tempo/Intervals as editable percentages of that week's total km
+  (long run stays whatever's on the week row itself, shown here read-only
+  alongside its own % of the total), each defaulting to its phase's split
+  from the Training guide below until you override it; the km next to each
+  percentage recalculates live as you type, and a running "accounted for"
+  line adds long run + the three percentages together so you can see how
+  close it is to 100%. Setting
   (or changing) either the race date or the start date automatically
   grows or shrinks the week rows so the plan's last week always lands on
   race week — shrinking keeps the earlier weeks' values as-is and just

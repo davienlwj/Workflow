@@ -804,6 +804,20 @@
   </form>
 </section>
 
+<!-- Week breakdown sheet (popup, opened by tapping a week number in the Edit races sheet - stacks on top of it, doesn't close it) -->
+<section id="weekBreakdownSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Week breakdown">
+  <div class="grabber"></div>
+  <h2 class="view-title" id="weekBreakdownTitle">Week</h2>
+  <div id="weekBreakdownSummary" class="mileage-plan-longrun"></div>
+  <div id="weekBreakdownRows" class="week-breakdown-rows"></div>
+  <p class="week-breakdown-hint">Long run is set on the week row itself - these percentages split the rest of that week's total km across easy, tempo and interval running.</p>
+  <div id="weekBreakdownAccounted" class="week-breakdown-accounted mono"></div>
+  <div class="actions">
+    <button type="button" id="weekBreakdownCancel" class="ghost-btn">Cancel</button>
+    <button type="button" id="weekBreakdownSave" class="primary">Save</button>
+  </div>
+</section>
+
 <!-- Plan a run sheet (popup, opened from a calendar day's "+ Plan run") -->
 <section id="planRunSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Plan a run">
   <div class="grabber"></div>

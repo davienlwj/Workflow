@@ -590,6 +590,24 @@ button { font-family: var(--font-mono); }
 
 .mileage-plan-longrun strong { color: var(--ink); }
 
+.mileage-plan-type-breakdown {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mileage-plan-type-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.mileage-plan-type-row .mono { color: var(--ink); }
+
 .mileage-plan-empty-state {
   font-size: 14px;
   color: var(--dim);
@@ -689,6 +707,21 @@ button { font-family: var(--font-mono); }
   color: var(--dim);
 }
 
+/* It's a <button> (opens that week's run-type breakdown - see
+   .week-breakdown-* below) rather than a plain label - reset it back to
+   looking like the plain text label it visually replaced. */
+button.mileage-plan-row-open {
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 2px;
+}
+
 .mileage-plan-input {
   min-width: 0;
   border: 1px solid var(--line);
@@ -711,6 +744,65 @@ button { font-family: var(--font-mono); }
   font-size: 16px;
   line-height: 1;
   padding: 4px;
+}
+
+/* #weekBreakdownSheet: one row per run type, an editable % input and a
+   read-only computed km figure that updates live as the % changes. */
+.week-breakdown-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.week-breakdown-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.week-breakdown-label {
+  flex: 1 1 auto;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.week-breakdown-pct-input {
+  flex: 0 0 62px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  padding: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  text-align: right;
+}
+
+.week-breakdown-pct-sign {
+  flex: 0 0 auto;
+  color: var(--dim);
+  font-size: 14px;
+}
+
+.week-breakdown-km {
+  flex: 0 0 64px;
+  text-align: right;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.week-breakdown-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.week-breakdown-accounted {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--dim);
 }
 
 .chart-svg { width: 100%; height: auto; display: block; }

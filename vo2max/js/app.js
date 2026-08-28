@@ -14,6 +14,7 @@ import {
 import {
   currentWeekIndex, weekProgress, daysUntilRace, weeksNeededForRace, resizeWeeks,
   DEFAULT_PLAN_WEEKS, PHASE_GUIDE, PHASE_GUIDE_NOTES,
+  defaultSplitsForWeek, weekSplits, weekSessionKm,
 } from './mileagePlan.js';
 import { lthrZoneTable, rhrZoneTable, zoneTable, hrZoneDurations } from './zones.js';
 import {
@@ -1402,6 +1403,7 @@ function closeAllSheets() {
   $('workoutSummarySheet').hidden = true;
   $('runSummarySheet').hidden = true;
   $('mileagePlanEditSheet').hidden = true;
+  $('weekBreakdownSheet').hidden = true;
   $('planRunSheet').hidden = true;
   $('planWorkoutSheet').hidden = true;
   $('restingHRDetailSheet').hidden = true;
@@ -1582,6 +1584,13 @@ function renderRacesCard() {
     return;
   }
   const p = weekProgress(mileagePlan, sessions, idx);
+  const km = weekSessionKm(mileagePlan.weeks[idx]);
+  const typeBreakdown = [
+    ['Long run', km.longRunKm],
+    ['Easy', km.easyKm],
+    ['Tempo', km.tempoKm],
+    ['Intervals', km.intervalsKm],
+  ].filter(([, dist]) => dist > 0);
   $('mileagePlanProgress').innerHTML = `
     <div class="mileage-plan-head">
       <span class="mileage-plan-week mono">Week ${p.week} of ${p.totalWeeks}</span>
@@ -1592,13 +1601,20 @@ function renderRacesCard() {
       <span class="mono"><strong>${p.completedKm}</strong> / ${p.totalKm}km</span>
       <span class="mono">${p.remainingKm}km left</span>
     </div>
-    <div class="mileage-plan-longrun">Long run target <strong class="mono">${p.longRunKm}km</strong></div>
+    <div class="mileage-plan-type-breakdown">
+      ${typeBreakdown.map(([label, dist]) => `
+        <div class="mileage-plan-type-row">
+          <span>${label}</span>
+          <span class="mono">${dist}km</span>
+        </div>
+      `).join('')}
+    </div>
   `;
 }
 
 function mileagePlanRowHTML(index, week) {
   return `<div class="mileage-plan-row" data-index="${index}">
-    <span class="mileage-plan-row-num mono">W${index + 1}</span>
+    <button type="button" class="mileage-plan-row-num mileage-plan-row-open mono" aria-label="View Week ${index + 1}'s run-type breakdown">W${index + 1}</button>
     <input type="number" step="0.1" min="0" class="mileage-plan-input mp-total" placeholder="Total km" value="${week.totalKm ?? ''}">
     <input type="number" step="0.1" min="0" class="mileage-plan-input mp-longrun" placeholder="Long run km" value="${week.longRunKm ?? ''}">
     <input type="text" class="mileage-plan-input mp-note" placeholder="Note" value="${escapeHTML(week.note ?? '')}">
@@ -1614,12 +1630,96 @@ function renderMileagePlanRows() {
  *  shared between the submit handler and syncWeekCountToRace below so a
  *  resize never clobbers whatever the user has already typed into a row. */
 function readWeekRowsFromDOM() {
-  return [...$('mileagePlanWeekRows').querySelectorAll('.mileage-plan-row')].map((row) => ({
+  return [...$('mileagePlanWeekRows').querySelectorAll('.mileage-plan-row')].map((row, i) => ({
     totalKm: Number(row.querySelector('.mp-total').value) || 0,
     longRunKm: Number(row.querySelector('.mp-longrun').value) || 0,
     note: row.querySelector('.mp-note').value.trim(),
+    // The row itself has no UI for the run-type split percentages (see
+    // the week breakdown sheet) - carry over whatever's already stored
+    // for this index so reading the DOM never drops it.
+    splits: mileagePlan.weeks[i]?.splits,
   }));
 }
+
+let breakdownWeekIndex = null; // which mileagePlan.weeks[] index #weekBreakdownSheet is currently open for
+
+const BREAKDOWN_KEYS = ['easyPct', 'tempoPct', 'intervalsPct'];
+const BREAKDOWN_LABELS = { easyPct: 'Easy', tempoPct: 'Tempo', intervalsPct: 'Intervals' };
+
+function weekBreakdownRowHTML(key, pct, km) {
+  return `<div class="week-breakdown-row" data-key="${key}">
+    <span class="week-breakdown-label">${BREAKDOWN_LABELS[key]}</span>
+    <input type="number" step="1" min="0" max="100" class="week-breakdown-pct-input" value="${pct}">
+    <span class="week-breakdown-pct-sign">%</span>
+    <span class="week-breakdown-km mono">${km}km</span>
+  </div>`;
+}
+
+/** Redraws #weekBreakdownSheet's rows from mileagePlan.weeks[breakdownWeekIndex]
+ *  - called on open, and read back from on save (see the pct-input listener
+ *  below for the live recompute-as-you-type that doesn't re-render the
+ *  whole sheet, just the km spans). */
+function renderWeekBreakdown() {
+  const week = mileagePlan.weeks[breakdownWeekIndex];
+  const splits = weekSplits(week);
+  const km = weekSessionKm(week);
+  $('weekBreakdownTitle').textContent = `Week ${breakdownWeekIndex + 1}${week.note ? ` — ${escapeHTML(week.note)}` : ''}`;
+  $('weekBreakdownSummary').innerHTML = `Total <strong class="mono">${week.totalKm}km</strong> · Long run <strong class="mono">${km.longRunKm}km</strong> (${km.longRunPct}%)`;
+  $('weekBreakdownRows').innerHTML = BREAKDOWN_KEYS.map((key) => weekBreakdownRowHTML(key, splits[key], km[`${key.replace('Pct', '')}Km`])).join('');
+  updateWeekBreakdownAccounted();
+}
+
+/** The percentages currently sitting in the sheet's inputs (not necessarily
+ *  saved yet), keyed the same way weekSplits()'s return value is. */
+function readBreakdownPctFromDOM() {
+  const splits = {};
+  for (const row of $('weekBreakdownRows').querySelectorAll('.week-breakdown-row')) {
+    splits[row.dataset.key] = Number(row.querySelector('.week-breakdown-pct-input').value) || 0;
+  }
+  return splits;
+}
+
+function updateWeekBreakdownAccounted() {
+  const week = mileagePlan.weeks[breakdownWeekIndex];
+  const km = weekSessionKm(week);
+  const splits = readBreakdownPctFromDOM();
+  const total = km.longRunPct + splits.easyPct + splits.tempoPct + splits.intervalsPct;
+  $('weekBreakdownAccounted').textContent = `Long run + Easy + Tempo + Intervals = ${total}% of this week's total`;
+}
+
+function openWeekBreakdownSheet(index) {
+  // Capture any unsaved edits to total/long run km/note from the DOM rows
+  // first, so the breakdown reflects what's currently on screen rather
+  // than stale saved values - readWeekRowsFromDOM already carries each
+  // week's splits forward untouched.
+  mileagePlan.weeks = readWeekRowsFromDOM();
+  breakdownWeekIndex = index;
+  renderWeekBreakdown();
+  $('weekBreakdownSheet').hidden = false;
+  $('weekBreakdownSheet').scrollTop = 0;
+}
+
+function closeWeekBreakdownSheet() {
+  $('weekBreakdownSheet').hidden = true;
+}
+
+$('weekBreakdownCancel').addEventListener('click', closeWeekBreakdownSheet);
+
+$('weekBreakdownRows').addEventListener('input', (e) => {
+  if (!e.target.matches('.week-breakdown-pct-input')) return;
+  const row = e.target.closest('.week-breakdown-row');
+  const key = row.dataset.key;
+  const week = mileagePlan.weeks[breakdownWeekIndex];
+  const splits = { ...weekSplits(week), ...readBreakdownPctFromDOM() };
+  const km = weekSessionKm({ ...week, splits });
+  row.querySelector('.week-breakdown-km').textContent = `${km[`${key.replace('Pct', '')}Km`]}km`;
+  updateWeekBreakdownAccounted();
+});
+
+$('weekBreakdownSave').addEventListener('click', () => {
+  mileagePlan.weeks[breakdownWeekIndex].splits = readBreakdownPctFromDOM();
+  closeWeekBreakdownSheet();
+});
 
 /** Grows/shrinks the week rows to exactly span from Week 1's start date
  *  through the race week, whenever both dates are set - a no-op if either
@@ -1676,12 +1776,18 @@ $('mileagePlanLoadDefault').addEventListener('click', () => {
 });
 
 $('mileagePlanWeekRows').addEventListener('click', (e) => {
-  const btn = e.target.closest('.mileage-plan-row-remove');
-  if (!btn) return;
-  const row = btn.closest('.mileage-plan-row');
-  const index = Number(row.dataset.index);
-  mileagePlan.weeks.splice(index, 1);
-  renderMileagePlanRows();
+  const removeBtn = e.target.closest('.mileage-plan-row-remove');
+  if (removeBtn) {
+    const index = Number(removeBtn.closest('.mileage-plan-row').dataset.index);
+    mileagePlan.weeks.splice(index, 1);
+    renderMileagePlanRows();
+    return;
+  }
+  const openBtn = e.target.closest('.mileage-plan-row-open');
+  if (openBtn) {
+    const index = Number(openBtn.closest('.mileage-plan-row').dataset.index);
+    openWeekBreakdownSheet(index);
+  }
 });
 
 $('mileagePlanEditForm').addEventListener('submit', (e) => {
