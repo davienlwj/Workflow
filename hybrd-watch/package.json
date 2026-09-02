@@ -1,0 +1,20 @@
+{
+  "name": "hybrd-watch",
+  "version": "1.0.0",
+  "description": "HYBR.D companion app for the Amazfit T-Rex 3 Pro (Zepp OS)",
+  "main": "app.js",
+  "scripts": {
+    "dev": "zeus dev",
+    "preview": "zeus preview",
+    "build": "zeus build"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@zeppos/device-types": "^3.0.0",
+    "@zeppos/zeus-cli": "^1.0.0"
+  },
+  "dependencies": {
+    "@zeppos/zml": "^0.0.38"
+  }
+}

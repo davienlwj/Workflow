@@ -4,10 +4,16 @@ A minimal calendar you add to your Home Screen. Type or dictate one line;
 it works out the subject, date, time and place, shows you what it understood,
 and files it.
 
-This repo also hosts [**VO2max Tracker**](vo2max/), a second, independent
-Home Screen app for logging a Norwegian 4x4 training block — see
+This repo also hosts [**VO2max Tracker**](vo2max/) (aka HYBR.D), a second,
+independent Home Screen app for logging a Norwegian 4x4 training block — see
 `vo2max/README.md` for its own install and usage notes. Both apps share the
 same GitHub Pages deployment and live at `/` and `/vo2max/` respectively.
+
+A third project, [**hybrd-watch**](hybrd-watch/), is a Zepp OS companion
+app for the Amazfit T-Rex 3 Pro that puts HYBR.D's VO2max/HR-zone data on
+your wrist — see `hybrd-watch/README.md`. It's a different kind of software
+from the two web apps above (it runs on the watch itself, built with Zepp's
+own tooling), not a third Home Screen app.
 
 > "meeting with Tom at KLCC at 3pm on 12/8"
 

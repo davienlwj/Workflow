@@ -1,0 +1,51 @@
+{
+  "configVersion": "v3",
+  "app": {
+    "appId": 1000000,
+    "appName": "HYBR.D",
+    "appType": "app",
+    "version": {
+      "code": 1,
+      "name": "1.0.0"
+    },
+    "icon": "icon.png",
+    "vender": "davienlwj",
+    "description": "Training status from the HYBR.D VO2max tracker, on your wrist."
+  },
+  "permissions": ["data:os.device.info", "device:os.local_storage"],
+  "runtime": {
+    "apiVersion": {
+      "compatible": "3.0",
+      "target": "4.2",
+      "minVersion": "3.0"
+    }
+  },
+  "targets": {
+    "t-rex-3-pro": {
+      "module": {
+        "page": {
+          "pages": ["page/home/index.page", "page/zones/index.page"]
+        },
+        "app-side": {
+          "path": "app-side/index"
+        },
+        "setting": {
+          "path": "setting/index"
+        }
+      },
+      "platforms": [
+        { "name": "t-rex-3-pro-44mm", "deviceSource": 10682624 },
+        { "name": "t-rex-3-pro-44mm", "deviceSource": 10682625 },
+        { "name": "t-rex-3-pro-44mm", "deviceSource": 10682627 }
+      ],
+      "designWidth": 466
+    }
+  },
+  "i18n": {
+    "en-US": {
+      "appName": "HYBR.D"
+    }
+  },
+  "defaultLanguage": "en-US",
+  "debug": false
+}
