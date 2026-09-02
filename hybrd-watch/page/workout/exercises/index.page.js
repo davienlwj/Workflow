@@ -4,6 +4,8 @@ import { BasePage } from '@zeppos/zml/base-page'
 import { GROUPS, EXERCISES } from '../../../utils/exercises'
 import { TITLE_TEXT, LIST_CONFIG } from 'zosLoader:./index.page.[pf].layout.js'
 
+const CREATE_ROW = { label: '+ Create Exercise' }
+
 Page(
   BasePage({
     state: {
@@ -22,8 +24,9 @@ Page(
         this.state.exercises = []
         this.buildList()
         // Fetched fresh each visit rather than baked into the app, since
-        // custom exercises are added from the phone's Watch settings and
-        // this list should reflect whatever's there right now.
+        // custom exercises can be added from either the phone's Watch
+        // settings or right here, and this list should reflect whatever's
+        // there right now regardless of which.
         this.request({ method: 'GET_CUSTOM_EXERCISES' })
           .then(({ exercises }) => {
             this.state.exercises = exercises
@@ -36,10 +39,36 @@ Page(
       }
     },
     dataArray() {
-      if (this.state.exercises.length === 0 && this.state.groupKey === 'custom') {
-        return [{ label: 'No custom exercises yet - add from phone settings' }]
-      }
-      return this.state.exercises.map((e) => ({ label: e.name }))
+      const rows = this.state.exercises.map((e) => ({ label: e.name }))
+      return this.state.groupKey === 'custom' ? [CREATE_ROW, ...rows] : rows
+    },
+    goToExercise(exercise) {
+      // id and name both travel in the param (pipe-delimited) so the
+      // sets/manage/hub pages never need to re-look-up a custom exercise's
+      // name - only the static built-in library supports that kind of
+      // lookup.
+      replace({ url: 'page/workout/sets/index.page', params: `${exercise.id}|${exercise.name}` })
+    },
+    createExercise() {
+      hmUI.createKeyboard({
+        inputType: hmUI.inputType.CHAR,
+        text: '',
+        onComplete: (kb, result) => {
+          hmUI.deleteKeyboard()
+          const name = (result?.data || '').trim()
+          if (!name) return
+          this.request({ method: 'ADD_CUSTOM_EXERCISE', params: name })
+            .then(({ exercise, error }) => {
+              if (error || !exercise) {
+                hmUI.showToast({ text: error || 'Could not add exercise' })
+                return
+              }
+              this.goToExercise(exercise)
+            })
+            .catch(() => hmUI.showToast({ text: "Couldn't reach the phone" }))
+        },
+        onCancel: () => hmUI.deleteKeyboard(),
+      })
     },
     buildList() {
       const dataArray = this.dataArray()
@@ -50,13 +79,17 @@ Page(
         data_type_config: [{ start: 0, end: dataArray.length, type_id: 1 }],
         data_type_config_count: 1,
         item_click_func: (list, index) => {
+          if (this.state.groupKey === 'custom') {
+            if (index === 0) {
+              this.createExercise()
+              return
+            }
+            const exercise = this.state.exercises[index - 1]
+            if (exercise) this.goToExercise(exercise)
+            return
+          }
           const exercise = this.state.exercises[index]
-          if (!exercise) return
-          // id and name both travel in the param (pipe-delimited) so the
-          // sets/manage/hub pages never need to re-look-up a custom
-          // exercise's name - only the static built-in library supports
-          // that kind of lookup.
-          replace({ url: 'page/workout/sets/index.page', params: `${exercise.id}|${exercise.name}` })
+          if (exercise) this.goToExercise(exercise)
         },
       })
     },

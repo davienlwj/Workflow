@@ -239,8 +239,15 @@ this app's settings and the watch's Zepp app settings. Every app open (and
 **No duplicates.** Same principle as intervals.icu sync: each watch-logged
 workout carries a stable id, and a workout already imported by that id is
 never re-added, so re-checking the same Gist repeatedly is harmless.
-Read-only from this app's side too - nothing is ever written back to the
-Gist.
+
+**Deleting is two-way.** Delete a synced workout here and this app writes
+its id to the Gist's deletion list - the watch picks that up on its next
+sync and removes its own copy too, rather than pushing it right back in.
+The other direction also works: delete it on the watch first, and this app
+skips re-importing it once the watch's next sync reflects the removal.
+Either way, nothing gets written to the Gist except that one deletion
+marker - the workouts and custom exercises fields stay the watch's alone
+to write.
 
 **What doesn't come across:** the watch logs a simplified version of a
 workout (weight, reps, and adjacent-pair supersets, no set-type marking, no
@@ -248,8 +255,9 @@ machine brand, no per-set notes) - once it lands in your history here,
 though, it's a normal workout entry, editable with this app's full tools
 same as anything logged by hand.
 
-**Custom exercises added on the watch** (from its own Zepp app settings,
-not this app) sync over too: the same Gist carries their id/name, and a
+**Custom exercises added on the watch** - either from its own Zepp app
+settings, or created right on the watch mid-workout via its on-screen
+keyboard - sync over too: the same Gist carries their id/name, and a
 workout referencing one that isn't already in your custom exercise list here
 gets it added automatically (as `Bodyweight`, no muscle group, since the
 watch has no picker for those) the first time such a workout comes in - edit

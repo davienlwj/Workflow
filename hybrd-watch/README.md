@@ -50,21 +50,34 @@ warm-up/drop/failure marking, no machine brand, no per-set notes. Everything
 the phone app's fuller editor supports is still there once a workout arrives
 in your history; the watch is a fast logger, not a replacement for it.
 
+### Deleting a workout
+
+Tap any entry in the recent-history list on the idle Workout hub to open it,
+then **Delete Workout**. This removes it from the watch immediately and
+marks it for the phone to remove too on its next sync (or the reverse: if
+you delete a synced workout on the phone first, the watch removes its own
+copy the next time it syncs - see `../vo2max/README.md`'s "Watch workout
+sync" section for how that direction works). Either way, deleting is
+two-way - it doesn't matter which end you delete from.
+
 ### Custom exercises
 
-Not in the built-in library? Add it from the phone: Zepp app → this app's
-settings → **Custom Exercises** → type a name → it's saved immediately (no
-separate button - the field commits as you move away from it). It'll show up
-in a "Custom" group at the end of the watch's group list next time you open
-Workout.
+Not in the built-in library? Add it from the watch itself: open **Custom**
+at the end of the group list (Workout → + Add Exercise → Custom) and tap
+**+ Create Exercise** - this brings up Zepp OS's own on-screen keyboard.
+Or add it from the phone instead: Zepp app → this app's settings →
+**Custom Exercises** → type a name (saved immediately - no separate button,
+the field commits as you move away from it). Either way it syncs to the
+other side and shows up in the watch's "Custom" group and the phone app's
+own exercise library.
 
-Kept deliberately simple to fit the phone settings page's plain text fields:
-name only, no muscle group or equipment picker. A workout that uses one
-still syncs to the phone app normally - the sync also carries along the
-custom exercise's definition, so the phone registers it in its own custom
-exercise list (as `Bodyweight`, no muscle group) the first time such a
-workout comes in, rather than showing up blank. Edit it further there
-anytime, same as one added by hand on the phone.
+Kept deliberately simple: name only, no muscle group or equipment picker
+either way. A workout that uses one still syncs to the phone app normally -
+the sync also carries along the custom exercise's definition, so the phone
+registers it in its own custom exercise list (as `Bodyweight`, no muscle
+group) the first time such a workout comes in, rather than showing up
+blank. Edit it further there anytime, same as one added by hand on the
+phone.
 
 ## Setup
 
@@ -144,8 +157,8 @@ report.
 ```
 app.json                    manifest — targets round, 466px-wide watches (the T-Rex 3 Pro 44mm's bucket; Zepp OS's build tooling resolves the exact device from this shape/width, not a per-model ID)
 app.js                      device-app entry point; owns globalData.liveWorkout, the in-progress workout
-app-side/index.js           side service: handles GET_LIFT_STATUS / SAVE_WORKOUT / GET_WORKOUTS / GET_LAST_SET / GET_CUSTOM_EXERCISES
-app-side/gist.js            pushes the local workout history and custom exercises to the configured GitHub Gist
+app-side/index.js           side service: GET_LIFT_STATUS / SAVE_WORKOUT / GET_WORKOUTS / DELETE_WORKOUT / GET_LAST_SET / GET_CUSTOM_EXERCISES / ADD_CUSTOM_EXERCISE / SYNC_NOW; syncWithGist() does the full two-way reconcile (pull deletions, apply them locally, push what's left) before every Gist write
+app-side/gist.js            pushes the local workout history, custom exercises and the (echoed-through) deletedWorkoutIds to the Gist; also reads deletedWorkoutIds back so the watch can act on a deletion made from the phone
 setting/index.js            phone-side settings page: Gist ID/token, and adding or removing custom exercises
 utils/constants.js          shared defaults and colors
 utils/exercises.js          the built-in exercise library, generated from ../vo2max/js/exercises.js - id/name/group only, group precomputed from that file's RADAR_GROUP_FOR rollup; regenerate rather than hand-edit if the source library changes
@@ -157,6 +170,7 @@ page/workout/exercises/     exercise list filtered to the chosen group (scrollab
 page/workout/sets/          weight/reps stepper for one exercise - "Add Set" repeatedly, then "Done"
 page/workout/manage/        per-exercise controls: add more sets, move up/down, superset with next, remove
 page/workout/summary/       shown after Finish: duration, volume, exercise and set counts
+page/workout/history/       tap a past workout from the hub's history list to open this - Delete Workout, or Back
 assets/t-rex-3-pro.r/       app icon (the ".r" suffix is Zepp's round-screen asset-group convention, not a typo)
 ```
 

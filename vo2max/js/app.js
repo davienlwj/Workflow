@@ -33,7 +33,7 @@ import {
   fetchWellnessHistory as intervalsFetchWellnessHistory,
   fetchActivityStreams as intervalsFetchActivityStreams,
 } from './intervals.js';
-import { fetchGistData } from './gistSync.js';
+import { fetchGistData, markWorkoutDeleted } from './gistSync.js';
 import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
   exerciseById, searchExercises,
@@ -1922,6 +1922,7 @@ $('woDelete').addEventListener('click', () => {
   deleteWorkout(workoutEditingId);
   workouts = loadWorkouts();
   if (toDelete) deleteWorkoutFromGoogle(toDelete);
+  if (toDelete?.watchWorkoutId) deleteWatchWorkoutFromGist(toDelete);
   closeWorkoutSheet();
   renderAll();
   toast('Workout deleted');
@@ -2553,6 +2554,22 @@ $('intervalsSyncNow').addEventListener('click', () => { syncIntervalsRuns(); });
 // by the next successful one - same purpose as intervalsNeedsReconnect above.
 let watchSyncNeedsReconnect = false;
 
+/** Best-effort, same pattern as deleteWorkoutFromGoogle above: marks a
+ *  watch-originated workout deleted on the Gist so the watch removes its
+ *  own copy next time it syncs, instead of pushing it right back in. A
+ *  failure here (offline, sync not connected) just means the watch won't
+ *  find out about this deletion until some future successful mark - the
+ *  workout is already gone from this app's own history regardless. */
+async function deleteWatchWorkoutFromGist(workout) {
+  const s = settings.watchSync;
+  if (!s?.gistId || !s?.token) return;
+  try {
+    await markWorkoutDeleted(s.gistId, s.token, workout.watchWorkoutId);
+  } catch (err) {
+    console.error('marking watch workout deleted failed', err);
+  }
+}
+
 /** Registers any watch-added custom exercise (from the watch's own Watch
  *  settings, synced alongside its workouts) that isn't already known here,
  *  by id - so a workout referencing one resolves to a real name/entry
@@ -2575,12 +2592,16 @@ function registerWatchCustomExercises(watchCustomExercises) {
 
 /** Imports every not-yet-seen watch workout (deduped by watchWorkoutId,
  *  the stable id the watch stamps on each finished workout - see
- *  hybrd-watch/utils/liveWorkout.js), returning how many were added. */
-function importNewWatchWorkouts(watchWorkouts) {
+ *  hybrd-watch/utils/liveWorkout.js), returning how many were added.
+ *  Skips anything already in deletedWorkoutIds - a workout deleted here
+ *  earlier that the watch hasn't caught up and removed on its end yet
+ *  would otherwise look "new" again and get re-imported right back in. */
+function importNewWatchWorkouts(watchWorkouts, deletedWorkoutIds = []) {
   const existingIds = new Set(workouts.map((w) => w.watchWorkoutId).filter(Boolean));
+  const deletedIds = new Set(deletedWorkoutIds);
   let count = 0;
   for (const w of watchWorkouts) {
-    if (!w.watchWorkoutId || existingIds.has(w.watchWorkoutId)) continue;
+    if (!w.watchWorkoutId || existingIds.has(w.watchWorkoutId) || deletedIds.has(w.watchWorkoutId)) continue;
     addWorkout(w);
     count += 1;
   }
@@ -2594,9 +2615,9 @@ async function syncWatchWorkouts({ silent = false } = {}) {
   let imported = null;
   let failure = null;
   try {
-    const { workouts: watchWorkouts, customExercises: watchCustomExercises } = await fetchGistData(s.gistId, s.token);
+    const { workouts: watchWorkouts, customExercises: watchCustomExercises, deletedWorkoutIds } = await fetchGistData(s.gistId, s.token);
     registerWatchCustomExercises(watchCustomExercises);
-    imported = importNewWatchWorkouts(watchWorkouts);
+    imported = importNewWatchWorkouts(watchWorkouts, deletedWorkoutIds);
     settings = { ...settings, watchSync: { ...settings.watchSync, lastSyncedAt: new Date().toISOString() } };
     saveSettings(settings);
     watchSyncNeedsReconnect = false;
@@ -2646,11 +2667,11 @@ $('watchSyncConnect').addEventListener('click', async () => {
   const token = $('watchSyncToken').value.trim();
   if (!gistId || !token) { toast('Fill in both the Gist ID and token first'); return; }
   try {
-    const { workouts: watchWorkouts, customExercises: watchCustomExercises } = await fetchGistData(gistId, token);
+    const { workouts: watchWorkouts, customExercises: watchCustomExercises, deletedWorkoutIds } = await fetchGistData(gistId, token);
     settings = { ...settings, watchSync: { gistId, token, enabled: true, lastSyncedAt: new Date().toISOString() } };
     saveSettings(settings);
     registerWatchCustomExercises(watchCustomExercises);
-    const imported = importNewWatchWorkouts(watchWorkouts);
+    const imported = importNewWatchWorkouts(watchWorkouts, deletedWorkoutIds);
     watchSyncNeedsReconnect = false;
     renderAll();
     renderWatchSyncStatus();

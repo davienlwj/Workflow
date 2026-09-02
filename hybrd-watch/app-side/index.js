@@ -1,6 +1,6 @@
 import { BaseSideService, settingsLib } from '@zeppos/zml/base-side'
 import { DEFAULT_SETTINGS, MAX_WORKOUT_HISTORY } from '../utils/constants'
-import { pushWorkoutsToGist } from './gist'
+import { fetchDeletedWorkoutIds, pushWorkoutsToGist } from './gist'
 
 const WORKOUTS_KEY = 'watchWorkouts'
 const CUSTOM_EXERCISES_KEY = 'customExercises'
@@ -45,20 +45,54 @@ function loadCustomExercises() {
   }
 }
 
+function saveCustomExercises(exercises) {
+  settingsLib.setItem(CUSTOM_EXERCISES_KEY, JSON.stringify(exercises))
+}
+
 function getCustomExercises(res) {
   res(null, { exercises: loadCustomExercises() })
 }
 
-/** Pushes the full local history (and the current custom exercise list, so
- *  the phone can register any it's missing) to the configured Gist.
- *  Returns an error message string on failure (including "not configured"),
- *  or null on success - never throws, so a save always completes locally
- *  regardless of what happens here. */
-async function trySyncToGist(workouts) {
+/** Adds one custom exercise (from the watch's own keyboard, mid-workout -
+ *  see page/workout/exercises/index.page.js) and syncs it out immediately,
+ *  same as the ones added from the phone's Watch settings - both live in
+ *  the same customExercises list and sync the same way. */
+async function addCustomExercise(res, name) {
+  const trimmed = (name || '').trim()
+  if (!trimmed) {
+    res(null, { error: 'Name cannot be empty' })
+    return
+  }
+  const exercise = { id: `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, name: trimmed }
+  saveCustomExercises([...loadCustomExercises(), exercise])
+  const syncError = await syncWithGist()
+  res(null, { exercise, syncError })
+}
+
+/** Full two-way sync: first checks the Gist for any workout the phone has
+ *  since deleted (see ../../vo2max/js/gistSync.js's markWorkoutDeleted)
+ *  and removes matching entries from local history, then pushes whatever's
+ *  left (plus the current custom exercise list) back - always echoing the
+ *  same deletedWorkoutIds back unchanged, so this push can never
+ *  accidentally erase a deletion the phone recorded a moment before this
+ *  ran. Returns an error message string on failure (including "not
+ *  configured"), or null on success - never throws, so a save or a local
+ *  delete always completes regardless of what happens here. */
+async function syncWithGist() {
   const settings = getSettings()
   if (!settings.gistId || !settings.githubToken) return 'Gist ID or token not set in this watch\'s settings'
   try {
-    await pushWorkoutsToGist(settings.gistId, settings.githubToken, workouts, loadCustomExercises())
+    const deletedWorkoutIds = await fetchDeletedWorkoutIds(settings.gistId, settings.githubToken)
+    let workouts = loadWorkouts()
+    if (deletedWorkoutIds.length > 0) {
+      const deleted = new Set(deletedWorkoutIds)
+      const remaining = workouts.filter((w) => !deleted.has(w.watchWorkoutId))
+      if (remaining.length !== workouts.length) {
+        workouts = remaining
+        saveWorkouts(workouts)
+      }
+    }
+    await pushWorkoutsToGist(settings.gistId, settings.githubToken, workouts, loadCustomExercises(), deletedWorkoutIds)
     return null
   } catch (err) {
     return `${err.status ? `HTTP ${err.status}` : 'network error'}: ${err.message}`
@@ -68,13 +102,24 @@ async function trySyncToGist(workouts) {
 async function saveWorkout(res, workout) {
   const workouts = [workout, ...loadWorkouts()].slice(0, MAX_WORKOUT_HISTORY)
   saveWorkouts(workouts)
-  const syncError = await trySyncToGist(workouts)
+  const syncError = await syncWithGist()
   res(null, { ok: true, syncError })
 }
 
 async function syncNow(res) {
-  const syncError = await trySyncToGist(loadWorkouts())
+  const syncError = await syncWithGist()
   res(null, { syncError })
+}
+
+/** Deletes one workout from local history (by the watchWorkoutId stamped
+ *  on it when finished - see utils/liveWorkout.js) and syncs the removal
+ *  to the Gist immediately, so the phone doesn't re-import it on its next
+ *  check. */
+async function deleteWorkout(res, watchWorkoutId) {
+  const workouts = loadWorkouts().filter((w) => w.watchWorkoutId !== watchWorkoutId)
+  saveWorkouts(workouts)
+  const syncError = await syncWithGist()
+  res(null, { ok: true, syncError })
 }
 
 /** The weight/reps of the most recent logged set for `exerciseId`, from
@@ -98,6 +143,7 @@ function getWorkouts(res) {
   const workouts = loadWorkouts()
   res(null, {
     workouts: workouts.map((w) => ({
+      watchWorkoutId: w.watchWorkoutId,
       date: w.date,
       name: w.name,
       exerciseCount: w.exercises.length,
@@ -160,10 +206,14 @@ AppSideService(
         saveWorkout(res, req.params)
       } else if (req.method === 'GET_WORKOUTS') {
         getWorkouts(res)
+      } else if (req.method === 'DELETE_WORKOUT') {
+        deleteWorkout(res, req.params)
       } else if (req.method === 'GET_LAST_SET') {
         getLastSet(res, req.params)
       } else if (req.method === 'GET_CUSTOM_EXERCISES') {
         getCustomExercises(res)
+      } else if (req.method === 'ADD_CUSTOM_EXERCISE') {
+        addCustomExercise(res, req.params)
       } else if (req.method === 'SYNC_NOW') {
         syncNow(res)
       }

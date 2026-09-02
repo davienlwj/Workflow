@@ -15,9 +15,9 @@
   "permissions": ["data:os.device.info", "device:os.local_storage"],
   "runtime": {
     "apiVersion": {
-      "compatible": "3.0",
+      "compatible": "4.0",
       "target": "4.2",
-      "minVersion": "3.0"
+      "minVersion": "4.0"
     }
   },
   "targets": {
@@ -31,7 +31,8 @@
             "page/workout/exercises/index.page",
             "page/workout/sets/index.page",
             "page/workout/manage/index.page",
-            "page/workout/summary/index.page"
+            "page/workout/summary/index.page",
+            "page/workout/history/index.page"
           ]
         },
         "app-side": {

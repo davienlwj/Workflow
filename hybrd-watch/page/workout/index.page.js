@@ -132,12 +132,17 @@ Page(
         )
       } else {
         rows.forEach((w, i) => {
-          this.state.dynamicWidgets.push(
-            hmUI.createWidget(hmUI.widget.TEXT, {
-              ...historyRowStyle(i),
-              text: `${w.date}  ${w.name || 'Workout'} · ${w.exerciseCount} ex · ${w.setCount} sets`,
+          const row = hmUI.createWidget(hmUI.widget.TEXT, {
+            ...historyRowStyle(i),
+            text: `${w.date}  ${w.name || 'Workout'} · ${w.exerciseCount} ex · ${w.setCount} sets`,
+          })
+          row.addEventListener(hmUI.event.CLICK_UP, () => {
+            replace({
+              url: 'page/workout/history/index.page',
+              params: `${w.watchWorkoutId}|${w.date}|${w.name || 'Workout'}`,
             })
-          )
+          })
+          this.state.dynamicWidgets.push(row)
         })
       }
       this.state.dynamicWidgets.push(
