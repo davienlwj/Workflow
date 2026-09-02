@@ -146,8 +146,10 @@ Page(
         hmUI.createWidget(hmUI.widget.BUTTON, {
           ...PRIMARY_BUTTON,
           click_func: () => {
+            // Straight to picking the first exercise, skipping the empty
+            // "0 exercises" in-progress screen this would otherwise land on.
             startLiveWorkout()
-            this.render()
+            push({ url: 'page/workout/groups/index.page' })
           },
         })
       )

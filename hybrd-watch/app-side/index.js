@@ -88,6 +88,23 @@ function saveWorkout(res, workout) {
   trySyncToGist(workouts)
 }
 
+/** The weight/reps of the most recent logged set for `exerciseId`, from
+ *  saved workout history (newest first - see saveWorkout below), for
+ *  defaulting the stepper to what was actually lifted last time instead of
+ *  a generic starting point. Null fields if this exercise has no history
+ *  yet. */
+function getLastSet(res, exerciseId) {
+  for (const workout of loadWorkouts()) {
+    const exercise = workout.exercises.find((e) => e.exerciseId === exerciseId)
+    if (exercise && exercise.sets.length > 0) {
+      const last = exercise.sets[exercise.sets.length - 1]
+      res(null, { weight: last.weight, reps: last.reps })
+      return
+    }
+  }
+  res(null, { weight: null, reps: null })
+}
+
 function getWorkouts(res) {
   const workouts = loadWorkouts()
   res(null, {
@@ -112,6 +129,8 @@ AppSideService(
         saveWorkout(res, req.params)
       } else if (req.method === 'GET_WORKOUTS') {
         getWorkouts(res)
+      } else if (req.method === 'GET_LAST_SET') {
+        getLastSet(res, req.params)
       }
     },
     onRun() {},

@@ -30,9 +30,13 @@ Page(
     },
     onInit(exerciseId) {
       this.state.exerciseId = exerciseId
+      // Same exercise already logged earlier in *this* session - reuse
+      // instantly, no round trip needed (the common "another set at the
+      // same weight" case).
       const prev = lastSet(exerciseId)
       this.state.weight = prev?.weight ?? DEFAULT_WEIGHT
       this.state.reps = prev?.reps ?? DEFAULT_REPS
+      this.state.needsHistoryLookup = !prev
     },
     build() {
       const exercise = EXERCISES.find((e) => e.id === this.state.exerciseId)
@@ -60,6 +64,24 @@ Page(
         text: this.countLabel(),
       })
       hmUI.createWidget(hmUI.widget.BUTTON, { ...DONE_BUTTON, click_func: () => back() })
+
+      // First time this exercise comes up in the session - check past
+      // workouts for what was actually lifted last time, so the stepper
+      // doesn't start from a generic default. Shown weight/reps update in
+      // place if this resolves after the user's already looking at it;
+      // fine either way since it's a normal BLE round trip, typically
+      // under a second.
+      if (this.state.needsHistoryLookup) {
+        this.request({ method: 'GET_LAST_SET', params: this.state.exerciseId })
+          .then(({ weight, reps }) => {
+            if (weight == null && reps == null) return
+            if (weight != null) this.state.weight = weight
+            if (reps != null) this.state.reps = reps
+            this.state.weightText.setProperty(hmUI.prop.TEXT, this.formatWeight())
+            this.state.repsText.setProperty(hmUI.prop.TEXT, String(this.state.reps))
+          })
+          .catch(() => {})
+      }
     },
     formatWeight() {
       const w = this.state.weight

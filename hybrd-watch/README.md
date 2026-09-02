@@ -22,16 +22,21 @@ tooling), not a web page.
 - **HR Zones** — your full zone table (LTHR-based or resting-HR/Karvonen,
   whichever is set as primary), with the interval target zone picked out in
   orange. Computed on-device from your settings, no network needed.
-- **Workout** — log a strength workout right from the gym floor: pick
-  exercises from the full built-in library (grouped by body part, scrollable),
-  key in weight/reps per set with a +/− stepper, reorder or superset
-  exercises, and watch a live timer and running volume total while you go.
-  Finishing shows a quick summary (time, volume, exercises, sets) and syncs
-  the workout to the phone app's history via a GitHub Gist — see "Workout
-  sync" below. **Runs stay on Zepp's own built-in workout tracking**, which
-  already syncs to intervals.icu and from there into the phone app; this
-  page is for strength training only, which intervals.icu has no equivalent
-  for.
+- **Workout** — log a strength workout right from the gym floor: tapping
+  "+ New Workout" (or "+ Add Exercise") goes straight to picking one from the
+  full built-in library (grouped by body part, scrollable), then a +/− weight/
+  reps stepper per set. The stepper starts from what you actually lifted last
+  time for that exercise — the most recent set within the current session if
+  there is one, otherwise the last time you logged it in any past workout —
+  rather than a generic default, so repeat sets (the common case) are often
+  just "Add Set" with no adjustment at all. Reorder or superset exercises from
+  the exercise-management screen, and watch a live timer and running volume
+  total while you go. Finishing shows a quick summary (time, volume,
+  exercises, sets) and syncs the workout to the phone app's history via a
+  GitHub Gist — see "Workout sync" below. **Runs stay on Zepp's own built-in
+  workout tracking**, which already syncs to intervals.icu and from there
+  into the phone app; this page is for strength training only, which
+  intervals.icu has no equivalent for.
 
 Only the built-in exercise library is loggable from the watch (not any custom
 exercises you've added on the phone), and each set only records weight, reps
