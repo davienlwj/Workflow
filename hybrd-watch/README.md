@@ -61,7 +61,7 @@ settings icon)** and fill in:
 
 - **intervals.icu sync** — Athlete ID and API Key from step 1.
 - **Zones & baseline** — resting HR, max HR, LTHR, baseline VO2max/date, and
-  which zone model is primary. Match whatever's set in the phone app's own
+  and a toggle for which zone model is primary. Match whatever's set in the phone app's own
   Settings screen so the two agree; the watch app ships with the same
   defaults the phone app does, so if you haven't touched either yet they're
   already in sync.
@@ -78,7 +78,7 @@ app.json                    manifest — targets round, 466px-wide watches (the 
 app.js                      device-app entry point
 app-side/index.js           side service: handles GET_STATUS / GET_ZONES requests from the watch
 app-side/intervals.js       trimmed port of ../vo2max/js/intervals.js's intervals.icu client
-setting/index.js            phone-side settings page (Athlete ID, API Key, HR/baseline fields, zone model)
+setting/index.js            phone-side settings page (Athlete ID, API Key, HR/baseline fields, zone model toggle)
 utils/zones.js              zone-table math, ported from ../vo2max/js/zones.js — keep the two in sync by hand
 utils/constants.js          shared defaults (mirrors vo2max/js/store.js's DEFAULT_SETTINGS) and colors
 page/home/                  "Today" page: VO2max, resting HR, sleep, run status

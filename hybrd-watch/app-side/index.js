@@ -6,10 +6,12 @@ import { fetchLatestWellness, fetchRunStatus } from './intervals'
 function getSettings() {
   const settings = { ...DEFAULT_SETTINGS }
   for (const key of Object.keys(DEFAULT_SETTINGS)) {
+    if (key === 'primaryZoneModel') continue // derived below from the settings page's toggle
     const raw = settingsLib.getItem(key)
     if (raw == null || raw === '') continue
     settings[key] = typeof DEFAULT_SETTINGS[key] === 'number' ? Number(raw) : raw
   }
+  settings.primaryZoneModel = settingsLib.getItem('useRhrZones') === 'true' ? 'rhr' : 'lthr'
   return settings
 }
 

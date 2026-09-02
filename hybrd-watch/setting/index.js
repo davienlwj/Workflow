@@ -2,9 +2,6 @@ import { DEFAULT_SETTINGS } from '../utils/constants'
 
 AppSettingsPage({
   build(props) {
-    const primaryZoneModel =
-      props.settingsStorage.getItem('primaryZoneModel') || DEFAULT_SETTINGS.primaryZoneModel
-
     return View({}, [
       Section(
         {
@@ -56,16 +53,9 @@ AppSettingsPage({
             placeholder: 'YYYY-MM-DD',
             settingsKey: 'baselineDate',
           }),
-          Select({
-            label: 'Zone model',
-            value: primaryZoneModel,
-            options: [
-              { name: 'LTHR-based', value: 'lthr' },
-              { name: 'Resting-HR (Karvonen)', value: 'rhr' },
-            ],
-            onChange: (value) => {
-              props.settingsStorage.setItem('primaryZoneModel', value)
-            },
+          Toggle({
+            label: 'Use resting-HR (Karvonen) zones instead of LTHR',
+            settingsKey: 'useRhrZones',
           }),
         ]
       ),
