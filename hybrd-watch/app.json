@@ -33,12 +33,7 @@
           "path": "setting/index"
         }
       },
-      "platforms": [
-        { "name": "t-rex-3-pro-44mm", "deviceSource": 10682624, "st": "r" },
-        { "name": "t-rex-3-pro-44mm", "deviceSource": 10682625, "st": "r" },
-        { "name": "t-rex-3-pro-44mm", "deviceSource": 10682627, "st": "r" }
-      ],
-      "designWidth": 466
+      "platforms": [{ "st": "r", "dw": 466 }]
     }
   },
   "i18n": {

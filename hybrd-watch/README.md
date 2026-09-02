@@ -74,7 +74,7 @@ button needed.
 ## Layout
 
 ```
-app.json                    manifest — targets the T-Rex 3 Pro 44mm specifically (466x466 round, Zepp OS 5.0)
+app.json                    manifest — targets round, 466px-wide watches (the T-Rex 3 Pro 44mm's bucket; Zepp OS's build tooling resolves the exact device from this shape/width, not a per-model ID)
 app.js                      device-app entry point
 app-side/index.js           side service: handles GET_STATUS / GET_ZONES requests from the watch
 app-side/intervals.js       trimmed port of ../vo2max/js/intervals.js's intervals.icu client
@@ -83,7 +83,7 @@ utils/zones.js              zone-table math, ported from ../vo2max/js/zones.js �
 utils/constants.js          shared defaults (mirrors vo2max/js/store.js's DEFAULT_SETTINGS) and colors
 page/home/                  "Today" page: VO2max, resting HR, sleep, run status
 page/zones/                 "HR Zones" page: the full zone table
-assets/t-rex-3-pro/         app icon
+assets/t-rex-3-pro.r/       app icon (the ".r" suffix is Zepp's round-screen asset-group convention, not a typo)
 ```
 
 ## Why a separate Zepp OS project instead of extending the PWA
