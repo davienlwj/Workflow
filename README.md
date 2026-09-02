@@ -38,8 +38,10 @@ Screen*. It launches full screen with no browser chrome.
 ### Hosting it on GitHub Pages
 
 `.github/workflows/pages.yml` runs the tests and publishes the site on every
-push. Turn it on once: **Settings → Pages → Build and deployment → Source:
-GitHub Actions**. The app then lives at `https://<username>.github.io/<repo>/`.
+push to `main` (only `main` - feature branches build and test but don't
+deploy, so work in progress never overwrites what's live). Turn it on once:
+**Settings → Pages → Build and deployment → Source: GitHub Actions**. The
+app then lives at `https://<username>.github.io/<repo>/`.
 
 GitHub Pages only serves **public** repositories on the free plan. If the repo
 is private, either make it public — nothing here is secret, and your tasks

@@ -26,6 +26,14 @@ jobs:
 
   deploy:
     needs: test
+    # Deploys only from main. Every claude/** branch matches the push
+    # trigger above (so tests still run on each push, same as before), but
+    # two long-lived feature branches once both matched here too - whichever
+    # one pushed last silently clobbered the other's features on the live
+    # site, since neither branch had the other's work. Merging to main is
+    # now the only thing that goes live; a feature branch's own pushes just
+    # get tested.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
