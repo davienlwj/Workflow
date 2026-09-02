@@ -21,6 +21,7 @@ import {
   EXERCISE_LIST_CONFIG,
   EMPTY_EXERCISES_TEXT,
   IDLE_BUTTON,
+  SYNC_NOW_BUTTON,
   ADD_EXERCISE_BUTTON,
   FINISH_BUTTON,
   DISCARD_BUTTON,
@@ -148,8 +149,20 @@ Page(
             startLiveWorkout()
             replace({ url: 'page/workout/groups/index.page' })
           },
+        }),
+        hmUI.createWidget(hmUI.widget.BUTTON, {
+          ...SYNC_NOW_BUTTON,
+          click_func: () => this.syncNow(),
         })
       )
+    },
+    syncNow() {
+      hmUI.showToast({ text: 'Syncing…' })
+      this.request({ method: 'SYNC_NOW' })
+        .then(({ syncError }) => {
+          hmUI.showToast({ text: syncError ? `Sync failed: ${syncError}` : 'Synced to Gist' })
+        })
+        .catch(() => hmUI.showToast({ text: "Couldn't reach the phone" }))
     },
     finish() {
       const workout = getLiveWorkout()
@@ -157,9 +170,13 @@ Page(
       const summaryParams = [elapsedMs(), totalVolume(), workout.exercises.length, totalSetCount()].join('|')
       const finished = finishLiveWorkout()
       if (!finished) return
-      this.request({ method: 'SAVE_WORKOUT', params: finished }).catch(() => {
-        hmUI.showToast({ text: "Couldn't reach the phone - workout not saved" })
-      })
+      this.request({ method: 'SAVE_WORKOUT', params: finished })
+        .then(({ syncError }) => {
+          if (syncError) hmUI.showToast({ text: `Saved, but sync failed: ${syncError}` })
+        })
+        .catch(() => {
+          hmUI.showToast({ text: "Couldn't reach the phone - workout not saved" })
+        })
       this.render()
       push({ url: 'page/workout/summary/index.page', params: summaryParams })
     },

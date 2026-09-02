@@ -65,6 +65,19 @@ export const IDLE_BUTTON = {
   text_size: px(27),
 }
 
+export const SYNC_NOW_BUTTON = {
+  text: 'Sync now',
+  x: Math.floor((DEVICE_WIDTH - px(160)) / 2),
+  y: px(414),
+  w: px(160),
+  h: px(36),
+  radius: px(18),
+  normal_color: 0x1a1a1a,
+  press_color: 0x333333,
+  color: 0x999999,
+  text_size: px(18),
+}
+
 // ---- in-progress state ----
 
 export const TIMER_TEXT = {

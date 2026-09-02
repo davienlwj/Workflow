@@ -45,27 +45,32 @@ function getCustomExercises(res) {
   res(null, { exercises: loadCustomExercises() })
 }
 
-/** Best-effort: pushes the full local history (and the current custom
- *  exercise list, so the phone can register any it's missing) to the
- *  configured Gist. Never throws - a save always succeeds locally
- *  regardless of whether the network is reachable right now, and the next
- *  successful sync (after any future save) re-pushes the complete list
- *  anyway, so nothing is lost. */
+/** Pushes the full local history (and the current custom exercise list, so
+ *  the phone can register any it's missing) to the configured Gist.
+ *  Returns an error message string on failure (including "not configured"),
+ *  or null on success - never throws, so a save always completes locally
+ *  regardless of what happens here. */
 async function trySyncToGist(workouts) {
   const settings = getSettings()
-  if (!settings.gistId || !settings.githubToken) return
+  if (!settings.gistId || !settings.githubToken) return 'Gist ID or token not set in this watch\'s settings'
   try {
     await pushWorkoutsToGist(settings.gistId, settings.githubToken, workouts, loadCustomExercises())
+    return null
   } catch (err) {
-    console.log(`gist sync failed: ${err.message}`)
+    return `${err.status ? `HTTP ${err.status}` : 'network error'}: ${err.message}`
   }
 }
 
-function saveWorkout(res, workout) {
+async function saveWorkout(res, workout) {
   const workouts = [workout, ...loadWorkouts()].slice(0, MAX_WORKOUT_HISTORY)
   saveWorkouts(workouts)
-  res(null, { ok: true })
-  trySyncToGist(workouts)
+  const syncError = await trySyncToGist(workouts)
+  res(null, { ok: true, syncError })
+}
+
+async function syncNow(res) {
+  const syncError = await trySyncToGist(loadWorkouts())
+  res(null, { syncError })
 }
 
 /** The weight/reps of the most recent logged set for `exerciseId`, from
@@ -155,6 +160,8 @@ AppSideService(
         getLastSet(res, req.params)
       } else if (req.method === 'GET_CUSTOM_EXERCISES') {
         getCustomExercises(res)
+      } else if (req.method === 'SYNC_NOW') {
+        syncNow(res)
       }
     },
     onRun() {},
