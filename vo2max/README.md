@@ -35,9 +35,12 @@ Dashboard as the place they come together.
 
 - **Dashboard** — a month calendar grid at the top (every day that has
   something logged shows a small icon: a run gets the running-figure glyph,
-  a workout gets the dumbbell glyph, a day with both gets both), six stat
-  tiles below it (runs logged, workouts logged, mileage this week, volume
-  this week, days since your last run, days since your last workout) — plus
+  a workout gets the dumbbell glyph, a day with both gets both — plus, if
+  the Run tab's Races card has a target race date set, that day gets a
+  flag glyph, set automatically the moment you save the race's date, no
+  separate step), six stat
+  tiles below it (sessions logged, workouts logged, mileage this week, volume
+  this week, days since your last session, days since your last workout) — plus
   Resting HR and Sleep tiles once intervals.icu sync is connected (see
   below) — and a combined **recent activity** feed — the last few runs and workouts,
   newest first, each tagged with a small running-figure or dumbbell icon
@@ -46,11 +49,32 @@ Dashboard as the place they come together.
   edit or delete it), plus **+ Log run** and **+ Log workout** actions that
   open the respective log popup pre-filled with that date — this is the
   only place logging happens for a specific day; Run and Workout's own
-  *+ Log* buttons always default to today.
+  *+ Log* buttons always default to today. The race day's popup instead
+  shows a **Race day** row naming the target race — tap it to jump
+  straight to the Races edit sheet.
+
+  A day can also be **pre-planned** ahead of time instead of (or before)
+  actually logging it: the day popup's **+ Plan run** / **+ Plan workout**
+  buttons (shown whenever that kind hasn't been logged or planned for that
+  day yet) open a small form — a run plan picks a run type (reusing the
+  same growable Easy/Long/Threshold/VO2max list runs are logged with) and
+  an optional target distance; a workout plan optionally picks one of your
+  saved Routines. A planned day gets the same running-figure/dumbbell
+  glyph as a logged one, just light grey instead of brand orange, both on
+  the calendar grid and in that day's **Planned** section — where each
+  entry has a **Start** action (tap
+  the row) that jumps straight into the real Log/Workout form, pre-filled
+  with the plan's details (a routine's exercises pre-load exactly like
+  picking that routine from *Start Workout* already does), plus a small ✕
+  to drop the plan without logging anything. The plan itself is only
+  cleared once that real entry is actually saved — backing out of the
+  pre-filled form without saving leaves it exactly as it was, so a plan
+  never gets silently lost to a half-started log.
 - **Run** — the cardio detail view: sessions logged, average session HR,
-  days since your last session, a VO2max trend chart labeling each point
-  with its exact value, a total-mileage bar chart filterable by
-  week/month/year, and the full chronological session list (tap one to edit
+  days since your last session, a total-mileage scatter-and-line chart
+  filterable by week/month/year (each point labeled with its exact km, the
+  running total shown below the chart), and the full chronological session
+  list (tap one to edit
   or delete it — *Add to Calendar* there downloads a standard `.ics` file
   for that session that Apple Calendar, Google Calendar, or Outlook can all
   import directly). *+ Log run* opens the same popup as the Dashboard
@@ -65,6 +89,54 @@ Dashboard as the place they come together.
   quality) still display and export to `.ics` correctly; editing one keeps
   that history intact even though the edit form itself no longer shows
   those fields.
+  Below the log button, a **Races** card holds your target race's details
+  plus a weekly mileage plan building toward it. The top half is the race
+  itself — name, date (with a live day-count: "N days to go" / "Race day!"
+  / "N days ago"), location, distance, goal time and notes, any of which
+  can be left blank; that date is also what puts the flag glyph on the
+  Dashboard calendar (see above). Below a **Mileage plan** sub-heading, a
+  minimalist progress bar tracks the current week of a distance-goal plan
+  against your actually-logged runs: km completed vs. that week's target
+  (with km remaining alongside it), a phase note (Build/Deload/Peak/Taper/
+  Race week), and a per-run-type breakdown below the bar (Long run/Easy/
+  Tempo/Intervals, whichever of those actually have km) - all recomputed
+  live from whichever runs you've logged this week. Before the plan's first week
+  starts it shows a "Plan starts …" preview instead of a bar; after its
+  last week ends it just says the plan is complete. **Edit** opens a sheet
+  with the race fields, then the plan's start date (the Monday Week 1
+  begins) and one compact row per week (total km / long run km / note),
+  each removable, plus **+ Add week** to extend the plan — so the number
+  of weeks, and every week's targets, are fully yours to adjust. Tapping a
+  week's number (e.g. "W1") opens that week's own run-type breakdown -
+  Easy/Tempo/Intervals as editable percentages of that week's total km
+  (long run stays whatever's on the week row itself, shown here read-only
+  alongside its own % of the total), each defaulting to its phase's split
+  from the Training guide below until you override it; the km next to each
+  percentage recalculates live as you type, and a running "accounted for"
+  line adds long run + the three percentages together so you can see how
+  close it is to 100%. Setting
+  (or changing) either the race date or the start date automatically
+  grows or shrinks the week rows so the plan's last week always lands on
+  race week — shrinking keeps the earlier weeks' values as-is and just
+  drops the tail, growing copies the last existing week's targets onto
+  the new ones (blank note) rather than starting them at zero. That only
+  fires when a date field itself changes (and once, self-healing, when
+  you open the sheet) — a manual +Add/✕ afterward stands as-is until a
+  date changes again, never silently overwritten on save. A **Training
+  guide** accordion below the progress bar documents the source 22-week
+  plan's method in full — each phase's weekly session mix (how many easy
+  runs, tempo runs, intervals, and the long run, plus what each one is
+  for) and its target mileage split (% of the week that should be long
+  run / easy / tempo / intervals), plus the standalone notes (starting
+  base, peak long run being 17–18km rather than the full 21.1km, the
+  25–28% quality-work ceiling, and why cutback weeks aren't optional) -
+  fixed reference text, not tied to whatever numbers you've actually
+  typed into your own weeks. The mileage plan itself defaults to (and the
+  edit sheet's **Load default 22-week plan** button can reset it back to)
+  that same 22-week Base → Build → Peak → Taper → Race template, starting
+  the following Monday the first time you open the app; every number in
+  it is just a starting point, and the race fields start blank and are
+  never guessed at.
 - **Workout** — the strength detail view: workouts logged, this week's
   total volume, days since your last workout, a muscle-balance radar chart
   (sets logged, filterable to week/month/year/all, rolled up into 9 general
@@ -100,7 +172,10 @@ Dashboard as the place they come together.
   defaults. A **Google Calendar sync** section (see below) automatically
   pushes every run and workout to its own dedicated calendar once connected,
   and an **intervals.icu sync** section automatically imports your runs
-  (e.g. synced there from a Zepp-paired watch) — see below for both.
+  (e.g. synced there from a Zepp-paired watch) — see below for both. Cycling,
+  Stairmaster, Elliptical, RowErg, and SkiErg sessions aren't auto-synced —
+  log those by hand from the Session type picker on any Log/Edit sheet,
+  which also splits a run into Easy/Long/Threshold/VO2max.
   Below that, an expandable **Zones & protocol reference**
   section: both the LTHR-based and RHR-based (Karvonen) zone tables, the
   interval target zone highlighted, and a protocol quick-reference card —
@@ -169,9 +244,20 @@ each time the app is opened, complete with distance/duration/pace/HR - and
 **VO2max**, too, when your watch estimated one that day: intervals.icu's
 daily wellness log carries a VO2max reading alongside resting HR and
 sleep, and an imported run's VO2max reading field is auto-filled from it
-instead of being left for you to type in by hand. Lifts aren't covered —
-intervals.icu has no equivalent to this app's per-exercise, per-set
-strength data, so workouts still need to be logged by hand regardless.
+instead of being left for you to type in by hand. Only runs auto-sync -
+cycling, stairmaster, elliptical, rowing, skiing, and structured lifts
+(intervals.icu has no equivalent to this app's per-exercise, per-set
+strength data) all still need to be logged by hand, from the **Session
+type** picker on any Log/Edit sheet:
+
+| Session type | Metrics |
+|---|---|
+| **Run** (further split into Easy/Long/Threshold/VO2max, or a custom one you add) | Distance, avg pace, avg/max HR |
+| **Cycling** | Distance, avg speed, avg cadence (RPM), avg power (W), avg/max HR |
+| **Stairmaster** | Floors climbed, step rate, level, avg/max HR |
+| **Elliptical** | Distance, resistance level, incline, stride rate, avg/max HR |
+| **RowErg** | Distance (m), avg pace (/500m), stroke rate (SPM), avg power (W), avg/max HR |
+| **SkiErg** | Distance (m), avg pace (/500m), stroke rate (SPM), avg power (W), avg/max HR |
 
 Unlike Strava or Google, intervals.icu needs no OAuth flow and no
 backend — just a personal API key you generate yourself, so setup is a
@@ -216,8 +302,8 @@ Month.
 trace from intervals.icu: a bar chart of time spent in each HR zone (using
 this app's own zone table from Settings, not intervals.icu's), a heart
 rate line graph over the run's elapsed time, and a pace line graph over the
-same. Manually-logged runs don't have this button - there's no raw stream
-data behind them to chart.
+same. Manually-logged sessions don't have this button - there's no raw
+stream data behind them to chart.
 
 ## Zone math
 
@@ -234,24 +320,98 @@ values like 146–158 rather than whatever a lone `round()` of each bound
 would give. `../tests/vo2max-zones.test.mjs` pins the exact bpm bands for
 the defaults in this app.
 
+## Share your workout (or run)
+
+A **Save PNG** button opens a preview sheet offering shareable 1080×1920
+PNGs, each drawn entirely client-side on a `<canvas>` (no backend, no
+third-party image service). A tab picker at the top of the sheet only
+shows the designs that apply - a workout gets Summary/Muscles/PRs/Receipt,
+a run gets Summary/Zones/Receipt:
+
+- **Summary** - the Strava-style stat card: workout name/date/duration/
+  volume/exercise+set counts/new PRs (or, for a run, distance as the hero
+  stat plus duration/avg pace/avg-max HR, plus a compact Warm up/Cool down
+  line each - only when that phase was actually toggled on and logged). A
+  **transparent background** with only a translucent stat panel painted,
+  so posting it as an Instagram Story sticker drops it straight onto
+  whatever photo is already there, the same way Strava's own
+  post-activity share works.
+- **Muscles** *(workout only)* - the same front/back body-diagram artwork
+  used elsewhere in the app, highlighting every muscle group this
+  workout's exercises targeted, each with its own name-and-percentage
+  callout label placed directly next to that region on the diagram.
+- **PRs** *(workout only)* - every exercise this workout touched, its
+  all-time best weight and estimated 1RM, with a "NEW" badge on whichever
+  one this workout actually just beat.
+- **Zones** *(run only)* - the run's full details (distance/duration/avg
+  pace/avg+max HR, plus Warm up/Cool down lines when logged) and, below
+  that, an HR-over-time line graph bordered like the rest of the card, with
+  a dotted threshold line and a small colored "Z1".."Z5" label at each
+  heart-rate zone's lower bound - the same zone table (LTHR or RHR,
+  whichever model is primary in Settings) the in-app Activity Detail chart
+  uses. The graph only appears for a run synced from intervals.icu, since
+  that's the only source with a raw HR-over-time stream to plot; a
+  manually-logged
+  run (only single avg/max HR numbers, no time series) still gets the
+  details section, just without a graph beneath it.
+- **Receipt** - a torn-paper strip styled like a printed gym/running
+  receipt (deliberately not transparent - a receipt is paper, not a
+  sticker): logo letterhead, dashed dividers, dotted-leader line items
+  (exercises as items priced in kg for a workout; a WARM UP line, then
+  distance/duration/pace/HR, then a COOL DOWN line for a run - the warm
+  up/cool down lines only appear when that phase was logged), a bold
+  totals block, a "THANK YOU / COME AGAIN" footer, and a decorative
+  barcode.
+
+Switching tabs re-renders the preview `<img>` in place (each option's PNG
+is cached the first time it's generated so re-visiting a tab is instant);
+**Save / Share** hands whichever one is currently shown to your device's
+native share sheet (`navigator.share`) when available, so Instagram shows
+up as a direct target - on a desktop browser (or anywhere Web Share
+doesn't support image files) it just downloads the PNG instead.
+
+**Save PNG** appears in three places for workouts, all opening the same
+preview sheet: the finish-workout summary (next to Save as Routine/Done);
+the workout sheet mid-live-session (so you don't have to wait until
+you're done and possibly rushed); and the workout sheet when reopening an
+already-saved workout from the calendar/history later, so you can come
+back and post it whenever you actually have time. A workout logged via
+the live timer has its duration persisted (`workout.durationMs`)
+specifically so it's still available for that last case; one logged
+directly for a past date has no duration to show and the Summary/Receipt
+cards just omit that stat. For a run, the same button lives on the Edit
+session sheet (Run tab -> tap a logged session), and on the **run summary
+sheet** shown right after saving a Run from the Log form (mirroring the
+finish-workout summary above) - one row each for Warm up/Workout/Cool
+down, Warm up and Cool down only appearing when actually carried out.
+Every other Session type (Cycling, Stairmaster, ...) just gets the plain
+"Session saved" confirmation instead, since there's no equivalent
+before/after-phase structure to summarize for them.
+
 ## Layout
 
 ```
 index.html                  markup and the four popup sheets (log/edit session, log/edit workout, exercise progress)
 css/style.css               the whole light theme
-js/store.js                 localStorage CRUD for settings, sessions, workouts and custom exercises
+js/store.js                 localStorage CRUD for settings, sessions, workouts, custom exercises,
+                              the mileage/races plan, and planned (not-yet-logged) runs/workouts
 js/zones.js                 zone tables, computed from settings
 js/block.js                 cardio progress stats — pure functions
 js/workout.js                strength progress stats — PRs, last-performance, volume; pure functions
+js/mileagePlan.js            weekly mileage-goal plan math (current week, progress vs. logged
+                              runs) — pure functions of plan + sessions + "now"
 js/exercises.js              the built-in exercise library (name, equipment, muscles) and the radar chart's muscle-group rollup
 js/muscleDiagram.js          stacks the muscle-diagram image assets for an exercise's muscles
-js/icons.js                  the running-figure / dumbbell pictograms (calendar, recent activity)
-js/chart.js                 dependency-free SVG charts: VO2max trend, mileage bars, exercise progress
+js/icons.js                  the running-figure / dumbbell / race-flag pictograms (calendar, recent activity)
+js/chart.js                 dependency-free SVG charts: mileage trend, exercise progress
 js/ics.js                   builds a per-session .ics file for calendar export, and the shared
                               summary/description text + event resources used by gcal.js
 js/gcal.js                  Google Identity Services auth + Calendar API calls for automatic sync
-js/intervals.js              intervals.icu API-key auth + activity fetch/mapping for run import
-                              (no backend needed - see the README's intervals.icu sync section)
+js/intervals.js              intervals.icu API-key auth + activity fetch/mapping for run
+                              import (no backend needed - see the README's intervals.icu
+                              sync section)
+js/shareCard.js               renders the Save-PNG cards (summary/muscles/PRs/zones/receipt) as
+                              shareable PNGs (canvas-drawn, no backend) - see "Share your workout" below
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/icon-source.png        the orange wordmark logo the app icons are built from

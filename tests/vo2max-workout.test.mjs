@@ -146,9 +146,21 @@ test('workoutSummaryByExercise reports sets/reps/volume per exercise, warm-ups e
   ]);
   const summary = workoutSummaryByExercise(w);
   assert.deepEqual(summary, [
-    { exerciseId: 'bench-press', name: 'Bench Press', setCount: 2, totalReps: 14, volume: 60 * 8 + 60 * 6 },
-    { exerciseId: 'squat', name: 'Back Squat', setCount: 1, totalReps: 5, volume: 80 * 5 },
+    { exerciseId: 'bench-press', name: 'Bench Press', setCount: 2, totalReps: 14, volume: 60 * 8 + 60 * 6, supersetId: null },
+    { exerciseId: 'squat', name: 'Back Squat', setCount: 1, totalReps: 5, volume: 80 * 5, supersetId: null },
   ]);
+});
+
+test('workoutSummaryByExercise carries supersetId through unchanged', () => {
+  const w = makeWorkout('2026-08-18', [
+    { exerciseId: 'bench-press', supersetId: 'superset-1', sets: [{ weight: 60, reps: 8, type: 'normal' }] },
+    { exerciseId: 'squat', supersetId: 'superset-1', sets: [{ weight: 80, reps: 5, type: 'normal' }] },
+    { exerciseId: 'bench-press', sets: [{ weight: 40, reps: 10, type: 'normal' }] },
+  ]);
+  const summary = workoutSummaryByExercise(w);
+  assert.equal(summary[0].supersetId, 'superset-1');
+  assert.equal(summary[1].supersetId, 'superset-1');
+  assert.equal(summary[2].supersetId, null);
 });
 
 test('workoutSummaryByExercise adds the user\'s bodyweight for a Bodyweight-equipment exercise', () => {
@@ -157,7 +169,7 @@ test('workoutSummaryByExercise adds the user\'s bodyweight for a Bodyweight-equi
   ]);
   const summary = workoutSummaryByExercise(w, undefined, 80);
   assert.deepEqual(summary[0], {
-    exerciseId: 'dip', name: 'Dip', setCount: 2, totalReps: 16, volume: 80 * 10 + 100 * 6,
+    exerciseId: 'dip', name: 'Dip', setCount: 2, totalReps: 16, volume: 80 * 10 + 100 * 6, supersetId: null,
   });
 });
 

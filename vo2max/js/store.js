@@ -5,6 +5,8 @@
  * of silently losing data.
  */
 
+import { defaultMileagePlan, DEFAULT_RACE } from './mileagePlan.js';
+
 const SETTINGS_KEY = 'vo2max.settings.v1';
 const SESSIONS_KEY = 'vo2max.sessions.v1';
 const WORKOUTS_KEY = 'vo2max.workouts.v1';
@@ -12,6 +14,9 @@ const CUSTOM_EXERCISES_KEY = 'vo2max.customExercises.v1';
 const LIVE_WORKOUT_KEY = 'vo2max.liveWorkout.v1';
 const ROUTINES_KEY = 'vo2max.routines.v1';
 const CUSTOM_BRANDS_KEY = 'vo2max.customBrands.v1';
+const CUSTOM_SESSION_TYPES_KEY = 'vo2max.customSessionTypes.v1';
+const MILEAGE_PLAN_KEY = 'vo2max.mileagePlan.v1';
+const PLANNED_ACTIVITIES_KEY = 'vo2max.plannedActivities.v1';
 
 export const DEFAULT_SETTINGS = {
   theme: 'light', // 'light' | 'dark'
@@ -224,6 +229,15 @@ export function addRoutine(routine) {
   return record;
 }
 
+export function updateRoutine(id, patch) {
+  const routines = loadRoutines();
+  const idx = routines.findIndex((r) => r.id === id);
+  if (idx === -1) return null;
+  routines[idx] = { ...routines[idx], ...patch, id };
+  saveRoutines(routines);
+  return routines[idx];
+}
+
 export function deleteRoutine(id) {
   const routines = loadRoutines().filter((r) => r.id !== id);
   saveRoutines(routines);
@@ -255,6 +269,33 @@ export function addCustomBrand(name) {
   return brands;
 }
 
+/** User-added session type labels, layered on top of the built-in
+ *  Interval/Easy run/Long run presets in app.js - same role/shape as
+ *  loadCustomBrands above. */
+export function loadCustomSessionTypes() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_SESSION_TYPES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomSessionTypes(types) {
+  localStorage.setItem(CUSTOM_SESSION_TYPES_KEY, JSON.stringify(types));
+}
+
+export function addCustomSessionType(name) {
+  const types = loadCustomSessionTypes();
+  if (!types.includes(name)) {
+    types.push(name);
+    saveCustomSessionTypes(types);
+  }
+  return types;
+}
+
 /** In-progress "today's workout" live session, so backgrounding/killing the
  *  PWA mid-workout at the gym doesn't lose it. Shape: { startedAt, date,
  *  name, notes, exercises } - same as readWorkoutForm()'s output plus
@@ -276,6 +317,59 @@ export function clearLiveWorkout() {
   localStorage.removeItem(LIVE_WORKOUT_KEY);
 }
 
+/** The weekly mileage-goal plan (total km + long run km + note per week,
+ *  anchored to a Monday start date) - see mileagePlan.js for the pure math
+ *  built on top of this. Defaults to a fresh plan starting next Monday the
+ *  first time this is read, same as any other first-run default. */
+export function loadMileagePlan() {
+  try {
+    const raw = localStorage.getItem(MILEAGE_PLAN_KEY);
+    if (!raw) return defaultMileagePlan();
+    const parsed = JSON.parse(raw);
+    if (!parsed?.startDate || !Array.isArray(parsed.weeks)) return defaultMileagePlan();
+    return { ...parsed, race: { ...DEFAULT_RACE, ...(parsed.race || {}) } };
+  } catch {
+    return defaultMileagePlan();
+  }
+}
+
+export function saveMileagePlan(plan) {
+  localStorage.setItem(MILEAGE_PLAN_KEY, JSON.stringify(plan));
+}
+
+/** Pre-planned runs/workouts for a date - shown on the Dashboard calendar
+ *  ahead of time and "started" straight into the real Log/Workout form.
+ *  At most one plan per date+kind (`kind`: 'run' | 'lift') - saving a new
+ *  one for a date+kind that already has one replaces it. Shape: { id,
+ *  date, kind, note, ...kind-specific fields (runType/targetDistanceKm for
+ *  a run, routineId for a lift) }. */
+export function loadPlannedActivities() {
+  try {
+    const raw = localStorage.getItem(PLANNED_ACTIVITIES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function savePlannedActivities(list) {
+  localStorage.setItem(PLANNED_ACTIVITIES_KEY, JSON.stringify(list));
+}
+
+export function addOrReplacePlannedActivity(entry) {
+  const list = loadPlannedActivities().filter((p) => !(p.date === entry.date && p.kind === entry.kind));
+  const record = { id: `planned-${makeId()}`, ...entry };
+  list.push(record);
+  savePlannedActivities(list);
+  return record;
+}
+
+export function deletePlannedActivity(id) {
+  savePlannedActivities(loadPlannedActivities().filter((p) => p.id !== id));
+}
+
 export function exportAll() {
   return JSON.stringify({
     settings: loadSettings(),
@@ -284,6 +378,9 @@ export function exportAll() {
     customExercises: loadCustomExercises(),
     routines: loadRoutines(),
     customBrands: loadCustomBrands(),
+    customSessionTypes: loadCustomSessionTypes(),
+    mileagePlan: loadMileagePlan(),
+    plannedActivities: loadPlannedActivities(),
     exportedAt: new Date().toISOString(),
   }, null, 2);
 }
@@ -296,4 +393,7 @@ export function importAll(json) {
   if (Array.isArray(data.customExercises)) saveCustomExercises(data.customExercises);
   if (Array.isArray(data.routines)) saveRoutines(data.routines);
   if (Array.isArray(data.customBrands)) saveCustomBrands(data.customBrands);
+  if (Array.isArray(data.customSessionTypes)) saveCustomSessionTypes(data.customSessionTypes);
+  if (data.mileagePlan?.startDate && Array.isArray(data.mileagePlan.weeks)) saveMileagePlan(data.mileagePlan);
+  if (Array.isArray(data.plannedActivities)) savePlannedActivities(data.plannedActivities);
 }

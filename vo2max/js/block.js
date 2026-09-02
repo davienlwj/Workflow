@@ -43,6 +43,23 @@ export function todayIso(now = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
+export function fmtDateLong(iso) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+  });
+}
+
+/** Milliseconds -> "mm:ss", or "h:mm:ss" past an hour. */
+export function fmtElapsed(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const mm = String(m).padStart(2, '0');
+  const ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
 export function daysSinceLastSession(sessions, now = todayIso()) {
   if (sessions.length === 0) return null;
   const last = [...sessions].sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -58,15 +75,6 @@ export function averageSessionHR(sessions) {
   const all = [...direct, ...legacy];
   if (all.length === 0) return null;
   return Math.round(all.reduce((sum, v) => sum + v, 0) / all.length);
-}
-
-/** VO2max readings over time, baseline first, for the trend chart. */
-export function vo2maxSeries(settings, sessions) {
-  const points = [{ date: settings.baselineDate, value: settings.baselineVO2max, label: 'Baseline' }];
-  sessions
-    .filter((s) => s.vo2max != null)
-    .forEach((s) => points.push({ date: s.date, value: s.vo2max, label: null }));
-  return points.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function round1(n) {

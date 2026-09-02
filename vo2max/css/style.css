@@ -34,6 +34,15 @@
   --accent-dim: #4a4a4a;
 }
 
+/* Mobile browsers (Android Chrome especially) paint a translucent blue
+   overlay on anything pressed/held unless this is reset - barely
+   noticeable on a quick tap, but glaring on the ~350ms long-press this
+   app uses to start a drag-to-reorder gesture (routine and workout
+   exercise lists). Reset everywhere rather than only on the drag
+   handles, since the highlight can land on the whole pressed element,
+   not just the glyph inside it. */
+* { -webkit-tap-highlight-color: transparent; }
+
 * { box-sizing: border-box; }
 
 /* Only html scrolls (the standard scrolling element). Giving body its own
@@ -260,6 +269,7 @@ main.has-live-bar {
 .form[hidden] { display: none; }
 
 .row { display: flex; gap: 10px; max-width: 100%; }
+.row[hidden] { display: none; }
 .row .field { flex: 1; min-width: 0; }
 
 .field {
@@ -272,6 +282,8 @@ main.has-live-bar {
   overflow: hidden;
 }
 
+.field[hidden] { display: none; }
+
 .field em { color: var(--dimmer); font-style: normal; }
 
 .field-toggle {
@@ -281,6 +293,23 @@ main.has-live-bar {
   font-size: 15px;
   font-weight: 700;
   color: var(--ink);
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+/* Same text styling as .field-toggle's Warm up/Cool down labels, for a
+   plain (non-toggle) section heading like the run form's "Workout" label -
+   margin zeroed since .form's own flex gap already spaces it from its
+   siblings, same as .field-toggle relies on. Same border-top/padding-top
+   as .field-toggle too, so Warm up/Workout/Cool down read as three
+   evenly-separated sections of the run form. */
+.field-section-label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
 }
 .field-toggle input[type="checkbox"] {
   width: 20px;
@@ -410,6 +439,12 @@ button { font-family: var(--font-mono); }
   font-size: 15px;
 }
 
+.ghost-btn.small {
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
 .danger-btn {
   background: transparent;
   border: 1px solid var(--dim);
@@ -421,9 +456,15 @@ button { font-family: var(--font-mono); }
 }
 
 .actions { display: flex; gap: 10px; justify-content: flex-end; }
+.actions[hidden] { display: none; }
 .actions .primary { flex: 1; }
 .actions-row { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
 .actions-row + .primary.block { margin-top: 18px; }
+
+/* The exercise detail sheet's Close/Edit/Delete row sits directly against
+   the Volume chart above it with no gap at all - 8px, matching the other
+   "list/chart-adjacent element" gaps fixed elsewhere on the Lift tab. */
+#exDetailActions { margin-top: 8px; }
 
 /* ------------------------------------------------------------ card, stats */
 
@@ -489,6 +530,281 @@ button { font-family: var(--font-mono); }
   padding: 10px 6px;
 }
 
+/* ---------------------------------------------------------- mileage plan */
+
+.mileage-plan-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.mileage-plan-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.mileage-plan-week {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.mileage-plan-note {
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.mileage-plan-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.mileage-plan-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: #FF6C2D;
+  transition: width 0.2s ease;
+}
+
+.mileage-plan-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.mileage-plan-bar-labels strong { color: var(--ink); }
+
+.mileage-plan-longrun {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.mileage-plan-longrun strong { color: var(--ink); }
+
+.mileage-plan-type-breakdown {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mileage-plan-type-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.mileage-plan-type-row .mono { color: var(--ink); }
+
+.mileage-plan-empty-state {
+  font-size: 14px;
+  color: var(--dim);
+}
+
+.mileage-plan-empty-state strong { color: var(--ink); }
+
+.mileage-plan-sublabel {
+  margin: 14px 0 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+}
+
+/* The Races card's "Training guide" - a .settings-details block nested
+   inside a card that already has its own edge padding/background, so its
+   own margin/background are zeroed and it spans full width instead of
+   compounding the outer padding. */
+.mileage-plan-guide {
+  margin: 14px 0 0;
+  background: transparent;
+}
+
+.mileage-plan-guide .settings-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.phase-guide-block + .phase-guide-block {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.phase-guide-sessions {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.phase-guide-goal {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--dim);
+}
+
+.phase-guide-split {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.phase-guide-notes {
+  margin: 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--dim);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Edit-plan sheet: one compact row per week - unlabeled inputs (a week
+   number prefix plus placeholder text stands in for labels) so 13+ rows
+   stay scannable instead of each carrying three full label/field pairs. */
+.mileage-plan-start-row {
+  margin-bottom: 12px;
+}
+
+.mileage-plan-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.mileage-plan-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.mileage-plan-row-num {
+  flex: 0 0 auto;
+  width: 28px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+/* It's a <button> (opens that week's run-type breakdown - see
+   .week-breakdown-* below) rather than a plain label - reset it back to
+   looking like the plain text label it visually replaced. */
+button.mileage-plan-row-open {
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 2px;
+}
+
+.mileage-plan-input {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  padding: 8px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.mileage-plan-row .mp-total, .mileage-plan-row .mp-longrun { flex: 0 0 62px; }
+.mileage-plan-row .mp-note { flex: 1 1 auto; }
+
+.mileage-plan-row-remove {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: var(--dim);
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px;
+}
+
+/* #weekBreakdownSheet: one row per run type, an editable % input and a
+   read-only computed km figure that updates live as the % changes. */
+.week-breakdown-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.week-breakdown-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.week-breakdown-label {
+  flex: 1 1 auto;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.week-breakdown-pct-input {
+  flex: 0 0 62px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  padding: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  text-align: right;
+}
+
+.week-breakdown-pct-sign {
+  flex: 0 0 auto;
+  color: var(--dim);
+  font-size: 14px;
+}
+
+.week-breakdown-km {
+  flex: 0 0 64px;
+  text-align: right;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.week-breakdown-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.week-breakdown-accounted {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--dim);
+}
+
 .chart-svg { width: 100%; height: auto; display: block; }
 .chart-grid { stroke: var(--line); stroke-width: 1; }
 .chart-axis { fill: var(--dimmer); font-size: 9px; }
@@ -500,13 +816,19 @@ button { font-family: var(--font-mono); }
 .chart-dot-baseline { fill: var(--ink); stroke: var(--ink); }
 .chart-bar { fill: var(--accent-dim); stroke: var(--accent); stroke-width: 1; }
 
-/* Run tab only: the VO2max trend chart's point marker and the mileage
-   bar chart's bars get the brand orange, matching the rest of the app's
-   orange accents. */
-#chartWrap .chart-dot { fill: #FF6C2D; stroke: #FF6C2D; }
-#chartWrap .chart-value-label, #mileageChartWrap .chart-value-label { fill: #FF6C2D; }
-#mileageChartWrap .chart-bar { fill: #FF6C2D; stroke: #FF6C2D; }
+/* Run tab only: the mileage trend chart's dots, line and value labels get
+   the brand orange, matching the rest of the app's orange accents. */
+#mileageChartWrap .chart-dot { fill: #FF6C2D; stroke: #FF6C2D; }
+#mileageChartWrap .chart-line { stroke: #FF6C2D; }
+#mileageChartWrap .chart-value-label { fill: #FF6C2D; }
 .chart-empty { color: var(--dimmer); font-size: 14px; text-align: center; padding: 40px 0; }
+
+.mileage-total-footer {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--dim);
+  text-align: right;
+}
 .chart-radar-fill { fill: var(--accent); fill-opacity: 0.12; stroke: none; }
 /* Muscle balance radar's axis labels, data shape (fill/outline) and point
    markers get the brand orange - the percentage under each label
@@ -610,9 +932,37 @@ button { font-family: var(--font-mono); }
 
 .muscle-group-detail-pct { font-size: 12px; color: var(--dim); text-align: right; }
 
+/* ------------------------------------------------------- share card preview */
+
+.share-card-preview-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  max-height: 60vh;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 4px 0;
+}
+
+.share-card-preview-img {
+  max-width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  display: block;
+}
+
+.share-card-preview-loading {
+  color: var(--dim);
+  font-size: 14px;
+}
+
 /* -------------------------------------------------------------- scopes */
 
 .scopes { display: flex; gap: 8px; margin: 8px 0 10px; }
+.scopes[hidden] { display: none; }
 
 .scope {
   flex: 1;
@@ -691,18 +1041,12 @@ button { font-family: var(--font-mono); }
 
 .cal-cell.has-activity { color: var(--ink); border-color: var(--dim); font-weight: 700; }
 
-/* Diagonal hatching, not just a border, so today reads at a glance even
+/* A solid fill, not just a border, so today reads at a glance even
    among a grid of otherwise-identical cells. */
 .cal-cell.today {
-  border-color: var(--dim);
-  color: #FF6C2D;
-  background-image: repeating-linear-gradient(
-    45deg,
-    var(--line) 0,
-    var(--line) 2px,
-    transparent 2px,
-    transparent 7px
-  );
+  border-color: #FF6C2D;
+  background: #FF6C2D;
+  color: #ffffff;
 }
 
 .cal-cell.selected {
@@ -710,18 +1054,6 @@ button { font-family: var(--font-mono); }
   border-color: var(--accent);
   color: var(--bg);
   font-weight: 700;
-}
-
-/* Re-applied after .selected's background shorthand clears it, in a
-   lighter stripe color so the hatch still shows on the accent fill. */
-.cal-cell.today.selected {
-  background-image: repeating-linear-gradient(
-    45deg,
-    var(--accent) 0,
-    var(--accent) 2px,
-    transparent 2px,
-    transparent 7px
-  );
 }
 
 /* Running-figure / dumbbell pictograms: calendar cells, the day panel's
@@ -732,6 +1064,7 @@ button { font-family: var(--font-mono); }
 .cal-icons { display: flex; gap: 3px; }
 .cal-icons .glyph-icon { width: 11px; height: 11px; color: #FF6C2D; }
 .cal-cell.selected .glyph-icon { color: var(--bg); }
+.cal-cell.today .glyph-icon { color: #ffffff; }
 
 .cal-legend {
   display: flex;
@@ -751,6 +1084,14 @@ button { font-family: var(--font-mono); }
    than the runner's, so it reads smaller at the same box size - bump it up
    to match the run icon's visual weight. */
 .cal-legend-item .glyph-workout { width: 16px; height: 16px; }
+
+/* A planned (not yet logged) run/workout gets the same glyph, just light
+   grey instead of brand orange - reads as a "ghost" of the solid icon a
+   completed one gets, so the calendar and legend stay one consistent
+   icon system rather than needing new art. Placed after every other
+   .glyph-icon color rule above (same specificity, so source order
+   decides) so it wins regardless of which cell state it's drawn on. */
+.glyph-icon.glyph-planned { color: #b3b3b3; }
 
 .cal-day-panel {
   display: flex;
@@ -793,10 +1134,39 @@ button { font-family: var(--font-mono); }
 
 .cal-day-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 4px;
 }
-.cal-day-actions .ghost-btn { flex: 1; }
+.cal-day-actions .ghost-btn { flex: 1 1 120px; }
+
+/* A planned run/workout row - same card as .cal-day-item, but its content
+   is two separate actions (Start, and a small ✕ to drop the plan) rather
+   than the whole row being one tap target like a logged session/workout's
+   row is. */
+.cal-planned-item { cursor: default; }
+
+.cal-planned-start {
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.cal-planned-remove {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: var(--dim);
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px;
+  cursor: pointer;
+}
 
 /* --------------------------------------------------------------- history */
 
@@ -830,7 +1200,14 @@ button { font-family: var(--font-mono); }
 #routinesSectionTitle { margin-bottom: 16px; }
 #addRoutineTabBtn { margin-top: 8px; }
 
-.routine-delete {
+/* Same 0px-gap issue in the popup version of this list (#routinesSheet,
+   reached via "Start Workout" -> "Select Routine"): "+ Create Routine"
+   sits directly against the list, which sits directly against the
+   Close button, with nothing carrying any spacing between them. */
+#addRoutineBtn { margin-bottom: 8px; }
+#routinesList { margin-bottom: 8px; }
+
+.routine-delete, .routine-edit {
   background: transparent;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -855,11 +1232,34 @@ button { font-family: var(--font-mono); }
   padding: 8px 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
+  /* Long-press drag reads the pointer's own movement (see the pointer
+     handlers) - touch-action:none stops the browser also trying to
+     scroll/zoom the sheet underneath the same gesture. */
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
-.routine-selected-remove {
+.routine-selected-item.dragging {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  border-color: var(--accent);
+  position: relative;
+  z-index: 1;
+}
+
+.routine-selected-item.swapping { border-color: #FF6C2D; }
+
+.routine-drag-handle {
+  color: var(--dimmer);
+  font-size: 18px;
+  flex-shrink: 0;
+  cursor: grab;
+}
+
+.routine-selected-info { flex: 1; min-width: 0; }
+
+.routine-selected-remove, .routine-selected-swap {
   background: transparent;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -869,7 +1269,12 @@ button { font-family: var(--font-mono); }
   font-size: 13px;
   line-height: 1;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+.routine-selected-swap .glyph-swap { width: 14px; height: 14px; color: var(--dim); }
 
 .wo-picker-result.selected {
   background: var(--accent);
@@ -960,14 +1365,29 @@ button { font-family: var(--font-mono); }
   padding: 10px 16px calc(20px + var(--safe-b));
   max-height: 88vh;
   overflow-y: auto;
+  transition: transform 0.2s ease;
+}
+
+.sheet.dragging {
+  transition: none;
 }
 
 .grabber {
+  position: relative;
   width: 36px;
   height: 4px;
   border-radius: 2px;
   background: var(--line);
   margin: 4px auto 14px;
+  touch-action: none;
+}
+
+/* Invisible padding around the visual bar so the drag handle is easy to
+   grab on a touchscreen without changing the sheet's layout spacing. */
+.grabber::before {
+  content: '';
+  position: absolute;
+  inset: -16px -40px;
 }
 
 /* ------------------------------------------------------------ live workout */
@@ -1082,6 +1502,9 @@ button { font-family: var(--font-mono); }
   margin-bottom: 18px;
 }
 
+/* Sits directly against the Save as Routine/Done row with no gap otherwise. */
+#summaryShare { margin-bottom: 8px; }
+
 .summary-exercise-row {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -1091,6 +1514,26 @@ button { font-family: var(--font-mono); }
 
 .summary-exercise-name { font-weight: 700; font-size: 14px; }
 .summary-exercise-stats { font-size: 12px; color: var(--dim); margin-top: 2px; }
+
+/* A paired superset in the finish-workout summary - same dashed-border
+   grouping as .wo-superset-group during the live workout itself. */
+.summary-superset-group {
+  border: 1px dashed var(--accent);
+  border-radius: 14px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.summary-superset-group .summary-exercise-row { border-color: transparent; }
+.summary-superset-label {
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 
 /* ----------------------------------------------------------------- toast */
 
@@ -1212,6 +1655,19 @@ button { font-family: var(--font-mono); }
   gap: 14px;
 }
 
+.wo-exercise-block, .wo-superset-group {
+  /* The drag handle's long-press timer starts on any touch inside the
+     block, but a real finger easily overlaps the name/meta text next to
+     the small handle glyph - without this, iOS reads that as a text
+     long-press and pops its own Copy/Look Up callout (with its own blue
+     selection highlight) on top of the drag. Doesn't affect the kg/reps
+     <input> fields - those keep their native text editing regardless of
+     an ancestor's user-select. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .wo-exercise-block {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -1244,6 +1700,9 @@ button { font-family: var(--font-mono); }
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+
+.wo-superset-label-left { display: flex; align-items: center; gap: 6px; }
+.wo-superset-label-left .wo-drag-handle { color: var(--accent); }
 
 .wo-superset-unpair {
   background: transparent;
@@ -1281,6 +1740,25 @@ button { font-family: var(--font-mono); }
   font-size: 13px;
   line-height: 1;
   flex-shrink: 0;
+}
+
+.wo-drag-handle {
+  color: var(--dimmer);
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+  padding: 4px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.wo-exercise-block.dragging, .wo-superset-group.dragging {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  border-color: var(--accent);
+  position: relative;
+  z-index: 1;
 }
 
 .wo-last-performance {

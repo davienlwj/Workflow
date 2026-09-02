@@ -76,7 +76,7 @@ test('sessionToICS includes each interval\'s logged duration', () => {
 
 test('sessionToICS builds an easy-run summary and description', () => {
   const unfolded = sessionToICS(easyRunSession).replaceAll('\r\n ', '');
-  assert.match(unfolded, /SUMMARY:Easy run: 45min\\, 8\.2km/);
+  assert.match(unfolded, /SUMMARY:Easy: 45min\\, 8\.2km/);
   assert.match(unfolded, /Duration: 45 min/);
   assert.match(unfolded, /Avg pace: 5:30 min\/km/);
   assert.match(unfolded, /Distance: 8\.2 km/);
@@ -88,7 +88,7 @@ test('sessionToICS builds an easy-run summary and description', () => {
 test('sessionToICS builds a long-run summary distinct from an easy run', () => {
   const longRun = { ...easyRunSession, type: 'long-run', durationMin: 110, distanceKm: 18 };
   const unfolded = sessionToICS(longRun).replaceAll('\r\n ', '');
-  assert.match(unfolded, /SUMMARY:Long run: 110min\\, 18km/);
+  assert.match(unfolded, /SUMMARY:Long: 110min\\, 18km/);
 });
 
 test('sessionToICS treats a session with no type field as interval (pre-dates the type field)', () => {
@@ -116,7 +116,7 @@ test('sessionToICS builds a run-style summary for an interval session logged wit
     notes: '',
   };
   const unfolded = sessionToICS(newStyleInterval).replaceAll('\r\n ', '');
-  assert.match(unfolded, /SUMMARY:4x4: 32min\\, 6km/);
+  assert.match(unfolded, /SUMMARY:VO2max: 32min\\, 6km/);
   assert.match(unfolded, /Duration: 32 min/);
   assert.match(unfolded, /Average HR: 178 bpm/);
   assert.doesNotMatch(unfolded, /Intervals completed/);
