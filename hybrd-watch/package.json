@@ -11,8 +11,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@zeppos/device-types": "^3.0.0",
-    "@zeppos/zeus-cli": "^1.0.0"
+    "@zeppos/device-types": "^3.0.0"
   },
   "dependencies": {
     "@zeppos/zml": "^0.0.38"
