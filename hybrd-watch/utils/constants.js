@@ -1,16 +1,6 @@
-// Defaults mirror vo2max/js/store.js's DEFAULT_SETTINGS, so a watch that
-// hasn't been configured yet agrees with a freshly-installed phone app.
 export const DEFAULT_SETTINGS = {
-  baselineVO2max: 46,
-  baselineDate: '2026-08-16',
-  restingHR: 54,
-  maxHR: 194,
-  lthr: 181,
-  primaryZoneModel: 'lthr', // 'lthr' | 'rhr'
-  intervalsAthleteId: '',
-  intervalsApiKey: '',
-  gistId: '',
-  githubToken: '',
+  gistId: '', // the secret Gist's id, shared with the phone app - see setting/index.js
+  githubToken: '', // GitHub personal access token, gist scope
 }
 
 export const MAX_WORKOUT_HISTORY = 20 // oldest trimmed off locally once exceeded

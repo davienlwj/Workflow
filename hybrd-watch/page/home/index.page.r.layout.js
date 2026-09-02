@@ -8,7 +8,7 @@ export const { width: DEVICE_WIDTH, height: DEVICE_HEIGHT } = getDeviceInfo()
 export const TITLE_TEXT = {
   text: 'HYBR.D',
   x: px(40),
-  y: px(40),
+  y: px(50),
   w: DEVICE_WIDTH - px(80),
   h: px(36),
   color: DIM,
@@ -17,54 +17,61 @@ export const TITLE_TEXT = {
   align_v: hmUI.align.CENTER_V,
 }
 
-export const VO2MAX_TEXT = {
+export const DAYS_TEXT = {
   text: '--',
-  x: px(40),
-  y: px(84),
-  w: DEVICE_WIDTH - px(80),
-  h: px(96),
+  x: px(30),
+  y: px(120),
+  w: DEVICE_WIDTH - px(60),
+  h: px(64),
   color: WHITE,
-  text_size: px(84),
+  text_size: px(48),
   align_h: hmUI.align.CENTER_H,
   align_v: hmUI.align.CENTER_V,
 }
 
-export const VO2MAX_SUB_TEXT = {
-  text: 'VO2max',
-  x: px(40),
-  y: px(180),
-  w: DEVICE_WIDTH - px(80),
-  h: px(32),
+export const DAYS_SUB_TEXT = {
+  text: 'since last workout',
+  x: px(30),
+  y: px(186),
+  w: DEVICE_WIDTH - px(60),
+  h: px(30),
   color: BRAND_ORANGE,
+  text_size: px(22),
+  align_h: hmUI.align.CENTER_H,
+  align_v: hmUI.align.CENTER_V,
+}
+
+export const LAST_WORKOUT_TEXT = {
+  text: '',
+  x: px(30),
+  y: px(236),
+  w: DEVICE_WIDTH - px(60),
+  h: px(34),
+  color: 0xcccccc,
+  text_size: px(24),
+  align_h: hmUI.align.CENTER_H,
+  align_v: hmUI.align.CENTER_V,
+  text_style: hmUI.text_style.ELLIPSIS,
+}
+
+export const WEEK_VOLUME_TEXT = {
+  text: '',
+  x: px(30),
+  y: px(278),
+  w: DEVICE_WIDTH - px(60),
+  h: px(34),
+  color: 0xcccccc,
   text_size: px(24),
   align_h: hmUI.align.CENTER_H,
   align_v: hmUI.align.CENTER_V,
 }
 
-function statRow(y) {
-  return {
-    x: px(40),
-    y: px(y),
-    w: DEVICE_WIDTH - px(80),
-    h: px(36),
-    color: 0xcccccc,
-    text_size: px(28),
-    align_h: hmUI.align.CENTER_H,
-    align_v: hmUI.align.CENTER_V,
-    text_style: hmUI.text_style.NONE,
-  }
-}
-
-export const STAT_ROW_1 = { ...statRow(240), text: '' } // resting HR / sleep
-export const STAT_ROW_2 = { ...statRow(280), text: '' } // days since last run
-export const STAT_ROW_3 = { ...statRow(320), text: '' } // week km
-
 export const STATUS_TEXT = {
   text: '',
   x: px(30),
-  y: px(360),
+  y: px(324),
   w: DEVICE_WIDTH - px(60),
-  h: px(30),
+  h: px(40),
   color: FAINT,
   text_size: px(18),
   align_h: hmUI.align.CENTER_H,
@@ -72,32 +79,15 @@ export const STATUS_TEXT = {
   text_style: hmUI.text_style.WRAP,
 }
 
-const HALF_BUTTON_W = px(190)
-const HALF_BUTTON_GAP = px(20)
-const HALF_BUTTON_START_X = Math.floor((DEVICE_WIDTH - HALF_BUTTON_W * 2 - HALF_BUTTON_GAP) / 2)
-
-export const ZONES_BUTTON = {
-  text: 'HR Zones',
-  x: HALF_BUTTON_START_X,
-  y: px(396),
-  w: HALF_BUTTON_W,
-  h: px(56),
-  radius: px(28),
-  normal_color: 0x1a1a1a,
-  press_color: 0x333333,
-  color: WHITE,
-  text_size: px(24),
-}
-
 export const WORKOUT_BUTTON = {
   text: 'Workout',
-  x: HALF_BUTTON_START_X + HALF_BUTTON_W + HALF_BUTTON_GAP,
-  y: px(396),
-  w: HALF_BUTTON_W,
+  x: Math.floor((DEVICE_WIDTH - px(220)) / 2),
+  y: px(384),
+  w: px(220),
   h: px(56),
   radius: px(28),
-  normal_color: 0x1a1a1a,
-  press_color: 0x333333,
+  normal_color: BRAND_ORANGE,
+  press_color: 0xcc561f,
   color: WHITE,
-  text_size: px(24),
+  text_size: px(28),
 }

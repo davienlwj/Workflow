@@ -10,10 +10,11 @@ independent Home Screen app for logging a Norwegian 4x4 training block — see
 same GitHub Pages deployment and live at `/` and `/vo2max/` respectively.
 
 A third project, [**hybrd-watch**](hybrd-watch/), is a Zepp OS companion
-app for the Amazfit T-Rex 3 Pro that puts HYBR.D's VO2max/HR-zone data on
-your wrist — see `hybrd-watch/README.md`. It's a different kind of software
-from the two web apps above (it runs on the watch itself, built with Zepp's
-own tooling), not a third Home Screen app.
+app for the Amazfit T-Rex 3 Pro that lets you log a strength workout right
+from the watch, synced into HYBR.D's history — see `hybrd-watch/README.md`.
+It's a different kind of software from the two web apps above (it runs on
+the watch itself, built with Zepp's own tooling), not a third Home Screen
+app.
 
 > "meeting with Tom at KLCC at 3pm on 12/8"
 

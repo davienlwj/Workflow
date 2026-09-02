@@ -1,7 +1,5 @@
 import { BaseSideService, settingsLib } from '@zeppos/zml/base-side'
 import { DEFAULT_SETTINGS, MAX_WORKOUT_HISTORY } from '../utils/constants'
-import { zoneTable } from '../utils/zones'
-import { fetchLatestWellness, fetchRunStatus } from './intervals'
 import { pushWorkoutsToGist } from './gist'
 
 const WORKOUTS_KEY = 'watchWorkouts'
@@ -9,48 +7,10 @@ const WORKOUTS_KEY = 'watchWorkouts'
 function getSettings() {
   const settings = { ...DEFAULT_SETTINGS }
   for (const key of Object.keys(DEFAULT_SETTINGS)) {
-    if (key === 'primaryZoneModel') continue // derived below from the settings page's toggle
     const raw = settingsLib.getItem(key)
-    if (raw == null || raw === '') continue
-    settings[key] = typeof DEFAULT_SETTINGS[key] === 'number' ? Number(raw) : raw
+    if (raw) settings[key] = raw
   }
-  settings.primaryZoneModel = settingsLib.getItem('useRhrZones') === 'true' ? 'rhr' : 'lthr'
   return settings
-}
-
-async function getStatus(res) {
-  const settings = getSettings()
-  if (!settings.intervalsAthleteId || !settings.intervalsApiKey) {
-    res(null, { error: 'NOT_CONFIGURED' })
-    return
-  }
-  try {
-    const [wellness, runStatus] = await Promise.all([
-      fetchLatestWellness(settings.intervalsAthleteId, settings.intervalsApiKey),
-      fetchRunStatus(settings.intervalsAthleteId, settings.intervalsApiKey),
-    ])
-    const vo2max = wellness.vo2max
-    res(null, {
-      vo2max,
-      vo2maxDelta: vo2max != null ? Math.round((vo2max - settings.baselineVO2max) * 10) / 10 : null,
-      restingHR: wellness.restingHR,
-      sleepHours: wellness.sleepHours,
-      daysSinceLastRun: runStatus.daysSinceLastRun,
-      weekKm: runStatus.weekKm,
-      syncedAt: Date.now(),
-    })
-  } catch (err) {
-    res(null, { error: err.status === 401 || err.status === 403 ? 'BAD_CREDENTIALS' : 'NETWORK_ERROR' })
-  }
-}
-
-function getZones(res) {
-  const settings = getSettings()
-  const table = zoneTable(settings, settings.primaryZoneModel)
-  res(null, {
-    model: settings.primaryZoneModel,
-    zones: table.map((z) => ({ name: z.name, low: z.bpmLow, high: z.bpmHigh, target: !!z.target })),
-  })
 }
 
 function loadWorkouts() {
@@ -89,7 +49,7 @@ function saveWorkout(res, workout) {
 }
 
 /** The weight/reps of the most recent logged set for `exerciseId`, from
- *  saved workout history (newest first - see saveWorkout below), for
+ *  saved workout history (newest first - see saveWorkout above), for
  *  defaulting the stepper to what was actually lifted last time instead of
  *  a generic starting point. Null fields if this exercise has no history
  *  yet. */
@@ -117,14 +77,56 @@ function getWorkouts(res) {
   })
 }
 
+function workoutVolume(workout) {
+  let volume = 0
+  for (const exercise of workout.exercises) {
+    for (const set of exercise.sets) volume += (set.weight || 0) * (set.reps || 0)
+  }
+  return volume
+}
+
+function mondayOfThisWeek() {
+  const now = new Date()
+  const monday = new Date(now)
+  const dayIndex = (now.getDay() + 6) % 7 // 0 = Monday
+  monday.setDate(now.getDate() - dayIndex)
+  monday.setHours(0, 0, 0, 0)
+  return monday
+}
+
+/** The Today page's dashboard: days since your last watch-logged workout,
+ *  that workout's name/exercise count, and total volume lifted this week
+ *  (Monday-anchored) - all from local workout history, since (unlike
+ *  intervals.icu for runs) there's no cloud source for lift data to pull
+ *  from instead. Only reflects workouts logged from the watch itself, not
+ *  ones logged on the phone - the sync only ever flows watch -> phone. */
+function getLiftStatus(res) {
+  const workouts = loadWorkouts()
+  let daysSinceLastWorkout = null
+  let lastWorkout = null
+  if (workouts.length > 0) {
+    const latest = workouts[0]
+    const last = new Date(`${latest.date}T00:00:00`)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    daysSinceLastWorkout = Math.round((today - last) / 86400000)
+    lastWorkout = { name: latest.name, exerciseCount: latest.exercises.length }
+  }
+
+  const monday = mondayOfThisWeek()
+  const weekVolume = workouts
+    .filter((w) => new Date(`${w.date}T00:00:00`) >= monday)
+    .reduce((sum, w) => sum + workoutVolume(w), 0)
+
+  res(null, { daysSinceLastWorkout, lastWorkout, weekVolume: Math.round(weekVolume) })
+}
+
 AppSideService(
   BaseSideService({
     onInit() {},
     onRequest(req, res) {
-      if (req.method === 'GET_STATUS') {
-        getStatus(res)
-      } else if (req.method === 'GET_ZONES') {
-        getZones(res)
+      if (req.method === 'GET_LIFT_STATUS') {
+        getLiftStatus(res)
       } else if (req.method === 'SAVE_WORKOUT') {
         saveWorkout(res, req.params)
       } else if (req.method === 'GET_WORKOUTS') {

@@ -10,7 +10,7 @@
     },
     "icon": "icon.png",
     "vender": "davienlwj",
-    "description": "Training status from the HYBR.D VO2max tracker, on your wrist."
+    "description": "Log strength workouts from HYBR.D, on your wrist."
   },
   "permissions": ["data:os.device.info", "device:os.local_storage"],
   "runtime": {
@@ -26,7 +26,6 @@
         "page": {
           "pages": [
             "page/home/index.page",
-            "page/zones/index.page",
             "page/workout/index.page",
             "page/workout/groups/index.page",
             "page/workout/exercises/index.page",
