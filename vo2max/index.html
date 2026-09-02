@@ -258,6 +258,27 @@
     </details>
 
     <details class="settings-details">
+      <summary class="section-title">Watch workout sync</summary>
+      <div class="settings-details-body form">
+        <p class="field-hint">Pulls in workouts logged on the Amazfit T-Rex 3 Pro companion app (see hybrd-watch/ in this repo) via a private GitHub Gist you own - no backend, just a personal access token. Create a secret gist with one file named "hybrd-workouts.json" containing <code>{"workouts":[]}</code>, then a personal access token with the "gist" scope (github.com → Settings → Developer settings → Personal access tokens). Paste both the Gist ID (from its URL) and the token here, and the same two values into the watch app's Zepp settings. Read-only from here - nothing is ever written back to the gist.</p>
+        <label class="field">
+          <span>Gist ID</span>
+          <input id="watchSyncGistId" type="text" placeholder="from the gist's URL" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>Personal access token</span>
+          <input id="watchSyncToken" type="text" placeholder="gist-scoped GitHub token" autocomplete="off" spellcheck="false">
+        </label>
+        <p id="watchSyncStatus" class="field-hint">Not connected.</p>
+        <div class="actions">
+          <button type="button" id="watchSyncConnect" class="ghost-btn">Connect</button>
+          <button type="button" id="watchSyncDisconnect" class="ghost-btn" hidden>Disconnect</button>
+        </div>
+        <button type="button" id="watchSyncNow" class="ghost-btn block" hidden>Sync now</button>
+      </div>
+    </details>
+
+    <details class="settings-details">
       <summary class="section-title">Zones reference</summary>
       <div class="settings-details-body">
         <h2 class="section-title">LTHR-based zones <span id="lthrPrimaryBadge" class="badge" hidden>primary</span></h2>

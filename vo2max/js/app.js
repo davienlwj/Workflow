@@ -33,6 +33,7 @@ import {
   fetchWellnessHistory as intervalsFetchWellnessHistory,
   fetchActivityStreams as intervalsFetchActivityStreams,
 } from './intervals.js';
+import { fetchWatchWorkouts } from './gistSync.js';
 import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
   exerciseById, searchExercises,
@@ -2546,6 +2547,111 @@ $('intervalsDisconnect').addEventListener('click', () => {
 
 $('intervalsSyncNow').addEventListener('click', () => { syncIntervalsRuns(); });
 
+/* --------------------------------------------------------- WATCH SYNC */
+
+// Set on a failed sync (e.g. a revoked token or wrong Gist ID), cleared
+// by the next successful one - same purpose as intervalsNeedsReconnect above.
+let watchSyncNeedsReconnect = false;
+
+/** Imports every not-yet-seen watch workout (deduped by watchWorkoutId,
+ *  the stable id the watch stamps on each finished workout - see
+ *  hybrd-watch/utils/liveWorkout.js), returning how many were added. */
+function importNewWatchWorkouts(watchWorkouts) {
+  const existingIds = new Set(workouts.map((w) => w.watchWorkoutId).filter(Boolean));
+  let count = 0;
+  for (const w of watchWorkouts) {
+    if (!w.watchWorkoutId || existingIds.has(w.watchWorkoutId)) continue;
+    addWorkout(w);
+    count += 1;
+  }
+  if (count > 0) workouts = loadWorkouts();
+  return count;
+}
+
+async function syncWatchWorkouts({ silent = false } = {}) {
+  const s = settings.watchSync;
+  if (!s?.enabled || !s?.gistId || !s?.token) return;
+  let imported = null;
+  let failure = null;
+  try {
+    const watchWorkouts = await fetchWatchWorkouts(s.gistId, s.token);
+    imported = importNewWatchWorkouts(watchWorkouts);
+    settings = { ...settings, watchSync: { ...settings.watchSync, lastSyncedAt: new Date().toISOString() } };
+    saveSettings(settings);
+    watchSyncNeedsReconnect = false;
+  } catch (err) {
+    console.error('watch sync failed', err);
+    watchSyncNeedsReconnect = true;
+    failure = err;
+  }
+  if (imported) renderAll();
+  renderWatchSyncStatus();
+  if (silent) return;
+  if (failure?.networkError) toast('Could not reach GitHub - check your connection', 3400);
+  else if (imported == null) toast('Could not sync - check your Gist ID and token');
+  else if (imported > 0) toast(`Imported ${imported} workout${imported === 1 ? '' : 's'} from the watch`);
+  else toast('No new workouts to import');
+}
+
+function renderWatchSyncStatus() {
+  $('watchSyncGistId').value = settings.watchSync.gistId;
+  $('watchSyncToken').value = settings.watchSync.token;
+  const { enabled } = settings.watchSync;
+  $('watchSyncDisconnect').hidden = !enabled;
+  $('watchSyncNow').hidden = !enabled;
+  if (!enabled) {
+    $('watchSyncStatus').textContent = 'Not connected.';
+    $('watchSyncConnect').hidden = false;
+  } else if (watchSyncNeedsReconnect) {
+    $('watchSyncStatus').textContent = 'Sync failed - tap Connect to retry.';
+    $('watchSyncConnect').hidden = false;
+  } else {
+    $('watchSyncStatus').textContent = 'Connected - importing watch workouts automatically.';
+    $('watchSyncConnect').hidden = true;
+  }
+}
+
+$('watchSyncGistId').addEventListener('change', () => {
+  settings = { ...settings, watchSync: { ...settings.watchSync, gistId: $('watchSyncGistId').value.trim() } };
+  saveSettings(settings);
+});
+$('watchSyncToken').addEventListener('change', () => {
+  settings = { ...settings, watchSync: { ...settings.watchSync, token: $('watchSyncToken').value.trim() } };
+  saveSettings(settings);
+});
+
+$('watchSyncConnect').addEventListener('click', async () => {
+  const gistId = $('watchSyncGistId').value.trim();
+  const token = $('watchSyncToken').value.trim();
+  if (!gistId || !token) { toast('Fill in both the Gist ID and token first'); return; }
+  try {
+    const watchWorkouts = await fetchWatchWorkouts(gistId, token);
+    settings = { ...settings, watchSync: { gistId, token, enabled: true, lastSyncedAt: new Date().toISOString() } };
+    saveSettings(settings);
+    const imported = importNewWatchWorkouts(watchWorkouts);
+    watchSyncNeedsReconnect = false;
+    renderAll();
+    renderWatchSyncStatus();
+    toast(imported > 0 ? `Connected - imported ${imported} workout${imported === 1 ? '' : 's'}` : 'Connected - no workouts to import yet');
+  } catch (err) {
+    console.error('watch sync connect failed', err);
+    if (err.networkError) toast('Could not reach GitHub - check your connection', 3400);
+    else if (err.status === 401 || err.status === 403 || err.status === 404) toast('Could not connect - check your Gist ID and token');
+    else toast(`Could not connect - GitHub error ${err.status ?? ''}`.trim());
+  }
+});
+
+$('watchSyncDisconnect').addEventListener('click', () => {
+  if (!confirm('Disconnect watch sync? Workouts already imported stay in your history - only future auto-import stops.')) return;
+  watchSyncNeedsReconnect = false;
+  settings = { ...settings, watchSync: { ...settings.watchSync, enabled: false } };
+  saveSettings(settings);
+  renderWatchSyncStatus();
+  toast('Disconnected');
+});
+
+$('watchSyncNow').addEventListener('click', () => { syncWatchWorkouts(); });
+
 /* ------------------------------------------------------------- SETTINGS */
 
 function renderSettingsForm() {
@@ -2565,6 +2671,7 @@ function renderSettingsForm() {
   $('sPrimaryModel').value = settings.primaryZoneModel;
   renderGCalStatus();
   renderIntervalsStatus();
+  renderWatchSyncStatus();
 }
 
 $('sTheme').addEventListener('click', (e) => {
@@ -2656,6 +2763,9 @@ resumeLiveWorkoutIfAny();
 if (settings.intervals.enabled) {
   syncIntervalsRuns({ silent: true });
   syncIntervalsWellness();
+}
+if (settings.watchSync.enabled) {
+  syncWatchWorkouts({ silent: true });
 }
 
 // The boot splash (index.html) has done its job now that the real UI is

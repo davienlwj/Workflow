@@ -72,15 +72,32 @@ export const STATUS_TEXT = {
   text_style: hmUI.text_style.WRAP,
 }
 
+const HALF_BUTTON_W = px(190)
+const HALF_BUTTON_GAP = px(20)
+const HALF_BUTTON_START_X = Math.floor((DEVICE_WIDTH - HALF_BUTTON_W * 2 - HALF_BUTTON_GAP) / 2)
+
 export const ZONES_BUTTON = {
   text: 'HR Zones',
-  x: Math.floor((DEVICE_WIDTH - px(200)) / 2),
+  x: HALF_BUTTON_START_X,
   y: px(396),
-  w: px(200),
+  w: HALF_BUTTON_W,
   h: px(56),
   radius: px(28),
   normal_color: 0x1a1a1a,
   press_color: 0x333333,
   color: WHITE,
-  text_size: px(28),
+  text_size: px(24),
+}
+
+export const WORKOUT_BUTTON = {
+  text: 'Workout',
+  x: HALF_BUTTON_START_X + HALF_BUTTON_W + HALF_BUTTON_GAP,
+  y: px(396),
+  w: HALF_BUTTON_W,
+  h: px(56),
+  radius: px(28),
+  normal_color: 0x1a1a1a,
+  press_color: 0x333333,
+  color: WHITE,
+  text_size: px(24),
 }

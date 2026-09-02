@@ -9,7 +9,11 @@ export const DEFAULT_SETTINGS = {
   primaryZoneModel: 'lthr', // 'lthr' | 'rhr'
   intervalsAthleteId: '',
   intervalsApiKey: '',
+  gistId: '',
+  githubToken: '',
 }
+
+export const MAX_WORKOUT_HISTORY = 20 // oldest trimmed off locally once exceeded
 
 export const BRAND_ORANGE = 0xff6c2d
 export const WHITE = 0xffffff

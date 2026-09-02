@@ -24,7 +24,16 @@
     "t-rex-3-pro": {
       "module": {
         "page": {
-          "pages": ["page/home/index.page", "page/zones/index.page"]
+          "pages": [
+            "page/home/index.page",
+            "page/zones/index.page",
+            "page/workout/index.page",
+            "page/workout/groups/index.page",
+            "page/workout/exercises/index.page",
+            "page/workout/sets/index.page",
+            "page/workout/manage/index.page",
+            "page/workout/summary/index.page"
+          ]
         },
         "app-side": {
           "path": "app-side/index"

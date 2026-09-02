@@ -10,6 +10,7 @@ import {
   STAT_ROW_3,
   STATUS_TEXT,
   ZONES_BUTTON,
+  WORKOUT_BUTTON,
 } from 'zosLoader:./index.page.[pf].layout.js'
 
 function formatDelta(delta) {
@@ -50,6 +51,12 @@ Page(
         ...ZONES_BUTTON,
         click_func: () => {
           push({ url: 'page/zones/index.page' })
+        },
+      })
+      hmUI.createWidget(hmUI.widget.BUTTON, {
+        ...WORKOUT_BUTTON,
+        click_func: () => {
+          push({ url: 'page/workout/index.page' })
         },
       })
     },

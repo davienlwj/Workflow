@@ -219,6 +219,36 @@ rate line graph over the run's elapsed time, and a pace line graph over the
 same. Manually-logged runs don't have this button - there's no raw stream
 data behind them to chart.
 
+## Watch workout sync
+
+If you've built and installed [**hybrd-watch**](../hybrd-watch/) — the Zepp
+OS companion app for the Amazfit T-Rex 3 Pro that also lives in this repo —
+strength workouts logged there sync into this app's Workout history
+automatically. Same shape as intervals.icu sync above: no backend, just a
+personal credential you generate yourself, this time a **GitHub Gist** you
+own instead of an API key, since the watch's Zepp app and this browser have
+no way to reach each other directly.
+
+**Settings → Watch workout sync** (paired with the matching setup in
+`hybrd-watch/README.md`, which has the full one-time steps): create a secret
+Gist holding one `hybrd-workouts.json` file, generate a GitHub personal
+access token with the `gist` scope, paste the Gist ID and token into both
+this app's settings and the watch's Zepp app settings. Every app open (and
+**Sync now** in Settings) checks the Gist for anything new.
+
+**No duplicates.** Same principle as intervals.icu sync: each watch-logged
+workout carries a stable id, and a workout already imported by that id is
+never re-added, so re-checking the same Gist repeatedly is harmless.
+Read-only from this app's side too - nothing is ever written back to the
+Gist.
+
+**What doesn't come across:** the watch logs a simplified version of a
+workout (weight, reps, and adjacent-pair supersets, no set-type marking, no
+machine brand, no per-set notes, and only from the built-in exercise
+library) - once it lands in your history here, though, it's a normal
+workout entry, editable with this app's full tools same as anything logged
+by hand.
+
 ## Zone math
 
 Both zone tables are computed live from your HR settings, not stored as
@@ -252,6 +282,8 @@ js/ics.js                   builds a per-session .ics file for calendar export, 
 js/gcal.js                  Google Identity Services auth + Calendar API calls for automatic sync
 js/intervals.js              intervals.icu API-key auth + activity fetch/mapping for run import
                               (no backend needed - see the README's intervals.icu sync section)
+js/gistSync.js                GitHub Gist client for pulling in workouts logged on the watch app
+                              (see the README's "Watch workout sync" section, and ../hybrd-watch/)
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/icon-source.png        the orange wordmark logo the app icons are built from

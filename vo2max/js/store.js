@@ -43,6 +43,12 @@ export const DEFAULT_SETTINGS = {
     // every app open while connected - cached here (rather than re-fetched only when
     // needed) so the Dashboard has something to show immediately, even offline
   },
+  watchSync: {
+    gistId: '', // the secret Gist's id, from its URL - same one pasted into the watch's Zepp app settings
+    token: '', // GitHub personal access token, gist scope - same one pasted into the watch's settings
+    enabled: false, // true once connected at least once - auto-sync only runs while this is true
+    lastSyncedAt: null, // ISO timestamp of the last successful check, shown in the status line
+  },
 };
 
 function clone(value) {
@@ -61,6 +67,7 @@ export function loadSettings() {
       profile: { ...DEFAULT_SETTINGS.profile, ...(parsed.profile || {}) },
       googleCalendar: { ...DEFAULT_SETTINGS.googleCalendar, ...(parsed.googleCalendar || {}) },
       intervals: { ...DEFAULT_SETTINGS.intervals, ...(parsed.intervals || {}) },
+      watchSync: { ...DEFAULT_SETTINGS.watchSync, ...(parsed.watchSync || {}) },
     };
   } catch {
     return clone(DEFAULT_SETTINGS);
