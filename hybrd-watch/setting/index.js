@@ -1,11 +1,8 @@
 import { DEFAULT_SETTINGS } from '../utils/constants'
 
 AppSettingsPage({
-  state: {
-    primaryZoneModel: DEFAULT_SETTINGS.primaryZoneModel,
-  },
   build(props) {
-    this.state.primaryZoneModel =
+    const primaryZoneModel =
       props.settingsStorage.getItem('primaryZoneModel') || DEFAULT_SETTINGS.primaryZoneModel
 
     return View({}, [
@@ -61,7 +58,7 @@ AppSettingsPage({
           }),
           Select({
             label: 'Zone model',
-            value: this.state.primaryZoneModel,
+            value: primaryZoneModel,
             options: [
               { name: 'LTHR-based', value: 'lthr' },
               { name: 'Resting-HR (Karvonen)', value: 'rhr' },
