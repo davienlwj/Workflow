@@ -4,21 +4,30 @@ import {
   loadWorkouts, addWorkout, updateWorkout, deleteWorkout,
   loadCustomExercises, addCustomExercise, deleteCustomExercise, updateCustomExercise,
   loadLiveWorkout, saveLiveWorkout, clearLiveWorkout,
-  loadRoutines, addRoutine, deleteRoutine,
+  loadRoutines, addRoutine, updateRoutine, deleteRoutine,
   loadCustomBrands, addCustomBrand,
+  loadCustomSessionTypes, addCustomSessionType,
+  loadMileagePlan, saveMileagePlan,
+  loadPlannedActivities, addOrReplacePlannedActivity, deletePlannedActivity,
   exportAll, importAll,
 } from './store.js';
+import {
+  currentWeekIndex, weekProgress, daysUntilRace, weeksNeededForRace, resizeWeeks,
+  DEFAULT_PLAN_WEEKS, PHASE_GUIDE, PHASE_GUIDE_NOTES,
+  defaultSplitsForWeek, weekSplits, weekSessionKm,
+} from './mileagePlan.js';
 import { lthrZoneTable, rhrZoneTable, zoneTable, hrZoneDurations } from './zones.js';
 import {
-  todayIso,
-  daysSinceLastSession, averageSessionHR, vo2maxSeries,
+  todayIso, fmtDateLong, fmtElapsed,
+  daysSinceLastSession, averageSessionHR,
   mileageBuckets, totalMileage,
   parsePaceMinKm, formatPaceMinKm,
 } from './block.js';
 import {
-  vo2maxTrendSVG, mileageBarChartSVG, exerciseProgressSVG, exerciseVolumeSVG, muscleRadarSVG,
+  mileageTrendSVG, exerciseProgressSVG, exerciseVolumeSVG, muscleRadarSVG,
   restingHRTrendSVG, sleepBarChartSVG,
-  activityHRLineChartSVG, activityPaceLineChartSVG, hrZoneDurationListHTML,
+  activityHRLineChartSVG, activityPaceLineChartSVG, activitySpeedLineChartSVG, activitySwimPaceLineChartSVG,
+  hrZoneDurationListHTML,
 } from './chart.js';
 import { sessionToICS, sessionToGCalEvent, workoutToGCalEvent } from './ics.js';
 import {
@@ -27,7 +36,6 @@ import {
 } from './gcal.js';
 import {
   listActivities as intervalsListActivities,
-  isRunActivity as isIntervalsRunActivity,
   activityToSession as intervalsActivityToSession,
   fetchRecentWellness as intervalsFetchRecentWellness,
   fetchWellnessHistory as intervalsFetchWellnessHistory,
@@ -40,11 +48,17 @@ import {
 } from './exercises.js';
 import { muscleDiagramHTML } from './muscleDiagram.js';
 import {
+  renderWorkoutShareCard, renderMuscleBalanceCard, renderPRsCard, renderRunShareCard, renderRunZonesCard,
+  renderWorkoutReceiptCard, renderRunReceiptCard,
+} from './shareCard.js';
+import {
   workoutVolume, lastPerformance, personalRecords, newPRsInWorkout, exerciseProgress, exerciseVolumeProgress, loggedBrandsForExercise,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince,
   muscleSetBreakdown, muscleSetBreakdownDetailed, workoutSummaryByExercise,
 } from './workout.js';
-import { runIconSVG, dumbbellIconSVG } from './icons.js';
+import {
+  runIconSVG, dumbbellIconSVG, swapIconSVG, raceFlagIconSVG,
+} from './icons.js';
 
 let settings = loadSettings();
 
@@ -64,7 +78,31 @@ let workouts = loadWorkouts();
 let customExercises = loadCustomExercises();
 let routines = loadRoutines();
 let customBrands = loadCustomBrands();
+let customSessionTypes = loadCustomSessionTypes();
+let mileagePlan = loadMileagePlan();
+let plannedActivities = loadPlannedActivities();
+let planTargetDate = null; // the date #planRunSheet/#planWorkoutSheet is currently editing a plan for
+// Set right before opening the real Log/Workout form from a planned
+// entry's "Start" - the plan is only actually deleted once that real
+// entry is saved (not the moment Start is tapped), so abandoning the
+// form without saving leaves the plan intact. See startRunFromPlan/
+// startWorkoutFromPlan and their respective save/cancel handlers.
+let pendingRunPlanId = null;
+let pendingWorkoutPlanId = null;
 let editingId = null;
+// The sport of the session currently open in the Edit sheet ('run' unless
+// it's a Cycling/Stairmaster/Elliptical/RowErg/SkiErg entry, or a legacy
+// synced swim/other activity) - readSessionForm and updateComputedDistance
+// consult this to know which fields are actually live in the form, since a
+// non-run session hides/repurposes several of them (see openEditSheet). The
+// Edit sheet's Activity select is locked (can't reclassify an existing
+// session), so this is set once when the sheet opens and never changes.
+let editingSport = 'run';
+// Same role as editingSport, for the Log sheet - but live: the Log form's
+// Activity select IS interactive (it's choosing a brand new session's
+// sport), so this changes whenever the user picks a different one (see the
+// #logType change listener below).
+let logSport = 'run';
 let workoutEditingId = null;
 let exerciseSheetId = null;
 let exDetailBrand = ''; // '' = all brands, else a brand logged for the open exercise
@@ -77,7 +115,25 @@ let liveSession = null; // { startedAt } while a live "today's workout" session 
 let workoutSheetMode = 'instant'; // 'instant' | 'live' - which mode #workoutSheet is currently rendering
 let liveTimerInterval = null;
 let lastFinishedWorkout = null; // set by openWorkoutSummarySheet, read by "Save as Routine"
+let lastFinishedDurationMs = 0; // set by openWorkoutSummarySheet, read by "Save PNG"
+let lastFinishedNewPRs = []; // set by openWorkoutSummarySheet, shown in its own inline PR banner
+let lastFinishedSession = null; // set by openRunSummarySheet, read by "Save PNG"
+// #shareCardSheet's current subject - null while it's closed. `workoutsForPRs`
+// is the full workouts list PRs should be computed against: for an
+// already-saved workout that's just `workouts` (it's already in there); for
+// a still-running live session it's `workouts` plus a synthetic in-progress
+// record, so "new PR" framing reflects today's not-yet-saved sets too.
+let shareCardContext = null; // { workout, workoutsForPRs, durationMs, newPRs }
+let shareCardOption = 'summary'; // 'summary' | 'muscle' | 'prs' | 'zones' | 'receipt' - which tab is showing
+let shareCardBlobs = {}; // rendered-PNG cache for the currently open sheet, keyed by option
+let shareCardObjectUrl = null; // the preview <img>'s current blob: URL, revoked on tab switch/close
 let routineSelectedIds = []; // exercise ids chosen so far in the open routine builder
+let editingRoutineId = null; // id of the routine being edited, or null when creating a new one
+let swappingIndex = null; // index in routineSelectedIds currently being replaced via the picker, or null
+let routineDrag = null; // { id, pointerId, longPressTimer, startX, startY, dragging } while reordering
+let woExerciseDrag = null; // { unit, handle, pointerId, longPressTimer, startX, startY, dragging } while
+// reordering exercises within #woExerciseList (live workout, logging a past workout, or editing one -
+// all three render into the same list, so this one implementation covers all of them)
 
 const $ = (id) => document.getElementById(id);
 
@@ -194,11 +250,6 @@ function downloadFile(filename, content, mime) {
   URL.revokeObjectURL(url);
 }
 
-function fmtDateLong(iso) {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', {
-    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
-  });
-}
 
 function fmtDateShort(iso) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -210,8 +261,14 @@ function numOrNull(v) {
   return Number.isNaN(n) ? null : n;
 }
 
-/** Distance = duration / pace, whenever both are present; otherwise left alone for manual entry. */
+/** Distance = duration / pace, whenever both are present; otherwise left
+ *  alone for manual entry. Only meaningful for a run's pace field - the
+ *  Log/Edit sheets repurpose the same input for a ride's speed, a swim's
+ *  pace/100m, or a RowErg/SkiErg's pace/500m, where this min/km formula
+ *  would silently compute nonsense. */
 function updateComputedDistance(prefix) {
+  const sport = prefix === 'edit' ? editingSport : logSport;
+  if (sport !== 'run') return;
   const duration = numOrNull($(`${prefix}DurationMin`).value);
   const pace = parsePaceMinKm($(`${prefix}AvgPace`).value);
   if (duration != null && pace != null && pace > 0) {
@@ -224,6 +281,118 @@ function updateComputedDistance(prefix) {
 
 function sessionTypeOf(session) {
   return session.type ?? 'interval';
+}
+
+const NO_METRIC_SPORTS = new Set(['other', 'stairmaster', 'elliptical']);
+const ROW_SKI = new Set(['row', 'ski']);
+const EDIT_METRIC_LABEL = {
+  run: 'Avg pace (min/km)', ride: 'Avg speed (km/h)', swim: 'Avg pace (min/100m)',
+  row: 'Avg pace (/500m)', ski: 'Avg pace (/500m)',
+};
+
+/** The Log/Edit sheets' one pace-like input is reused across sports rather
+ *  than giving each its own field: relabeled and repointed at the right
+ *  session property, or hidden entirely for a sport with no single such
+ *  metric (Stairmaster's floors climbed and Elliptical's resistance/incline/
+ *  stride rate all live in the extra-fields area instead - see below). */
+function setMetricField(prefix, sport, session) {
+  const field = $(`${prefix}AvgPaceField`);
+  if (NO_METRIC_SPORTS.has(sport)) {
+    field.hidden = true;
+    $(`${prefix}AvgPace`).value = '';
+    return;
+  }
+  field.hidden = false;
+  $(`${prefix}AvgPaceLabel`).textContent = EDIT_METRIC_LABEL[sport] ?? EDIT_METRIC_LABEL.run;
+  if (sport === 'ride') $(`${prefix}AvgPace`).value = session.avgSpeedKmh ?? '';
+  else if (sport === 'swim') $(`${prefix}AvgPace`).value = formatPaceMinKm(session.avgPace100m);
+  else if (ROW_SKI.has(sport)) $(`${prefix}AvgPace`).value = formatPaceMinKm(session.avgPace500m);
+  else $(`${prefix}AvgPace`).value = formatPaceMinKm(session.avgPace);
+}
+
+// Every other per-sport metric (beyond the shared pace-like field above)
+// renders into a generic #logExtraFields/#editExtraFields container, two
+// per row, rather than hand-building a static HTML block per sport.
+const SPORT_EXTRA_FIELDS = {
+  ride: [
+    { key: 'avgRpm', label: 'Avg cadence (RPM)' },
+    { key: 'avgPower', label: 'Avg power (W)' },
+  ],
+  row: [
+    { key: 'avgStrokeRate', label: 'Stroke rate (SPM)' },
+    { key: 'avgPower', label: 'Avg power (W)' },
+  ],
+  ski: [
+    { key: 'avgStrokeRate', label: 'Stroke rate (SPM)' },
+    { key: 'avgPower', label: 'Avg power (W)' },
+  ],
+  stairmaster: [
+    { key: 'floorsClimbed', label: 'Floors climbed' },
+    { key: 'stepRate', label: 'Step rate (steps/min)' },
+    { key: 'level', label: 'Level' },
+  ],
+  elliptical: [
+    { key: 'resistanceLevel', label: 'Resistance level' },
+    { key: 'incline', label: 'Incline (%)' },
+    { key: 'strideRate', label: 'Stride rate (SPM)' },
+  ],
+};
+
+function extraFieldsHTML(sport) {
+  const fields = SPORT_EXTRA_FIELDS[sport] || [];
+  let html = '';
+  for (let i = 0; i < fields.length; i += 2) {
+    const pair = fields.slice(i, i + 2);
+    html += `<div class="row">${pair.map((f) => `
+      <label class="field">
+        <span>${f.label}</span>
+        <input class="edit-extra-input" data-key="${f.key}" type="number" min="0">
+      </label>`).join('')}</div>`;
+  }
+  return html;
+}
+
+function setExtraFields(prefix, sport, session) {
+  const container = $(`${prefix}ExtraFields`);
+  container.innerHTML = extraFieldsHTML(sport);
+  for (const f of (SPORT_EXTRA_FIELDS[sport] || [])) {
+    const input = container.querySelector(`[data-key="${f.key}"]`);
+    if (input) input.value = session[f.key] ?? '';
+  }
+}
+
+function readExtraFields(prefix, sport) {
+  const out = {};
+  for (const f of (SPORT_EXTRA_FIELDS[sport] || [])) {
+    const input = $(`${prefix}ExtraFields`).querySelector(`[data-key="${f.key}"]`);
+    out[f.key] = input ? numOrNull(input.value) : null;
+  }
+  return out;
+}
+
+/** Shows/hides and (re)populates every sport-conditional field in the Log or
+ *  Edit sheet for the given sport - the metric field, its extras, distance
+ *  (km for most sports, m for RowErg/SkiErg, hidden entirely for
+ *  Stairmaster which uses floors climbed instead), and the warmup/cooldown
+ *  toggles (run-only). `session` is the data to populate from - {} for a
+ *  freshly reset Log form or when the user switches Activity mid-entry,
+ *  since a different sport's fields don't carry over. */
+function applySportFieldsToForm(prefix, sport, session = {}) {
+  setMetricField(prefix, sport, session);
+  setExtraFields(prefix, sport, session);
+  const isRowSki = ROW_SKI.has(sport);
+  $(`${prefix}DistanceKmField`).hidden = sport === 'stairmaster' || isRowSki;
+  $(`${prefix}DistanceMField`).hidden = !isRowSki;
+  $(`${prefix}DistanceM`).value = isRowSki && session.distanceKm != null ? Math.round(session.distanceKm * 1000) : '';
+  if (!isRowSki) $(`${prefix}DistanceKm`).value = session.distanceKm ?? '';
+  $(`${prefix}WarmupToggleField`).hidden = sport !== 'run';
+  $(`${prefix}CooldownToggleField`).hidden = sport !== 'run';
+  // "Workout" labels the main block distinguishing it from the optional
+  // Warm up/Cool down phases above and below it - only meaningful when
+  // those phases are actually offered, i.e. for a run.
+  $(`${prefix}WorkoutLabel`).hidden = sport !== 'run';
+  const hint = $(`${prefix}DistanceHint`);
+  if (hint) hint.hidden = sport !== 'run';
 }
 
 // Warm up / cool down are optional phases toggled on/off per session, each
@@ -268,10 +437,12 @@ for (const prefix of ['log', 'edit']) {
 
 function resetLogForm() {
   $('logDate').value = todayIso();
-  $('logType').value = 'interval';
+  logSport = 'run';
+  refreshActivitySelect($('logType'), 'run');
+  $('logRunTypeField').hidden = false;
+  refreshTypeSelect($('logRunType'), 'easy');
   $('logDurationMin').value = '';
-  $('logAvgPace').value = '';
-  $('logDistanceKm').value = '';
+  applySportFieldsToForm('log', 'run', {});
   $('logRunAvgHR').value = '';
   $('logRunMaxHR').value = '';
   resetPhaseFields('log', 'Warmup');
@@ -281,35 +452,69 @@ function resetLogForm() {
   $('logNotes').value = '';
 }
 
+// Picking a different Activity on the Log form re-derives which fields
+// apply and blanks them (a different sport's numbers don't carry over) -
+// the Edit sheet's Activity select is locked instead (see openEditSheet),
+// since reclassifying an *existing* session's sport is not something this
+// form supports.
+$('logType').addEventListener('change', () => {
+  logSport = $('logType').value;
+  $('logRunTypeField').hidden = logSport !== 'run';
+  if (logSport === 'run') refreshTypeSelect($('logRunType'), 'easy');
+  applySportFieldsToForm('log', logSport, {});
+});
+
 $('logDurationMin').addEventListener('input', () => updateComputedDistance('log'));
 $('logAvgPace').addEventListener('input', () => updateComputedDistance('log'));
 
 $('logRPE').addEventListener('input', () => { $('logRPEOut').textContent = $('logRPE').value; });
 
-// Every session type shares the same fields now (duration/pace/distance/HR).
 // intervalsCompleted/intervals/recovery are deliberately left out of this
 // object rather than zeroed out: addSession simply won't have them, and
 // updateSession's patch merge (`{...existing, ...patch}`) leaves an older
 // interval session's per-rep HR breakdown untouched when it's re-saved,
 // since the edit form no longer collects or shows those fields.
+//
+// `sport` comes from logSport/editingSport, kept in sync with the Activity
+// select (see resetLogForm, the #logType change listener above, and
+// openEditSheet). `type` is only meaningful for a run (its Easy/Long/
+// Threshold/VO2max sub-classification, from the Run type select) - every
+// other sport's activity IS its type, so there's nothing further to store.
 function readSessionForm(prefix) {
-  const type = $(`${prefix}Type`).value;
+  const sport = prefix === 'edit' ? editingSport : logSport;
   // The Log form has no VO2max field (only Edit does, for filling one in after the fact).
   const vo2maxEl = $(`${prefix}VO2max`);
-  return {
-    type,
+  const isRowSki = ROW_SKI.has(sport);
+  const distanceKm = sport === 'stairmaster'
+    ? null
+    : isRowSki
+      ? (numOrNull($(`${prefix}DistanceM`).value) != null ? numOrNull($(`${prefix}DistanceM`).value) / 1000 : null)
+      : numOrNull($(`${prefix}DistanceKm`).value);
+  const base = {
+    sport,
+    type: sport === 'run' ? $(`${prefix}RunType`).value : null,
     date: $(`${prefix}Date`).value,
     rpe: Number($(`${prefix}RPE`).value),
     vo2max: vo2maxEl ? numOrNull(vo2maxEl.value) : null,
     notes: $(`${prefix}Notes`).value.trim(),
     durationMin: numOrNull($(`${prefix}DurationMin`).value),
-    avgPace: parsePaceMinKm($(`${prefix}AvgPace`).value),
-    distanceKm: numOrNull($(`${prefix}DistanceKm`).value),
+    distanceKm,
     avgHR: numOrNull($(`${prefix}RunAvgHR`).value),
     maxHR: numOrNull($(`${prefix}RunMaxHR`).value),
-    warmup: readPhaseFields(prefix, 'Warmup'),
-    cooldown: readPhaseFields(prefix, 'Cooldown'),
   };
+  if (sport === 'run') {
+    return {
+      ...base,
+      avgPace: parsePaceMinKm($(`${prefix}AvgPace`).value),
+      warmup: readPhaseFields(prefix, 'Warmup'),
+      cooldown: readPhaseFields(prefix, 'Cooldown'),
+    };
+  }
+  if (sport === 'ride') return { ...base, avgSpeedKmh: numOrNull($(`${prefix}AvgPace`).value), ...readExtraFields(prefix, sport) };
+  if (sport === 'swim') return { ...base, avgPace100m: parsePaceMinKm($(`${prefix}AvgPace`).value) };
+  if (isRowSki) return { ...base, avgPace500m: parsePaceMinKm($(`${prefix}AvgPace`).value), ...readExtraFields(prefix, sport) };
+  if (sport === 'stairmaster' || sport === 'elliptical') return { ...base, ...readExtraFields(prefix, sport) };
+  return base; // legacy 'other'
 }
 
 /** Opens the Log session popup for a given date (from a calendar day). */
@@ -322,11 +527,63 @@ function openLogSheet(dateIso) {
 }
 
 function closeLogSheet() {
+  pendingRunPlanId = null;
   $('scrim').hidden = true;
   $('logSheet').hidden = true;
 }
 
 $('logCancel').addEventListener('click', closeLogSheet);
+
+/** A run summary's phase row - Warm up/Workout/Cool down - showing
+ *  whatever distance/pace/HR that phase has. `phase` is the
+ *  {distanceKm, avgPace, avgHR, maxHR} shape readPhaseFields/readSessionForm
+ *  produce, used as-is for warmup/cooldown and assembled from the saved
+ *  session's own top-level fields for the main Workout row. Returns '' (no
+ *  row at all) when the phase wasn't logged, e.g. Warm up/Cool down toggled
+ *  off. */
+function runSummaryPhaseRowHTML(label, phase) {
+  if (!phase) return '';
+  const parts = [
+    phase.distanceKm != null ? `${phase.distanceKm}km` : null,
+    phase.avgPace != null ? `${formatPaceMinKm(phase.avgPace)}/km` : null,
+    phase.avgHR != null ? `avg ${phase.avgHR}` : null,
+    phase.maxHR != null ? `max ${phase.maxHR}` : null,
+  ].filter(Boolean).join(' · ');
+  return `
+    <div class="summary-exercise-row">
+      <div class="summary-exercise-name">${label}</div>
+      <div class="summary-exercise-stats mono">${parts || '—'}</div>
+    </div>
+  `;
+}
+
+/** Shown right after saving a run - mirrors openWorkoutSummarySheet's
+ *  finish-workout flow. One row each for Warm up/Workout/Cool down, Warm
+ *  up and Cool down only appearing when actually carried out. */
+function openRunSummarySheet(session) {
+  lastFinishedSession = session;
+  $('runSummaryDuration').textContent = session.durationMin != null ? `${session.durationMin} min` : '—';
+  $('runSummaryPhases').innerHTML = [
+    runSummaryPhaseRowHTML('Warm up', session.warmup),
+    runSummaryPhaseRowHTML('Workout', {
+      distanceKm: session.distanceKm, avgPace: session.avgPace, avgHR: session.avgHR, maxHR: session.maxHR,
+    }),
+    runSummaryPhaseRowHTML('Cool down', session.cooldown),
+  ].join('');
+  $('scrim').hidden = false;
+  $('runSummarySheet').hidden = false;
+  $('runSummarySheet').scrollTop = 0;
+}
+
+$('runSummaryShare').addEventListener('click', () => {
+  if (!lastFinishedSession) return;
+  openRunShareCardSheet(lastFinishedSession);
+});
+
+$('runSummaryDone').addEventListener('click', () => {
+  $('scrim').hidden = true;
+  $('runSummarySheet').hidden = true;
+});
 
 $('logForm').addEventListener('submit', (e) => {
   e.preventDefault();
@@ -334,8 +591,11 @@ $('logForm').addEventListener('submit', (e) => {
   // Warn (rather than silently double-logging) if intervals.icu already
   // auto-synced a run for this same date - the user gets to decide it's
   // really a second run that day (e.g. two-a-days) instead of finding a
-  // surprise duplicate later.
-  const autoSyncedSameDay = sessions.find((s) => s.date === form.date && s.intervalsActivityId);
+  // surprise duplicate later. Scoped to sport 'run': a synced ride or swim
+  // on the same date isn't a duplicate of a manually-logged run at all.
+  const autoSyncedSameDay = sessions.find(
+    (s) => s.date === form.date && s.intervalsActivityId && (s.sport ?? 'run') === 'run',
+  );
   if (autoSyncedSameDay
     && !confirm(`A run from intervals.icu was already auto-synced for ${fmtDateLong(form.date)}. Log this one too?`)) {
     return;
@@ -343,9 +603,18 @@ $('logForm').addEventListener('submit', (e) => {
   const saved = addSession(form);
   sessions = loadSessions();
   syncSessionToGoogle(saved);
+  if (pendingRunPlanId) {
+    deletePlannedActivity(pendingRunPlanId);
+    pendingRunPlanId = null;
+    plannedActivities = loadPlannedActivities();
+  }
   closeLogSheet();
   renderAll();
-  toast('Session saved');
+  // Runs get a finish-style summary (mirrors the lift flow's
+  // openWorkoutSummarySheet); every other Session type just gets the
+  // existing plain confirmation toast.
+  if (saved.sport === 'run') openRunSummarySheet(saved);
+  else toast('Session saved');
 });
 
 /* ------------------------------------------------------------- HISTORY */
@@ -354,12 +623,171 @@ const recoveryLabel = { easy: 'Easy', moderate: 'Moderate', hard: 'Hard' };
 // A filled-vs-outline glyph so recovery intensity reads at a glance without
 // relying on color (monotone theme) or having to read the word.
 const recoverySymbol = { easy: '○', moderate: '◐', hard: '●' };
-const typeLabel = { interval: '4x4', 'easy-run': 'Easy run', 'long-run': 'Long run' };
+// interval/easy-run/long-run are legacy keys (every run's type before the
+// Easy/Long/Threshold/VO2max split existed) - kept mapped rather than
+// migrated so old sessions keep displaying correctly without a migration
+// step. "Interval (Norwegian 4x4)" was always this app's VO2max-intensity
+// protocol, hence the relabel.
+const typeLabel = {
+  interval: 'VO2max', 'easy-run': 'Easy', 'long-run': 'Long',
+  easy: 'Easy', long: 'Long', threshold: 'Threshold', vo2max: 'VO2max',
+};
+
+// The Session type select is really an Activity picker: one fixed entry per
+// machine this app knows how to log, each driving which fields
+// applySportFieldsToForm shows (see SPORT_EXTRA_FIELDS etc. below). Runs get
+// a second, further pick (Run type - see RUN_TYPE_PRESETS) since "Run" alone
+// isn't specific enough to categorize a training log by.
+const ACTIVITY_OPTIONS = [
+  { value: 'run', label: 'Run' },
+  { value: 'ride', label: 'Cycling' },
+  { value: 'stairmaster', label: 'Stairmaster' },
+  { value: 'elliptical', label: 'Elliptical' },
+  { value: 'row', label: 'RowErg' },
+  { value: 'ski', label: 'SkiErg' },
+];
+// swim/other aren't offered as a new selection (no manual-entry metrics
+// defined for them) but can still exist on old intervals.icu-synced
+// sessions from before auto-sync was scoped back down to runs only, so they
+// still need a label for the badge/legacy-select-option fallback.
+const ACTIVITY_LABEL = {
+  ...Object.fromEntries(ACTIVITY_OPTIONS.map((a) => [a.value, a.label])),
+  swim: 'Swim', other: 'Activity',
+};
+
+/** The Activity select's full option list - the fixed presets, plus (only
+ *  when the session's own sport isn't one of them - e.g. a legacy synced
+ *  swim) one extra option so opening the sheet never silently misrepresents
+ *  what it is. */
+function activityOptionsHTML(selectedSport) {
+  const known = new Set(ACTIVITY_OPTIONS.map((a) => a.value));
+  const presetHTML = ACTIVITY_OPTIONS
+    .map((a) => `<option value="${a.value}"${a.value === selectedSport ? ' selected' : ''}>${a.label}</option>`)
+    .join('');
+  const extraHTML = selectedSport && !known.has(selectedSport)
+    ? `<option value="${selectedSport}" selected>${ACTIVITY_LABEL[selectedSport] ?? selectedSport}</option>`
+    : '';
+  return `${presetHTML}${extraHTML}`;
+}
+
+function refreshActivitySelect(select, sport) {
+  select.innerHTML = activityOptionsHTML(sport);
+  select.value = sport;
+}
+
+// A run's own sub-classification, kept as a separate pick from the Activity
+// select above (see RUN_TYPE_PRESETS) since "Run" alone isn't specific
+// enough to categorize a training log by. Grown the same way machine
+// brands are: presets, then any custom types the user has added, then a
+// trailing "+ Add type…".
+const RUN_TYPE_PRESETS = [
+  { value: 'easy', label: 'Easy' },
+  { value: 'long', label: 'Long' },
+  { value: 'threshold', label: 'Threshold' },
+  { value: 'vo2max', label: 'VO2max' },
+];
+
+/** Builds a Run type <select>'s full option list: presets, then any custom
+ *  types, then a trailing "+ Add type…" option - mirrors brandOptionsHTML's
+ *  shape below. `selected` is shown pre-selected even if it isn't (yet) one
+ *  of those - e.g. a legacy 'interval' session - using its display label
+ *  when known (typeLabel) so a legacy value never shows its raw stored key. */
+function typeOptionsHTML(selected) {
+  const presetValues = new Set(RUN_TYPE_PRESETS.map((t) => t.value));
+  const customs = customSessionTypes.filter((t) => !presetValues.has(t));
+  const presetHTML = RUN_TYPE_PRESETS
+    .map((t) => `<option value="${t.value}"${t.value === selected ? ' selected' : ''}>${t.label}</option>`)
+    .join('');
+  const customHTML = customs
+    .map((t) => `<option value="${escapeHTML(t)}"${t === selected ? ' selected' : ''}>${escapeHTML(t)}</option>`)
+    .join('');
+  const knownValues = new Set([...presetValues, ...customs]);
+  const extraHTML = selected && !knownValues.has(selected)
+    ? `<option value="${escapeHTML(selected)}" selected>${escapeHTML(typeLabel[selected] ?? selected)}</option>`
+    : '';
+  return `${presetHTML}${customHTML}${extraHTML}<option value="__add__">+ Add type…</option>`;
+}
+
+/** Rebuilds a Run type select's options and selects `value`, tracking it in
+ *  data-confirmed so wireTypeSelectAddFlow can revert to it if the user
+ *  opens "+ Add type…" and then cancels. */
+function refreshTypeSelect(select, value) {
+  select.innerHTML = typeOptionsHTML(value);
+  select.value = value;
+  select.dataset.confirmed = value;
+}
+
+/** Wires the "+ Add type…" entry once per select (Log and Edit each have
+ *  their own) - mirrors the .wo-brand-select add-flow used for machine
+ *  brands. */
+function wireTypeSelectAddFlow(select) {
+  select.addEventListener('change', () => {
+    if (select.value !== '__add__') {
+      select.dataset.confirmed = select.value;
+      return;
+    }
+    const name = window.prompt('New run type name:')?.trim();
+    if (name) {
+      addCustomSessionType(name);
+      customSessionTypes = loadCustomSessionTypes();
+      refreshTypeSelect(select, name);
+    } else {
+      refreshTypeSelect(select, select.dataset.confirmed || 'easy');
+    }
+  });
+}
+wireTypeSelectAddFlow($('logRunType'));
+wireTypeSelectAddFlow($('editRunType'));
+
+/** The sport-appropriate headline metric for a session - avgPace (min/km)
+ *  for a run, avgSpeedKmh for a ride, avgPace100m for a swim,
+ *  avgPace500m for RowErg/SkiErg, floors climbed for Stairmaster, or
+ *  nothing for elliptical/'other' (a legacy synced activity type), which
+ *  have no single number that stands in for the whole session the way
+ *  distance/pace does elsewhere. `label` names which metric it is (for
+ *  stat-tile/receipt headers); `text` is null whenever the session has no
+ *  value for that metric yet, so every call site can fall back to its own
+ *  placeholder consistently. Sessions logged before this existed default to
+ *  sport 'run', matching sessionTypeOf's own legacy fallback. */
+function sessionMetric(session) {
+  const sport = session.sport ?? 'run';
+  if (sport === 'ride') {
+    return { label: 'AVG SPEED', text: session.avgSpeedKmh != null ? `${session.avgSpeedKmh}km/h` : null };
+  }
+  if (sport === 'swim') {
+    return { label: 'AVG PACE/100M', text: session.avgPace100m != null ? `${formatPaceMinKm(session.avgPace100m)}/100m` : null };
+  }
+  if (sport === 'row' || sport === 'ski') {
+    return { label: 'AVG PACE/500M', text: session.avgPace500m != null ? `${formatPaceMinKm(session.avgPace500m)}/500m` : null };
+  }
+  if (sport === 'stairmaster') {
+    return { label: 'FLOORS', text: session.floorsClimbed != null ? `${session.floorsClimbed} floors` : null };
+  }
+  if (sport === 'elliptical' || sport === 'other') {
+    return { label: null, text: null };
+  }
+  return { label: 'AVG PACE', text: session.avgPace != null ? `${formatPaceMinKm(session.avgPace)}/km` : null };
+}
 
 /** True for sessions logged before every type shared the same fields, back
  *  when "Interval (Norwegian 4x4)" had its own per-rep HR breakdown. */
 function hasLegacyIntervalData(s) {
   return Boolean(s.intervalsCompleted) || Boolean((s.intervals || []).length);
+}
+
+/** The History/Dashboard badge text for a session: its Run type (Easy/Long/
+ *  Threshold/VO2max, or a custom one) for a run, or its own Activity label
+ *  otherwise - preferring a legacy synced session's specific stored `type`
+ *  string (e.g. "Gravel ride") over the generic Activity label when both
+ *  exist, since that detail was worth keeping when it was originally
+ *  synced. */
+function sessionBadgeLabel(session) {
+  const sport = session.sport ?? 'run';
+  if (sport === 'run') {
+    const t = sessionTypeOf(session);
+    return typeLabel[t] ?? t;
+  }
+  return session.type || ACTIVITY_LABEL[sport] || 'Activity';
 }
 
 function renderHistory() {
@@ -369,8 +797,7 @@ function renderHistory() {
   $('historyEmpty').hidden = sorted.length > 0;
 
   for (const s of sorted) {
-    const type = sessionTypeOf(s);
-    const badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
+    const badgeHTML = `<span class="pill pill-type">${sessionBadgeLabel(s)}</span>`;
     let legacyHTML = '';
     if (hasLegacyIntervalData(s)) {
       const avgs = (s.intervals || []).map((iv) => iv.avgHR).filter((v) => v != null);
@@ -384,11 +811,20 @@ function renderHistory() {
         ${s.recovery ? `<span>${recoverySymbol[s.recovery] ?? ''} ${recoveryLabel[s.recovery] ?? s.recovery}</span>` : ''}
       `;
     }
+    const metric = sessionMetric(s);
     const metaHTML = `
       ${legacyHTML}
       ${s.durationMin != null ? `<span class="mono">${s.durationMin}min</span>` : ''}
       ${s.distanceKm != null ? `<span class="mono">${s.distanceKm}km</span>` : ''}
-      ${s.avgPace != null ? `<span class="mono">${formatPaceMinKm(s.avgPace)}/km</span>` : ''}
+      ${metric.text ? `<span class="mono">${metric.text}</span>` : ''}
+      ${s.avgRpm != null ? `<span class="mono">${s.avgRpm}rpm</span>` : ''}
+      ${s.avgPower != null ? `<span class="mono">${s.avgPower}W</span>` : ''}
+      ${s.avgStrokeRate != null ? `<span class="mono">${s.avgStrokeRate}spm</span>` : ''}
+      ${s.stepRate != null ? `<span class="mono">${s.stepRate} steps/min</span>` : ''}
+      ${s.level != null ? `<span class="mono">Lvl ${s.level}</span>` : ''}
+      ${s.resistanceLevel != null ? `<span class="mono">Resist ${s.resistanceLevel}</span>` : ''}
+      ${s.incline != null ? `<span class="mono">${s.incline}% incline</span>` : ''}
+      ${s.strideRate != null ? `<span class="mono">${s.strideRate}spm</span>` : ''}
       ${s.avgHR != null ? `<span class="mono">avg ${s.avgHR}</span>` : ''}
       ${s.maxHR != null ? `<span class="mono">max ${s.maxHR}</span>` : ''}
       <span class="mono">RPE ${s.rpe}</span>
@@ -443,13 +879,28 @@ function activityByDate() {
   return map;
 }
 
-$('calLegend').innerHTML = `
-  <span class="cal-legend-item">${runIconSVG()}<span>Run</span></span>
-  <span class="cal-legend-item">${dumbbellIconSVG()}<span>Workout</span></span>
-`;
+/** Planned runs/workouts, keyed by date, each as { run, lift } (either may
+ *  be undefined) - at most one of each per date, see addOrReplacePlannedActivity. */
+function plannedByDate() {
+  const map = new Map();
+  for (const p of plannedActivities) {
+    if (!map.has(p.date)) map.set(p.date, {});
+    map.get(p.date)[p.kind] = p;
+  }
+  return map;
+}
 
 function renderCalendar() {
   const byDate = activityByDate();
+  const planned = plannedByDate();
+  const raceDate = mileagePlan.race?.date || null;
+
+  $('calLegend').innerHTML = `
+    <span class="cal-legend-item">${runIconSVG()}<span>Run</span></span>
+    <span class="cal-legend-item">${dumbbellIconSVG()}<span>Workout</span></span>
+    ${raceDate ? `<span class="cal-legend-item">${raceFlagIconSVG()}<span>Race day</span></span>` : ''}
+    ${plannedActivities.length > 0 ? `<span class="cal-legend-item">${runIconSVG('glyph-planned')}<span>Planned</span></span>` : ''}
+  `;
 
   $('calMonthLabel').textContent = new Date(calYear, calMonth, 1)
     .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -464,14 +915,20 @@ function renderCalendar() {
   for (let d = 1; d <= daysInMonth; d++) {
     const iso = isoOf(calYear, calMonth, d);
     const day = byDate.get(iso);
+    const plan = planned.get(iso);
     const hasRun = Boolean(day && day.sessions.length);
     const hasWorkout = Boolean(day && day.workouts.length);
+    // A plan stops showing on the calendar once the real thing it was
+    // planning is actually logged - it's fulfilled, not still upcoming.
+    const plannedRun = Boolean(plan?.run) && !hasRun;
+    const plannedWorkout = Boolean(plan?.lift) && !hasWorkout;
+    const isRaceDay = iso === raceDate;
     const classes = ['cal-cell'];
-    if (hasRun || hasWorkout) classes.push('has-activity');
+    if (hasRun || hasWorkout || isRaceDay || plannedRun || plannedWorkout) classes.push('has-activity');
     if (iso === todayIsoStr) classes.push('today');
     if (iso === calSelectedDate) classes.push('selected');
-    const iconsHTML = (hasRun || hasWorkout)
-      ? `<span class="cal-icons">${hasRun ? runIconSVG() : ''}${hasWorkout ? dumbbellIconSVG() : ''}</span>`
+    const iconsHTML = (hasRun || hasWorkout || isRaceDay || plannedRun || plannedWorkout)
+      ? `<span class="cal-icons">${hasRun ? runIconSVG() : plannedRun ? runIconSVG('glyph-planned') : ''}${hasWorkout ? dumbbellIconSVG() : plannedWorkout ? dumbbellIconSVG('glyph-planned') : ''}${isRaceDay ? raceFlagIconSVG() : ''}</span>`
       : '';
     html += `<button type="button" class="${classes.join(' ')}" data-date="${iso}">
       <span>${d}</span>
@@ -481,8 +938,25 @@ function renderCalendar() {
   $('calGrid').innerHTML = html;
 }
 
+/** One planned run/lift row in the day panel: a "Start" button (opens the
+ *  real Log/Workout form pre-filled, see startRunFromPlan/
+ *  startWorkoutFromPlan) plus a small ✕ to drop the plan without starting it. */
+function plannedRowHTML(plan) {
+  const label = plan.kind === 'run'
+    ? [typeLabel[plan.runType] ?? plan.runType, plan.targetDistanceKm != null ? `${plan.targetDistanceKm}km` : null].filter(Boolean).join(' · ')
+    : (routines.find((r) => r.id === plan.routineId)?.name ?? 'Workout (no routine)');
+  const noteSuffix = plan.note ? ` — ${escapeHTML(plan.note)}` : '';
+  return `<div class="cal-day-item cal-planned-item">
+    <button type="button" class="cal-planned-start" data-plan-id="${plan.id}">${escapeHTML(label)}${noteSuffix}</button>
+    <button type="button" class="cal-planned-remove" data-plan-id="${plan.id}" aria-label="Remove plan">✕</button>
+  </div>`;
+}
+
 function renderCalDayPanel() {
   const day = activityByDate().get(calSelectedDate) || { sessions: [], workouts: [] };
+  const plan = plannedByDate().get(calSelectedDate) || {};
+  const showPlannedRun = Boolean(plan.run) && day.sessions.length === 0;
+  const showPlannedWorkout = Boolean(plan.lift) && day.workouts.length === 0;
   const panel = $('calDayPanel');
   panel.innerHTML = `
     <div class="cal-day-panel-date mono">${fmtDateLong(calSelectedDate)}</div>
@@ -494,8 +968,19 @@ function renderCalDayPanel() {
       <div class="cal-day-section-label">${dumbbellIconSVG()}<span>Workouts</span></div>
       ${day.workouts.map((w) => calDayWorkoutSummaryHTML(w)).join('')}
     ` : ''}
+    ${(showPlannedRun || showPlannedWorkout) ? `
+      <div class="cal-day-section-label">${runIconSVG('glyph-planned')}<span>Planned</span></div>
+      ${showPlannedRun ? plannedRowHTML(plan.run) : ''}
+      ${showPlannedWorkout ? plannedRowHTML(plan.lift) : ''}
+    ` : ''}
+    ${calSelectedDate === mileagePlan.race?.date ? `
+      <div class="cal-day-section-label">${raceFlagIconSVG()}<span>Race day</span></div>
+      <button type="button" class="cal-day-item" data-race="1">${escapeHTML(mileagePlan.race.name || 'Target race')}</button>
+    ` : ''}
     <div class="cal-day-actions">
-      <button type="button" id="calLogRunBtn" class="ghost-btn">+ Log run</button>
+      ${day.sessions.length === 0 && !showPlannedRun ? '<button type="button" id="calPlanRunBtn" class="ghost-btn">+ Plan run</button>' : ''}
+      ${day.workouts.length === 0 && !showPlannedWorkout ? '<button type="button" id="calPlanWorkoutBtn" class="ghost-btn">+ Plan workout</button>' : ''}
+      <button type="button" id="calLogRunBtn" class="ghost-btn">+ Log session</button>
       <button type="button" id="calLogWorkoutBtn" class="ghost-btn">+ Log workout</button>
     </div>
   `;
@@ -510,6 +995,36 @@ function renderCalDayPanel() {
       const w = workouts.find((x) => x.id === btn.dataset.workoutId);
       if (w) { closeCalDaySheet(); openWorkoutEditSheet(w); }
     });
+  });
+  panel.querySelector('.cal-day-item[data-race]')?.addEventListener('click', () => {
+    closeCalDaySheet();
+    openMileagePlanEditSheet();
+  });
+  panel.querySelectorAll('.cal-planned-start').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const p = plannedActivities.find((x) => x.id === btn.dataset.planId);
+      if (!p) return;
+      closeCalDaySheet();
+      if (p.kind === 'run') startRunFromPlan(p); else startWorkoutFromPlan(p);
+    });
+  });
+  panel.querySelectorAll('.cal-planned-remove').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      deletePlannedActivity(btn.dataset.planId);
+      plannedActivities = loadPlannedActivities();
+      renderCalendar();
+      renderCalDayPanel();
+    });
+  });
+  $('calPlanRunBtn')?.addEventListener('click', () => {
+    const iso = calSelectedDate;
+    closeCalDaySheet();
+    openPlanRunSheet(iso);
+  });
+  $('calPlanWorkoutBtn')?.addEventListener('click', () => {
+    const iso = calSelectedDate;
+    closeCalDaySheet();
+    openPlanWorkoutSheet(iso);
   });
   $('calLogRunBtn').addEventListener('click', () => {
     const iso = calSelectedDate;
@@ -546,8 +1061,7 @@ $('calDaySheetClose').addEventListener('click', closeCalDaySheet);
 /** A compact {badgeHTML, metaHTML} summary of one session — shared by the
  *  calendar day panel and the dashboard's recent-activity feed. */
 function sessionCompactSummary(s) {
-  const type = sessionTypeOf(s);
-  const badgeHTML = `<span class="pill pill-type">${typeLabel[type] ?? type}</span>`;
+  const badgeHTML = `<span class="pill pill-type">${sessionBadgeLabel(s)}</span>`;
   let metaHTML;
   if (hasLegacyIntervalData(s)) {
     const avgs = (s.intervals || []).map((iv) => iv.avgHR).filter((v) => v != null);
@@ -618,11 +1132,11 @@ function renderDashboard() {
   const mileageThisWeek = weekBuckets.length ? weekBuckets[weekBuckets.length - 1].km : 0;
 
   const tiles = [
-    [String(sessions.length), 'Runs logged', true],
+    [String(sessions.length), 'Sessions logged', true],
     [String(workouts.length), 'Workouts logged', true],
     [`${mileageThisWeek} km`, 'Mileage this week', true],
     [`${volumeSince(workouts, 7, todayIso(), allExercises(), bodyweightKg())} kg`, 'Volume this week', true],
-    [daysSinceRun != null ? String(daysSinceRun) : '—', 'Days since last run', false],
+    [daysSinceRun != null ? String(daysSinceRun) : '—', 'Days since last session', false],
     [daysSinceWorkout != null ? String(daysSinceWorkout) : '—', 'Days since last workout', false],
   ];
   const plainTilesHTML = tiles.map(([value, label, accent]) => `
@@ -748,34 +1262,47 @@ $('sleepDetailClose').addEventListener('click', () => {
  *  known, no fetch needed) - these are the activity's own reported
  *  distance/duration/avg pace/avg+max HR, which are more reliable than
  *  anything re-derived from the noisy raw sample stream. */
+const STAT_TILE_METRIC_LABEL = { run: 'Avg Pace', ride: 'Avg Speed', swim: 'Avg Pace/100m' };
+
 async function openActivityDetailSheet(session) {
   const s = settings.intervals;
   if (!s?.enabled || !session.intervalsActivityId) return;
+  const sport = session.sport ?? 'run';
+  const metric = sessionMetric(session);
   $('activityDetailStats').innerHTML = `
     <div class="stat-tile"><div class="stat-value mono">${session.distanceKm ?? '–'}km</div><div class="stat-label">Distance</div></div>
     <div class="stat-tile"><div class="stat-value mono">${session.durationMin ?? '–'}min</div><div class="stat-label">Duration</div></div>
-    <div class="stat-tile"><div class="stat-value mono">${session.avgPace != null ? `${formatPaceMinKm(session.avgPace)}/km` : '–'}</div><div class="stat-label">Avg Pace</div></div>
+    <div class="stat-tile"><div class="stat-value mono">${metric.text ?? '–'}</div><div class="stat-label">${STAT_TILE_METRIC_LABEL[sport] ?? 'Avg Pace'}</div></div>
     <div class="stat-tile"><div class="stat-value mono">${session.avgHR ?? '–'} / ${session.maxHR ?? '–'}</div><div class="stat-label">Avg / Max HR</div></div>
   `;
   $('scrim').hidden = false;
   $('activityDetailSheet').hidden = false;
   $('activityDetailSheet').scrollTop = 0;
+  // 'other' sports (walks, hikes, weight training, ...) have no pace/speed
+  // concept at all, so that whole chart section is skipped rather than
+  // showing an empty "Pace" chart with nothing to plot.
+  const showMetricChart = sport !== 'other';
+  $('activityPaceChartLabel').hidden = !showMetricChart;
+  $('activityPaceChartWrap').hidden = !showMetricChart;
+  if (showMetricChart) $('activityPaceChartLabel').textContent = sport === 'ride' ? 'Speed' : 'Pace';
   const loading = '<p class="chart-empty">Loading…</p>';
   $('activityZoneChartWrap').innerHTML = loading;
   $('activityHRChartWrap').innerHTML = loading;
-  $('activityPaceChartWrap').innerHTML = loading;
+  if (showMetricChart) $('activityPaceChartWrap').innerHTML = loading;
   try {
     const points = await intervalsFetchActivityStreams(session.intervalsActivityId, s.apiKey);
     const table = zoneTable(settings, settings.primaryZoneModel);
     $('activityZoneChartWrap').innerHTML = hrZoneDurationListHTML(hrZoneDurations(points, table));
     $('activityHRChartWrap').innerHTML = activityHRLineChartSVG(points, table);
-    $('activityPaceChartWrap').innerHTML = activityPaceLineChartSVG(points);
+    if (sport === 'ride') $('activityPaceChartWrap').innerHTML = activitySpeedLineChartSVG(points);
+    else if (sport === 'swim') $('activityPaceChartWrap').innerHTML = activitySwimPaceLineChartSVG(points);
+    else if (showMetricChart) $('activityPaceChartWrap').innerHTML = activityPaceLineChartSVG(points);
   } catch (err) {
     console.error('Failed to load activity streams', err);
     const failMsg = '<p class="chart-empty">Could not load activity detail from intervals.icu.</p>';
     $('activityZoneChartWrap').innerHTML = failMsg;
     $('activityHRChartWrap').innerHTML = failMsg;
-    $('activityPaceChartWrap').innerHTML = failMsg;
+    if (showMetricChart) $('activityPaceChartWrap').innerHTML = failMsg;
   }
 }
 
@@ -832,12 +1359,18 @@ $('recentActivityList').addEventListener('click', (e) => {
 
 function openEditSheet(session) {
   editingId = session.id;
-  const type = sessionTypeOf(session);
+  const sport = session.sport ?? 'run';
+  editingSport = sport;
   $('editDate').value = session.date;
-  $('editType').value = type;
+  // The Activity select just shows what this session is - reclassifying an
+  // existing session's sport isn't supported, so it's locked. The Run type
+  // select underneath it (Easy/Long/Threshold/VO2max) stays fully editable.
+  refreshActivitySelect($('editType'), sport);
+  $('editType').disabled = true;
+  $('editRunTypeField').hidden = sport !== 'run';
+  if (sport === 'run') refreshTypeSelect($('editRunType'), session.type ?? 'interval');
   $('editDurationMin').value = session.durationMin ?? '';
-  $('editAvgPace').value = formatPaceMinKm(session.avgPace);
-  $('editDistanceKm').value = session.distanceKm ?? '';
+  applySportFieldsToForm('edit', sport, session);
   $('editRunAvgHR').value = session.avgHR ?? '';
   $('editRunMaxHR').value = session.maxHR ?? '';
   populatePhaseFields('edit', 'Warmup', session.warmup);
@@ -858,7 +1391,7 @@ function closeEditSheet() {
   $('editSheet').hidden = true;
 }
 
-$('scrim').addEventListener('click', () => {
+function closeAllSheets() {
   closeEditSheet();
   closeLogSheet();
   closeWorkoutSheet();
@@ -867,12 +1400,61 @@ $('scrim').addEventListener('click', () => {
   closeStartChoiceSheet();
   closeRoutinesSheet();
   closeRoutineBuilderSheet();
+  closeShareCardSheet();
   $('workoutSummarySheet').hidden = true;
+  $('runSummarySheet').hidden = true;
+  $('mileagePlanEditSheet').hidden = true;
+  $('weekBreakdownSheet').hidden = true;
+  $('planRunSheet').hidden = true;
+  $('planWorkoutSheet').hidden = true;
   $('restingHRDetailSheet').hidden = true;
   $('sleepDetailSheet').hidden = true;
   $('activityDetailSheet').hidden = true;
-});
+}
+
+$('scrim').addEventListener('click', closeAllSheets);
 $('editCancel').addEventListener('click', closeEditSheet);
+
+/* --------------------------------------------------- swipe down to close */
+
+(() => {
+  const SWIPE_CLOSE_PX = 90;
+  let sheet = null;
+  let startY = 0;
+  let dy = 0;
+  let dragging = false;
+
+  document.addEventListener('pointerdown', (e) => {
+    const grabber = e.target.closest('.grabber');
+    const host = grabber && grabber.closest('.sheet');
+    if (!host || host.hidden) return;
+    sheet = host;
+    startY = e.clientY;
+    dy = 0;
+    dragging = true;
+    sheet.classList.add('dragging');
+    grabber.setPointerCapture(e.pointerId);
+  });
+
+  document.addEventListener('pointermove', (e) => {
+    if (!dragging || !sheet) return;
+    dy = Math.max(0, e.clientY - startY);
+    sheet.style.transform = `translateY(${dy}px)`;
+  });
+
+  const endDrag = () => {
+    if (!dragging || !sheet) return;
+    sheet.classList.remove('dragging');
+    sheet.style.transform = '';
+    if (dy > SWIPE_CLOSE_PX) closeAllSheets();
+    sheet = null;
+    dragging = false;
+    dy = 0;
+  };
+
+  document.addEventListener('pointerup', endDrag);
+  document.addEventListener('pointercancel', endDrag);
+})();
 
 $('editDurationMin').addEventListener('input', () => updateComputedDistance('edit'));
 $('editAvgPace').addEventListener('input', () => updateComputedDistance('edit'));
@@ -926,10 +1508,402 @@ function renderRunTab() {
     </div>
   `).join('');
 
-  $('chartWrap').innerHTML = vo2maxTrendSVG(vo2maxSeries(settings, sessions));
-
+  $('mileageChartWrap').innerHTML = mileageTrendSVG(mileageBuckets(sessions, mileageScope));
   $('mileageTotal').textContent = `${totalMileage(sessions)} km total`;
-  $('mileageChartWrap').innerHTML = mileageBarChartSVG(mileageBuckets(sessions, mileageScope));
+
+  renderRacesCard();
+}
+
+/** The Run tab's target-race line: name/date/countdown plus whichever of
+ *  location/distance/goal time/notes were actually filled in - empty
+ *  fields are just omitted rather than shown blank. Returns a "no race
+ *  set" prompt when the plan has no race date at all. */
+/** Static reference content behind the default plan's numbers (session
+ *  types + mileage split per phase, plus a few standalone notes) - fixed
+ *  text, independent of whatever the user's own weeks actually say, so
+ *  it's rendered once at load rather than on every renderRacesCard(). */
+function trainingGuideHTML() {
+  const phasesHTML = PHASE_GUIDE.map((p) => `
+    <div class="phase-guide-block">
+      <div class="mileage-plan-head">
+        <span class="mileage-plan-week mono">${escapeHTML(p.phase)}</span>
+        <span class="mileage-plan-note">${escapeHTML(p.weeks)}${p.runsPerWeek ? ` — ${escapeHTML(p.runsPerWeek)}` : ''}</span>
+      </div>
+      <ul class="phase-guide-sessions">${p.sessions.map((s) => `<li>${escapeHTML(s)}</li>`).join('')}</ul>
+      ${p.goal ? `<p class="phase-guide-goal">${escapeHTML(p.goal)}</p>` : ''}
+      ${p.split ? `<p class="phase-guide-split mono">Long ${p.split.longRun} · Easy ${p.split.easy} · Tempo ${p.split.tempo} · Intervals ${p.split.intervals}</p>` : ''}
+    </div>
+  `).join('');
+  const notesHTML = `<ul class="phase-guide-notes">${PHASE_GUIDE_NOTES.map((n) => `<li>${escapeHTML(n)}</li>`).join('')}</ul>`;
+  return `${phasesHTML}${notesHTML}`;
+}
+$('trainingGuideBody').innerHTML = trainingGuideHTML();
+
+function raceInfoHTML() {
+  const race = mileagePlan.race;
+  if (!race?.date && !race?.name) {
+    return '<p class="mileage-plan-empty-state">No target race set yet — tap Edit to add one.</p>';
+  }
+  const days = daysUntilRace(race);
+  const countdown = days == null ? '' : days > 0 ? `${days} day${days === 1 ? '' : 's'} to go`
+    : days === 0 ? 'Race day!' : `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ago`;
+  const details = [
+    race.location ? escapeHTML(race.location) : null,
+    race.distanceKm != null ? `${race.distanceKm}km` : null,
+    race.goalTime ? `Goal ${escapeHTML(race.goalTime)}` : null,
+  ].filter(Boolean).join(' · ');
+  return `
+    <div class="mileage-plan-head">
+      <span class="mileage-plan-week mono">${escapeHTML(race.name || 'Target race')}</span>
+      ${countdown ? `<span class="mileage-plan-note">${countdown}</span>` : ''}
+    </div>
+    ${race.date ? `<div class="mileage-plan-longrun">${fmtDateLong(race.date)}</div>` : ''}
+    ${details ? `<div class="mileage-plan-longrun">${details}</div>` : ''}
+    ${race.notes ? `<div class="mileage-plan-longrun">${escapeHTML(race.notes)}</div>` : ''}
+  `;
+}
+
+/** The Run tab's Races card: the target race's details up top, then (under
+ *  the "Mileage plan" sub-label) a minimalist progress bar for the current
+ *  plan week - completed vs target km, dynamically recomputed from
+ *  actually-logged runs - or a plain status line before the plan starts /
+ *  after its last week ends, since there's no week to show a bar for then. */
+function renderRacesCard() {
+  $('raceInfoBlock').innerHTML = raceInfoHTML();
+
+  const idx = currentWeekIndex(mileagePlan);
+  if (idx == null) {
+    const today = todayIso();
+    $('mileagePlanProgress').innerHTML = today < mileagePlan.startDate
+      ? (() => {
+        const first = mileagePlan.weeks[0];
+        return `<p class="mileage-plan-empty-state">Plan starts <strong>${fmtDateLong(mileagePlan.startDate)}</strong> — Week 1 target: <strong>${first?.totalKm ?? 0}km</strong>, long run <strong>${first?.longRunKm ?? 0}km</strong>.</p>`;
+      })()
+      : `<p class="mileage-plan-empty-state">${mileagePlan.weeks.length}-week plan complete — tap Edit to add more weeks.</p>`;
+    return;
+  }
+  const p = weekProgress(mileagePlan, sessions, idx);
+  const km = weekSessionKm(mileagePlan.weeks[idx]);
+  const typeBreakdown = [
+    ['Long run', km.longRunKm],
+    ['Easy', km.easyKm],
+    ['Tempo', km.tempoKm],
+    ['Intervals', km.intervalsKm],
+  ].filter(([, dist]) => dist > 0);
+  $('mileagePlanProgress').innerHTML = `
+    <div class="mileage-plan-head">
+      <span class="mileage-plan-week mono">Week ${p.week} of ${p.totalWeeks}</span>
+      ${p.note ? `<span class="mileage-plan-note">${escapeHTML(p.note)}</span>` : ''}
+    </div>
+    <div class="mileage-plan-bar-track"><div class="mileage-plan-bar-fill" style="width:${p.pct}%"></div></div>
+    <div class="mileage-plan-bar-labels">
+      <span class="mono"><strong>${p.completedKm}</strong> / ${p.totalKm}km</span>
+      <span class="mono">${p.remainingKm}km left</span>
+    </div>
+    <div class="mileage-plan-type-breakdown">
+      ${typeBreakdown.map(([label, dist]) => `
+        <div class="mileage-plan-type-row">
+          <span>${label}</span>
+          <span class="mono">${dist}km</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function mileagePlanRowHTML(index, week) {
+  return `<div class="mileage-plan-row" data-index="${index}">
+    <button type="button" class="mileage-plan-row-num mileage-plan-row-open mono" aria-label="View Week ${index + 1}'s run-type breakdown">W${index + 1}</button>
+    <input type="number" step="0.1" min="0" class="mileage-plan-input mp-total" placeholder="Total km" value="${week.totalKm ?? ''}">
+    <input type="number" step="0.1" min="0" class="mileage-plan-input mp-longrun" placeholder="Long run km" value="${week.longRunKm ?? ''}">
+    <input type="text" class="mileage-plan-input mp-note" placeholder="Note" value="${escapeHTML(week.note ?? '')}">
+    <button type="button" class="mileage-plan-row-remove" aria-label="Remove week ${index + 1}">✕</button>
+  </div>`;
+}
+
+function renderMileagePlanRows() {
+  $('mileagePlanWeekRows').innerHTML = mileagePlan.weeks.map((w, i) => mileagePlanRowHTML(i, w)).join('');
+}
+
+/** The week rows' current on-screen values (not necessarily saved yet) -
+ *  shared between the submit handler and syncWeekCountToRace below so a
+ *  resize never clobbers whatever the user has already typed into a row. */
+function readWeekRowsFromDOM() {
+  return [...$('mileagePlanWeekRows').querySelectorAll('.mileage-plan-row')].map((row, i) => ({
+    totalKm: Number(row.querySelector('.mp-total').value) || 0,
+    longRunKm: Number(row.querySelector('.mp-longrun').value) || 0,
+    note: row.querySelector('.mp-note').value.trim(),
+    // The row itself has no UI for the run-type split percentages (see
+    // the week breakdown sheet) - carry over whatever's already stored
+    // for this index so reading the DOM never drops it.
+    splits: mileagePlan.weeks[i]?.splits,
+  }));
+}
+
+let breakdownWeekIndex = null; // which mileagePlan.weeks[] index #weekBreakdownSheet is currently open for
+
+const BREAKDOWN_KEYS = ['easyPct', 'tempoPct', 'intervalsPct'];
+const BREAKDOWN_LABELS = { easyPct: 'Easy', tempoPct: 'Tempo', intervalsPct: 'Intervals' };
+
+function weekBreakdownRowHTML(key, pct, km) {
+  return `<div class="week-breakdown-row" data-key="${key}">
+    <span class="week-breakdown-label">${BREAKDOWN_LABELS[key]}</span>
+    <input type="number" step="1" min="0" max="100" class="week-breakdown-pct-input" value="${pct}">
+    <span class="week-breakdown-pct-sign">%</span>
+    <span class="week-breakdown-km mono">${km}km</span>
+  </div>`;
+}
+
+/** Redraws #weekBreakdownSheet's rows from mileagePlan.weeks[breakdownWeekIndex]
+ *  - called on open, and read back from on save (see the pct-input listener
+ *  below for the live recompute-as-you-type that doesn't re-render the
+ *  whole sheet, just the km spans). */
+function renderWeekBreakdown() {
+  const week = mileagePlan.weeks[breakdownWeekIndex];
+  const splits = weekSplits(week);
+  const km = weekSessionKm(week);
+  $('weekBreakdownTitle').textContent = `Week ${breakdownWeekIndex + 1}${week.note ? ` — ${escapeHTML(week.note)}` : ''}`;
+  $('weekBreakdownSummary').innerHTML = `Total <strong class="mono">${week.totalKm}km</strong> · Long run <strong class="mono">${km.longRunKm}km</strong> (${km.longRunPct}%)`;
+  $('weekBreakdownRows').innerHTML = BREAKDOWN_KEYS.map((key) => weekBreakdownRowHTML(key, splits[key], km[`${key.replace('Pct', '')}Km`])).join('');
+  updateWeekBreakdownAccounted();
+}
+
+/** The percentages currently sitting in the sheet's inputs (not necessarily
+ *  saved yet), keyed the same way weekSplits()'s return value is. */
+function readBreakdownPctFromDOM() {
+  const splits = {};
+  for (const row of $('weekBreakdownRows').querySelectorAll('.week-breakdown-row')) {
+    splits[row.dataset.key] = Number(row.querySelector('.week-breakdown-pct-input').value) || 0;
+  }
+  return splits;
+}
+
+function updateWeekBreakdownAccounted() {
+  const week = mileagePlan.weeks[breakdownWeekIndex];
+  const km = weekSessionKm(week);
+  const splits = readBreakdownPctFromDOM();
+  const total = km.longRunPct + splits.easyPct + splits.tempoPct + splits.intervalsPct;
+  $('weekBreakdownAccounted').textContent = `Long run + Easy + Tempo + Intervals = ${total}% of this week's total`;
+}
+
+function openWeekBreakdownSheet(index) {
+  // Capture any unsaved edits to total/long run km/note from the DOM rows
+  // first, so the breakdown reflects what's currently on screen rather
+  // than stale saved values - readWeekRowsFromDOM already carries each
+  // week's splits forward untouched.
+  mileagePlan.weeks = readWeekRowsFromDOM();
+  breakdownWeekIndex = index;
+  renderWeekBreakdown();
+  $('weekBreakdownSheet').hidden = false;
+  $('weekBreakdownSheet').scrollTop = 0;
+}
+
+function closeWeekBreakdownSheet() {
+  $('weekBreakdownSheet').hidden = true;
+}
+
+$('weekBreakdownCancel').addEventListener('click', closeWeekBreakdownSheet);
+
+$('weekBreakdownRows').addEventListener('input', (e) => {
+  if (!e.target.matches('.week-breakdown-pct-input')) return;
+  const row = e.target.closest('.week-breakdown-row');
+  const key = row.dataset.key;
+  const week = mileagePlan.weeks[breakdownWeekIndex];
+  const splits = { ...weekSplits(week), ...readBreakdownPctFromDOM() };
+  const km = weekSessionKm({ ...week, splits });
+  row.querySelector('.week-breakdown-km').textContent = `${km[`${key.replace('Pct', '')}Km`]}km`;
+  updateWeekBreakdownAccounted();
+});
+
+$('weekBreakdownSave').addEventListener('click', () => {
+  mileagePlan.weeks[breakdownWeekIndex].splits = readBreakdownPctFromDOM();
+  closeWeekBreakdownSheet();
+});
+
+/** Grows/shrinks the week rows to exactly span from Week 1's start date
+ *  through the race week, whenever both dates are set - a no-op if either
+ *  is blank (nothing to size against) or the count's already right. Wired
+ *  to both date fields' change events (live, while editing) and to the
+ *  sheet's own open (self-heals a plan saved before this existed, or
+ *  edited outside the sheet). Not re-run on submit - once sized, a manual
+ *  +Add/✕ override is left standing until a date actually changes again. */
+function syncWeekCountToRace() {
+  const target = weeksNeededForRace($('mileagePlanStartDate').value, $('mileagePlanRaceDate').value);
+  if (target == null) return;
+  const current = readWeekRowsFromDOM();
+  if (current.length === target) return;
+  mileagePlan.weeks = resizeWeeks(current, target);
+  renderMileagePlanRows();
+}
+
+function openMileagePlanEditSheet() {
+  const race = mileagePlan.race;
+  $('mileagePlanRaceName').value = race.name || '';
+  $('mileagePlanRaceDate').value = race.date || '';
+  $('mileagePlanRaceDistance').value = race.distanceKm ?? '';
+  $('mileagePlanRaceLocation').value = race.location || '';
+  $('mileagePlanRaceGoalTime').value = race.goalTime || '';
+  $('mileagePlanRaceNotes').value = race.notes || '';
+  $('mileagePlanStartDate').value = mileagePlan.startDate;
+  renderMileagePlanRows();
+  syncWeekCountToRace();
+  $('scrim').hidden = false;
+  $('mileagePlanEditSheet').hidden = false;
+  $('mileagePlanEditSheet').scrollTop = 0;
+}
+
+function closeMileagePlanEditSheet() {
+  $('scrim').hidden = true;
+  $('mileagePlanEditSheet').hidden = true;
+}
+
+$('mileagePlanEditBtn').addEventListener('click', openMileagePlanEditSheet);
+$('mileagePlanEditCancel').addEventListener('click', closeMileagePlanEditSheet);
+$('mileagePlanStartDate').addEventListener('change', syncWeekCountToRace);
+$('mileagePlanRaceDate').addEventListener('change', syncWeekCountToRace);
+
+$('mileagePlanAddWeek').addEventListener('click', () => {
+  const last = mileagePlan.weeks[mileagePlan.weeks.length - 1];
+  mileagePlan.weeks.push({ totalKm: last?.totalKm ?? 0, longRunKm: last?.longRunKm ?? 0, note: '' });
+  renderMileagePlanRows();
+});
+
+$('mileagePlanLoadDefault').addEventListener('click', () => {
+  if (!confirm('Replace all current weeks with the default 22-week half-marathon plan? Your start date and race details are left as they are.')) return;
+  mileagePlan.weeks = DEFAULT_PLAN_WEEKS.map((w) => ({ ...w }));
+  renderMileagePlanRows();
+});
+
+$('mileagePlanWeekRows').addEventListener('click', (e) => {
+  const removeBtn = e.target.closest('.mileage-plan-row-remove');
+  if (removeBtn) {
+    const index = Number(removeBtn.closest('.mileage-plan-row').dataset.index);
+    mileagePlan.weeks.splice(index, 1);
+    renderMileagePlanRows();
+    return;
+  }
+  const openBtn = e.target.closest('.mileage-plan-row-open');
+  if (openBtn) {
+    const index = Number(openBtn.closest('.mileage-plan-row').dataset.index);
+    openWeekBreakdownSheet(index);
+  }
+});
+
+$('mileagePlanEditForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const startDate = $('mileagePlanStartDate').value;
+  if (!startDate) return;
+  const weeks = readWeekRowsFromDOM();
+  if (weeks.length === 0) { toast('Add at least one week'); return; }
+  const race = {
+    name: $('mileagePlanRaceName').value.trim(),
+    date: $('mileagePlanRaceDate').value,
+    location: $('mileagePlanRaceLocation').value.trim(),
+    distanceKm: $('mileagePlanRaceDistance').value ? Number($('mileagePlanRaceDistance').value) : null,
+    goalTime: $('mileagePlanRaceGoalTime').value.trim(),
+    notes: $('mileagePlanRaceNotes').value.trim(),
+  };
+  mileagePlan = { startDate, weeks, race };
+  saveMileagePlan(mileagePlan);
+  closeMileagePlanEditSheet();
+  renderRacesCard();
+  renderCalendar();
+  if (calSelectedDate) renderCalDayPanel();
+  toast('Races saved');
+});
+
+/* ---------------------------------------------------- plan a run/workout */
+
+function openPlanRunSheet(dateIso) {
+  planTargetDate = dateIso;
+  $('planRunDate').textContent = fmtDateLong(dateIso);
+  refreshTypeSelect($('planRunType'), 'easy');
+  $('planRunDistance').value = '';
+  $('planRunNote').value = '';
+  $('scrim').hidden = false;
+  $('planRunSheet').hidden = false;
+  $('planRunSheet').scrollTop = 0;
+}
+
+function closePlanRunSheet() {
+  $('scrim').hidden = true;
+  $('planRunSheet').hidden = true;
+}
+
+$('planRunCancel').addEventListener('click', closePlanRunSheet);
+wireTypeSelectAddFlow($('planRunType'));
+
+$('planRunForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  addOrReplacePlannedActivity({
+    date: planTargetDate,
+    kind: 'run',
+    runType: $('planRunType').value,
+    targetDistanceKm: $('planRunDistance').value ? Number($('planRunDistance').value) : null,
+    note: $('planRunNote').value.trim(),
+  });
+  plannedActivities = loadPlannedActivities();
+  closePlanRunSheet();
+  renderCalendar();
+  toast('Run planned');
+});
+
+function openPlanWorkoutSheet(dateIso) {
+  planTargetDate = dateIso;
+  $('planWorkoutDate').textContent = fmtDateLong(dateIso);
+  $('planWorkoutRoutine').innerHTML = '<option value="">No routine — start blank</option>'
+    + routines.map((r) => `<option value="${r.id}">${escapeHTML(r.name)}</option>`).join('');
+  $('planWorkoutNote').value = '';
+  $('scrim').hidden = false;
+  $('planWorkoutSheet').hidden = false;
+  $('planWorkoutSheet').scrollTop = 0;
+}
+
+function closePlanWorkoutSheet() {
+  $('scrim').hidden = true;
+  $('planWorkoutSheet').hidden = true;
+}
+
+$('planWorkoutCancel').addEventListener('click', closePlanWorkoutSheet);
+
+$('planWorkoutForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  addOrReplacePlannedActivity({
+    date: planTargetDate,
+    kind: 'lift',
+    routineId: $('planWorkoutRoutine').value || null,
+    note: $('planWorkoutNote').value.trim(),
+  });
+  plannedActivities = loadPlannedActivities();
+  closePlanWorkoutSheet();
+  renderCalendar();
+  toast('Workout planned');
+});
+
+/** "Start" on a planned run: opens the real Log session form for that date,
+ *  pre-filled with the plan's run type/distance. The plan itself isn't
+ *  deleted yet - only once that form is actually saved (see the logForm
+ *  submit handler) - so backing out without saving leaves it intact. */
+function startRunFromPlan(plan) {
+  openLogSheet(plan.date);
+  if (plan.runType) $('logRunType').value = plan.runType;
+  if (plan.targetDistanceKm != null) $('logDistanceKm').value = plan.targetDistanceKm;
+  pendingRunPlanId = plan.id;
+}
+
+/** "Start" on a planned workout: opens the real Workout form for that date
+ *  (the live flow if it's today, the plain instant form otherwise),
+ *  pre-loaded with the planned routine's exercises if one was picked. Same
+ *  not-deleted-until-actually-saved rule as startRunFromPlan above. */
+function startWorkoutFromPlan(plan) {
+  const exerciseIds = plan.routineId ? (routines.find((r) => r.id === plan.routineId)?.exerciseIds || []) : [];
+  if (plan.date === todayIso()) {
+    if (liveSession) { toast('Finish or cancel your live workout first'); return; }
+    openLiveWorkoutSheet(exerciseIds);
+  } else {
+    openWorkoutSheet(plan.date, exerciseIds);
+  }
+  pendingWorkoutPlanId = plan.id;
 }
 
 $('startRunBtn').addEventListener('click', () => openLogSheet(todayIso()));
@@ -941,7 +1915,7 @@ $('mileageScope').addEventListener('click', (e) => {
   $('mileageScope').querySelectorAll('.scope').forEach((b) => {
     b.setAttribute('aria-selected', String(b === btn));
   });
-  $('mileageChartWrap').innerHTML = mileageBarChartSVG(mileageBuckets(sessions, mileageScope));
+  $('mileageChartWrap').innerHTML = mileageTrendSVG(mileageBuckets(sessions, mileageScope));
 });
 
 /* -------------------------------------------------------------- WORKOUT */
@@ -1027,7 +2001,7 @@ function exerciseBlockHTML(exerciseId, sets, supersetId, brand) {
           <div class="wo-exercise-meta">${escapeHTML(exerciseMetaText(ex))}</div>
         </div>
         <div class="wo-exercise-header-actions">
-          <button type="button" class="wo-exercise-save-png" title="Save this card as PNG" aria-label="Save this card as PNG">⇩</button>
+          <span class="wo-drag-handle" aria-hidden="true">⠿</span>
           ${supersetBtnHTML}
           <button type="button" class="wo-exercise-remove" aria-label="Remove exercise">✕</button>
         </div>
@@ -1052,7 +2026,7 @@ function makeShortId() {
 function supersetLabelHTML() {
   return `
     <div class="wo-superset-label">
-      <span>⚭ Superset</span>
+      <span class="wo-superset-label-left"><span class="wo-drag-handle" aria-hidden="true">⠿</span>⚭ Superset</span>
       <button type="button" class="wo-superset-unpair" aria-label="Remove superset pairing">✕</button>
     </div>
   `;
@@ -1229,40 +2203,7 @@ $('woPickerResults').addEventListener('click', (e) => {
   syncLiveWorkout();
 });
 
-/** Renders one exercise card (name, muscle diagram, sets - whatever's
- *  currently in the DOM for it) to a PNG and downloads it, via the vendored
- *  html2canvas (see index.html/sw.js) - there's no server and no canvas
- *  representation of this card already, so a real DOM screenshot is the only
- *  way to get an image out of it. */
-async function saveExerciseCardAsPng(block, exerciseName) {
-  if (!window.html2canvas) {
-    toast("Can't save PNG - image export didn't load");
-    return;
-  }
-  try {
-    const canvas = await window.html2canvas(block, {
-      backgroundColor: getComputedStyle(block).backgroundColor,
-      scale: Math.max(2, window.devicePixelRatio || 1),
-    });
-    const url = canvas.toDataURL('image/png');
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${exerciseName.replace(/[^a-z0-9]+/gi, '-')}-${todayIso()}.png`;
-    a.click();
-  } catch (err) {
-    console.error('save PNG failed', err);
-    toast("Couldn't save PNG");
-  }
-}
-
 $('woExerciseList').addEventListener('click', (e) => {
-  const savePngBtn = e.target.closest('.wo-exercise-save-png');
-  if (savePngBtn) {
-    const block = savePngBtn.closest('.wo-exercise-block');
-    const name = block.querySelector('.wo-exercise-name')?.textContent || 'exercise';
-    saveExerciseCardAsPng(block, name);
-    return;
-  }
   const doneBtn = e.target.closest('.wo-set-done');
   if (doneBtn) {
     const isDone = doneBtn.dataset.done === 'true';
@@ -1350,6 +2291,74 @@ $('woExerciseList').addEventListener('change', (e) => {
   syncLiveWorkout();
 });
 
+/** Long-press-and-drag reordering of exercises within #woExerciseList - the
+ *  same list element is used for the live workout sheet, logging a past
+ *  workout, and editing a saved one, so this one implementation covers all
+ *  three. A "unit" being dragged is either a lone .wo-exercise-block or,
+ *  when the block is paired, its whole .wo-superset-group (grabbing either
+ *  paired exercise's handle moves the pair together, never just one half).
+ *  Nodes are moved in place with insertBefore rather than re-rendered from
+ *  a data array, since each block holds live, un-persisted input values
+ *  (weights/reps typed in) that a re-render would wipe out; DOM order is
+ *  exactly what readWorkoutForm() reads back on save, so no other syncing
+ *  is needed beyond the syncLiveWorkout() call already used elsewhere in
+ *  this file to persist a running live session. */
+const WO_DRAG_HOLD_MS = 350;
+const WO_DRAG_CANCEL_PX = 10;
+
+function woDragUnitFor(handle) {
+  return handle.closest('.wo-superset-group') || handle.closest('.wo-exercise-block');
+}
+
+function cancelWoExerciseDrag() {
+  if (woExerciseDrag?.longPressTimer) clearTimeout(woExerciseDrag.longPressTimer);
+  if (woExerciseDrag?.dragging) {
+    woExerciseDrag.unit.classList.remove('dragging');
+    syncLiveWorkout();
+  }
+  woExerciseDrag = null;
+}
+
+$('woExerciseList').addEventListener('pointerdown', (e) => {
+  const handle = e.target.closest('.wo-drag-handle');
+  if (!handle) return;
+  const unit = woDragUnitFor(handle);
+  if (!unit || unit.parentNode !== $('woExerciseList')) return;
+  const pointerId = e.pointerId;
+  const longPressTimer = setTimeout(() => {
+    if (!woExerciseDrag || woExerciseDrag.unit !== unit) return;
+    woExerciseDrag.dragging = true;
+    unit.classList.add('dragging');
+    unit.setPointerCapture(pointerId);
+  }, WO_DRAG_HOLD_MS);
+  woExerciseDrag = { unit, handle, pointerId, longPressTimer, startX: e.clientX, startY: e.clientY, dragging: false };
+});
+
+$('woExerciseList').addEventListener('pointermove', (e) => {
+  if (!woExerciseDrag || woExerciseDrag.pointerId !== e.pointerId) return;
+  if (!woExerciseDrag.dragging) {
+    const dx = Math.abs(e.clientX - woExerciseDrag.startX);
+    const dy = Math.abs(e.clientY - woExerciseDrag.startY);
+    if (dx > WO_DRAG_CANCEL_PX || dy > WO_DRAG_CANCEL_PX) cancelWoExerciseDrag();
+    return;
+  }
+  e.preventDefault();
+  const list = $('woExerciseList');
+  const { unit } = woExerciseDrag;
+  const overEl = document.elementFromPoint(e.clientX, e.clientY);
+  const target = overEl?.closest('.wo-superset-group') || overEl?.closest('.wo-exercise-block');
+  if (!target || target === unit || target.parentNode !== list) return;
+  const children = [...list.children];
+  const unitIdx = children.indexOf(unit);
+  const targetIdx = children.indexOf(target);
+  if (unitIdx === -1 || targetIdx === -1) return;
+  if (unitIdx < targetIdx) list.insertBefore(unit, target.nextSibling);
+  else list.insertBefore(unit, target);
+});
+
+$('woExerciseList').addEventListener('pointerup', cancelWoExerciseDrag);
+$('woExerciseList').addEventListener('pointercancel', cancelWoExerciseDrag);
+
 function readWorkoutForm() {
   const exercises = [...$('woExerciseList').querySelectorAll('.wo-exercise-block')].map((block) => ({
     exerciseId: block.dataset.exerciseId,
@@ -1377,7 +2386,10 @@ function readWorkoutForm() {
 }
 
 /** Opens the workout sheet blank, for logging a new workout (defaults to today). */
-function openWorkoutSheet(dateIso) {
+/** @param {string[]} [exerciseIds] pre-load these exercises (one empty set
+ *  each) instead of starting blank - used when starting from a planned
+ *  routine (see startWorkoutFromPlan). */
+function openWorkoutSheet(dateIso, exerciseIds = []) {
   if (liveSession) { toast('Finish or cancel your live workout first'); return; }
   workoutEditingId = null;
   pairingSourceBlock = null;
@@ -1385,9 +2397,11 @@ function openWorkoutSheet(dateIso) {
   $('woDate').value = dateIso || todayIso();
   $('woName').value = '';
   $('woNotes').value = '';
-  $('woExerciseList').innerHTML = '';
+  $('woExerciseList').innerHTML = exerciseIds.map((id) => exerciseBlockHTML(id, [{}])).join('');
   $('woPicker').hidden = true;
   $('woDelete').hidden = true;
+  $('woSaveRoutine').hidden = true;
+  $('woSharePNG').hidden = true;
   $('woSave').textContent = 'Save workout';
   $('scrim').hidden = false;
   $('workoutSheet').hidden = false;
@@ -1409,6 +2423,8 @@ function openWorkoutEditSheet(workout) {
   regroupSupersets();
   $('woPicker').hidden = true;
   $('woDelete').hidden = false;
+  $('woSaveRoutine').hidden = false;
+  $('woSharePNG').hidden = false;
   $('woSave').textContent = 'Update workout';
   $('scrim').hidden = false;
   $('workoutSheet').hidden = false;
@@ -1416,6 +2432,7 @@ function openWorkoutEditSheet(workout) {
 }
 
 function closeWorkoutSheet() {
+  cancelWoExerciseDrag();
   workoutEditingId = null;
   $('scrim').hidden = true;
   $('workoutSheet').hidden = true;
@@ -1437,15 +2454,6 @@ function hideLiveMiniBar() {
   $('main').classList.remove('has-live-bar');
 }
 
-function fmtElapsed(ms) {
-  const totalSec = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  const mm = String(m).padStart(2, '0');
-  const ss = String(s).padStart(2, '0');
-  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
 
 /** Scans the live sheet's current DOM for the first exercise with an
  *  un-ticked set, for the mini-bar's "current exercise / current set" copy. */
@@ -1518,6 +2526,10 @@ function discardLiveWorkout() {
   clearLiveWorkout();
   hideLiveMiniBar();
   workoutEditingId = null;
+  // A no-op if finishLiveWorkout already cleared this on save; on a true
+  // cancel (the only other caller) it means nothing was actually logged,
+  // so the plan this session may have started from is left intact.
+  pendingWorkoutPlanId = null;
   $('scrim').hidden = true;
   $('workoutSheet').hidden = true;
   $('workoutSheet').classList.remove('live-mode');
@@ -1539,6 +2551,8 @@ function openLiveWorkoutSheet(exerciseIds = []) {
   $('woExerciseList').innerHTML = exerciseIds.map((id) => exerciseBlockHTML(id, [{}])).join('');
   $('woPicker').hidden = true;
   $('woDelete').hidden = true;
+  $('woSaveRoutine').hidden = true;
+  $('woSharePNG').hidden = false;
   saveLiveWorkoutState();
   startLiveTimer();
   hideLiveMiniBar();
@@ -1601,6 +2615,7 @@ function routineRowHTML(routine) {
         </div>
         <div class="history-meta"><span>${count} exercise${count === 1 ? '' : 's'}</span></div>
       </button>
+      <button type="button" class="routine-edit" data-id="${routine.id}" aria-label="Edit routine">✎</button>
       <button type="button" class="routine-delete" data-id="${routine.id}" aria-label="Delete routine">✕</button>
     </li>
   `;
@@ -1631,6 +2646,14 @@ function closeRoutinesSheet() {
 $('routinesClose').addEventListener('click', closeRoutinesSheet);
 
 $('routinesList').addEventListener('click', (e) => {
+  const editBtn = e.target.closest('.routine-edit');
+  if (editBtn) {
+    const routine = routines.find((r) => r.id === editBtn.dataset.id);
+    if (!routine) return;
+    closeRoutinesSheet();
+    openRoutineBuilderSheet(routine.exerciseIds, routine);
+    return;
+  }
   const deleteBtn = e.target.closest('.routine-delete');
   if (deleteBtn) {
     if (!confirm('Delete this routine?')) return;
@@ -1654,6 +2677,13 @@ $('addRoutineBtn').addEventListener('click', () => {
 });
 
 $('routinesTabList').addEventListener('click', (e) => {
+  const editBtn = e.target.closest('.routine-edit');
+  if (editBtn) {
+    const routine = routines.find((r) => r.id === editBtn.dataset.id);
+    if (!routine) return;
+    openRoutineBuilderSheet(routine.exerciseIds, routine);
+    return;
+  }
   const deleteBtn = e.target.closest('.routine-delete');
   if (deleteBtn) {
     if (!confirm('Delete this routine?')) return;
@@ -1679,17 +2709,24 @@ function renderRoutinePickerChips() {
   $('routinePickerChips').innerHTML = MUSCLES.map((m) => `<button type="button" class="chip" data-muscle="${m}">${MUSCLE_LABEL[m]}</button>`).join('');
 }
 
+/** Renders the routine builder's picked-exercise list. Each row is
+ *  long-press draggable to reorder (see the pointer handlers below), and
+ *  carries a swap button that lets the picker below replace just that
+ *  slot's exercise in place instead of removing and re-adding it (which
+ *  would lose its position in the order). */
 function renderRoutineSelectedList() {
   $('routineSelectedEmpty').hidden = routineSelectedIds.length > 0;
-  $('routineSelectedList').innerHTML = routineSelectedIds.map((id) => {
+  $('routineSelectedList').innerHTML = routineSelectedIds.map((id, idx) => {
     const ex = findExercise(id);
     if (!ex) return '';
     return `
-      <div class="routine-selected-item">
-        <div>
+      <div class="routine-selected-item${idx === swappingIndex ? ' swapping' : ''}" data-id="${id}">
+        <span class="routine-drag-handle" aria-hidden="true">⠿</span>
+        <div class="routine-selected-info">
           <div class="wo-exercise-name">${escapeHTML(ex.name)}</div>
           <div class="wo-exercise-meta">${escapeHTML(exerciseMetaText(ex))}</div>
         </div>
+        <button type="button" class="routine-selected-swap" data-id="${id}" aria-label="Swap exercise">${swapIconSVG()}</button>
         <button type="button" class="routine-selected-remove" data-id="${id}" aria-label="Remove exercise">✕</button>
       </div>
     `;
@@ -1726,12 +2763,16 @@ function openRoutineNewExerciseForm() {
   resetRoutineNewExerciseForm();
   $('routineNewExerciseForm').hidden = false;
   $('routinePickerResults').hidden = true;
+  $('routineNewExerciseBtn').hidden = true;
+  $('routineBuilderActions').hidden = true;
   $('routineNewExName').focus();
 }
 
 function closeRoutineNewExerciseForm() {
   $('routineNewExerciseForm').hidden = true;
   $('routinePickerResults').hidden = false;
+  $('routineNewExerciseBtn').hidden = false;
+  $('routineBuilderActions').hidden = false;
 }
 
 $('routineNewExerciseBtn').addEventListener('click', openRoutineNewExerciseForm);
@@ -1756,12 +2797,19 @@ $('routineNewExSave').addEventListener('click', () => {
   toast('Exercise added');
 });
 
-/** Opens the routine builder blank, or pre-seeded with `exerciseIds` (used
- *  by "Save as Routine" on the finish-workout summary). */
-function openRoutineBuilderSheet(exerciseIds = []) {
+/** Opens the routine builder blank or pre-seeded with `exerciseIds` (used
+ *  by "Save as Routine" on the finish-workout summary), or in edit mode
+ *  for an existing routine when `editingRoutine` is passed (its own
+ *  exerciseIds are what should be passed as `exerciseIds` too). */
+function openRoutineBuilderSheet(exerciseIds = [], editingRoutine = null) {
   routineSelectedIds = [...new Set(exerciseIds)];
-  $('routineName').value = '';
+  editingRoutineId = editingRoutine?.id ?? null;
+  swappingIndex = null;
+  $('routineBuilderTitle').textContent = editingRoutine ? 'Edit Routine' : 'New Routine';
+  $('routineSave').textContent = editingRoutine ? 'Save changes' : 'Save routine';
+  $('routineName').value = editingRoutine?.name ?? '';
   $('routinePickerSearch').value = '';
+  $('routinePickerHint').hidden = true;
   renderRoutinePickerChips();
   renderRoutineSelectedList();
   renderRoutinePickerResults();
@@ -1772,6 +2820,9 @@ function openRoutineBuilderSheet(exerciseIds = []) {
 }
 
 function closeRoutineBuilderSheet() {
+  cancelRoutineDrag();
+  editingRoutineId = null;
+  swappingIndex = null;
   $('scrim').hidden = true;
   $('routineBuilderSheet').hidden = true;
 }
@@ -1793,6 +2844,15 @@ $('routinePickerResults').addEventListener('click', (e) => {
   const btn = e.target.closest('.wo-picker-result');
   if (!btn) return;
   const id = btn.dataset.id;
+  if (swappingIndex != null) {
+    if (routineSelectedIds.includes(id)) { toast('Already in this routine'); return; }
+    routineSelectedIds[swappingIndex] = id;
+    swappingIndex = null;
+    $('routinePickerHint').hidden = true;
+    renderRoutineSelectedList();
+    renderRoutinePickerResults();
+    return;
+  }
   const idx = routineSelectedIds.indexOf(id);
   if (idx === -1) routineSelectedIds.push(id); else routineSelectedIds.splice(idx, 1);
   renderRoutineSelectedList();
@@ -1800,29 +2860,139 @@ $('routinePickerResults').addEventListener('click', (e) => {
 });
 
 $('routineSelectedList').addEventListener('click', (e) => {
-  const btn = e.target.closest('.routine-selected-remove');
-  if (!btn) return;
-  routineSelectedIds = routineSelectedIds.filter((id) => id !== btn.dataset.id);
+  const swapBtn = e.target.closest('.routine-selected-swap');
+  if (swapBtn) {
+    const idx = routineSelectedIds.indexOf(swapBtn.dataset.id);
+    if (idx === -1) return;
+    swappingIndex = idx;
+    const ex = findExercise(swapBtn.dataset.id);
+    $('routinePickerHint').textContent = `Tap an exercise below to replace "${ex?.name ?? 'this exercise'}"`;
+    $('routinePickerHint').hidden = false;
+    renderRoutineSelectedList();
+    $('routinePickerSearch').focus();
+    return;
+  }
+  const removeBtn = e.target.closest('.routine-selected-remove');
+  if (!removeBtn) return;
+  routineSelectedIds = routineSelectedIds.filter((id) => id !== removeBtn.dataset.id);
+  if (swappingIndex != null) { swappingIndex = null; $('routinePickerHint').hidden = true; }
   renderRoutineSelectedList();
   renderRoutinePickerResults();
 });
+
+/** Long-press-and-drag reordering for the routine builder's selected-
+ *  exercise list, via Pointer Events (works for touch and mouse alike,
+ *  unlike HTML5 drag-and-drop which mobile Safari doesn't support). A
+ *  350ms hold confirms the drag is intentional rather than a scroll/tap;
+ *  each time the pointer crosses into a sibling row, that row swaps
+ *  places with the dragged one and the list re-renders around it. */
+const ROUTINE_DRAG_HOLD_MS = 350;
+const ROUTINE_DRAG_CANCEL_PX = 10;
+
+function cancelRoutineDrag() {
+  if (routineDrag?.longPressTimer) clearTimeout(routineDrag.longPressTimer);
+  if (routineDrag?.dragging) {
+    $('routineSelectedList').querySelectorAll('.routine-selected-item.dragging')
+      .forEach((el) => el.classList.remove('dragging'));
+  }
+  routineDrag = null;
+}
+
+$('routineSelectedList').addEventListener('pointerdown', (e) => {
+  if (e.target.closest('button')) return; // remove/swap buttons behave normally
+  const item = e.target.closest('.routine-selected-item');
+  if (!item) return;
+  const id = item.dataset.id;
+  const pointerId = e.pointerId;
+  const longPressTimer = setTimeout(() => {
+    if (!routineDrag || routineDrag.id !== id) return;
+    routineDrag.dragging = true;
+    const el = $('routineSelectedList').querySelector(`.routine-selected-item[data-id="${CSS.escape(id)}"]`);
+    el?.classList.add('dragging');
+    el?.setPointerCapture(pointerId);
+  }, ROUTINE_DRAG_HOLD_MS);
+  routineDrag = { id, pointerId, longPressTimer, startX: e.clientX, startY: e.clientY, dragging: false };
+});
+
+$('routineSelectedList').addEventListener('pointermove', (e) => {
+  if (!routineDrag || routineDrag.pointerId !== e.pointerId) return;
+  if (!routineDrag.dragging) {
+    const dx = Math.abs(e.clientX - routineDrag.startX);
+    const dy = Math.abs(e.clientY - routineDrag.startY);
+    if (dx > ROUTINE_DRAG_CANCEL_PX || dy > ROUTINE_DRAG_CANCEL_PX) cancelRoutineDrag();
+    return;
+  }
+  e.preventDefault();
+  const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.routine-selected-item');
+  if (!target || target.dataset.id === routineDrag.id) return;
+  const fromIdx = routineSelectedIds.indexOf(routineDrag.id);
+  const toIdx = routineSelectedIds.indexOf(target.dataset.id);
+  if (fromIdx === -1 || toIdx === -1) return;
+  routineSelectedIds.splice(fromIdx, 1);
+  routineSelectedIds.splice(toIdx, 0, routineDrag.id);
+  renderRoutineSelectedList();
+  const revived = $('routineSelectedList').querySelector(`.routine-selected-item[data-id="${CSS.escape(routineDrag.id)}"]`);
+  revived?.classList.add('dragging');
+  revived?.setPointerCapture(routineDrag.pointerId);
+});
+
+$('routineSelectedList').addEventListener('pointerup', cancelRoutineDrag);
+$('routineSelectedList').addEventListener('pointercancel', cancelRoutineDrag);
 
 $('routineForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const name = $('routineName').value.trim();
   if (!name) { toast('Enter a routine name'); return; }
   if (routineSelectedIds.length === 0) { toast('Add at least one exercise'); return; }
-  addRoutine({ name, exerciseIds: routineSelectedIds });
+  if (editingRoutineId) {
+    updateRoutine(editingRoutineId, { name, exerciseIds: routineSelectedIds });
+  } else {
+    addRoutine({ name, exerciseIds: routineSelectedIds });
+  }
   routines = loadRoutines();
   renderRoutinesList();
+  const wasEditing = Boolean(editingRoutineId);
   closeRoutineBuilderSheet();
-  toast('Routine saved');
+  toast(wasEditing ? 'Routine updated' : 'Routine saved');
 });
 
 /** @param {ReturnType<typeof newPRsInWorkout>} [newPRs] shown as a
  *  celebratory banner above the duration when non-empty. */
+function summaryExerciseRowHTML(r) {
+  return `
+    <div class="summary-exercise-row">
+      <div class="summary-exercise-name">${escapeHTML(r.name)}</div>
+      <div class="summary-exercise-stats mono">${r.setCount} sets · ${r.totalReps} reps · ${r.volume}kg volume</div>
+    </div>
+  `;
+}
+
+/** Groups workoutSummaryByExercise's rows into superset pairs (two
+ *  consecutive rows sharing a non-null supersetId) or singles - matches
+ *  how the live workout sheet's own blocks end up grouped (readWorkoutForm
+ *  reads them in document order, and pairing always moves both blocks into
+ *  a shared wrapper, so a real pair is always adjacent in the saved data). */
+function groupSummaryRows(rows) {
+  const groups = [];
+  let i = 0;
+  while (i < rows.length) {
+    const row = rows[i];
+    const next = rows[i + 1];
+    if (row.supersetId && next?.supersetId === row.supersetId) {
+      groups.push([row, next]);
+      i += 2;
+    } else {
+      groups.push([row]);
+      i += 1;
+    }
+  }
+  return groups;
+}
+
 function openWorkoutSummarySheet(workout, durationMs, newPRs = []) {
   lastFinishedWorkout = workout;
+  lastFinishedDurationMs = durationMs;
+  lastFinishedNewPRs = newPRs;
   $('summaryPRBanner').hidden = newPRs.length === 0;
   $('summaryPRBanner').innerHTML = newPRs.length === 0 ? '' : [
     `<div class="pr-banner-title">🎉 New Personal Record${newPRs.length > 1 ? 's' : ''}!</div>`,
@@ -1831,12 +3001,10 @@ function openWorkoutSummarySheet(workout, durationMs, newPRs = []) {
   $('summaryDuration').textContent = fmtElapsed(durationMs);
   const rows = workoutSummaryByExercise(workout, allExercises(), bodyweightKg());
   $('summaryExercises').innerHTML = rows.length
-    ? rows.map((r) => `
-      <div class="summary-exercise-row">
-        <div class="summary-exercise-name">${escapeHTML(r.name)}</div>
-        <div class="summary-exercise-stats mono">${r.setCount} sets · ${r.totalReps} reps · ${r.volume}kg volume</div>
-      </div>
-    `).join('')
+    ? groupSummaryRows(rows).map((group) => (group.length > 1
+      ? `<div class="summary-superset-group"><div class="summary-superset-label">⚭ Superset</div>${group.map(summaryExerciseRowHTML).join('')}</div>`
+      : summaryExerciseRowHTML(group[0])
+    )).join('')
     : '<p class="empty">No working sets logged.</p>';
   $('scrim').hidden = false;
   $('workoutSummarySheet').hidden = false;
@@ -1849,10 +3017,258 @@ $('summarySaveRoutine').addEventListener('click', () => {
   openRoutineBuilderSheet(ids);
 });
 
+/** A warm up/cool down phase's distance/pace/HR, pre-formatted the same way
+ *  as the main pace-like metric (mm:ss via block.js's formatPaceMinKm kept
+ *  out of shareCard.js), or null if that phase wasn't carried out. Only
+ *  runs ever have these (see readPhaseFields), so no sport-aware branching
+ *  is needed the way sessionMetric needs for the main metric. */
+function buildRunPhaseShareData(phase) {
+  if (!phase) return null;
+  return {
+    distanceKm: phase.distanceKm ?? null,
+    paceLabel: phase.avgPace != null ? `${formatPaceMinKm(phase.avgPace)}/km` : null,
+    avgHR: phase.avgHR ?? null,
+    maxHR: phase.maxHR ?? null,
+  };
+}
+
+/** Builds a session's share-card data from a saved session - typeLabel
+ *  reuses sessionBadgeLabel, the same badge text the History list's own
+ *  rows show, and paceLabel/paceMetricLabel come from sessionMetric so a
+ *  ride's card says "AVG SPEED" and a swim's says "AVG PACE/100M" instead
+ *  of assuming every session is a run. warmup/cooldown are null unless
+ *  that phase was actually toggled on and logged. */
+function buildRunShareCardData(session) {
+  const metric = sessionMetric(session);
+  return {
+    typeLabel: sessionBadgeLabel(session),
+    dateLabel: fmtDateLong(session.date),
+    distanceKm: session.distanceKm ?? null,
+    durationMin: session.durationMin ?? null,
+    paceLabel: metric.text,
+    paceMetricLabel: metric.label ?? 'AVG PACE',
+    avgHR: session.avgHR ?? null,
+    maxHR: session.maxHR ?? null,
+    warmup: buildRunPhaseShareData(session.warmup),
+    cooldown: buildRunPhaseShareData(session.cooldown),
+  };
+}
+
+/** Fetches a synced run's raw HR stream from intervals.icu for the Zones
+ *  card's graph, alongside this app's own zone table (whichever model is
+ *  primary in Settings) - null/null for a manually-logged run (no
+ *  intervalsActivityId) or if the fetch fails, so the card just skips its
+ *  graph section rather than erroring the whole preview. */
+async function runHRZoneStream(session) {
+  const s = settings.intervals;
+  if (!s?.enabled || !session.intervalsActivityId) return { hrStream: null, zoneTable: null };
+  try {
+    const points = await intervalsFetchActivityStreams(session.intervalsActivityId, s.apiKey);
+    return { hrStream: points, zoneTable: zoneTable(settings, settings.primaryZoneModel) };
+  } catch (err) {
+    console.error('Failed to load HR stream for zones card', err);
+    return { hrStream: null, zoneTable: null };
+  }
+}
+
+/** Builds and caches (per #shareCardSheet visit) the PNG blob for the
+ *  currently open subject - a run session or a workout, each offering a
+ *  Summary/Zones/Receipt design (workout: Summary/Muscles/PRs/Receipt) -
+ *  see shareCardContext and #shareCardTabs' data-kinds. */
+async function buildShareCardBlob(option) {
+  if (shareCardBlobs[option]) return shareCardBlobs[option];
+  let blob;
+  if (shareCardContext.kind === 'run') {
+    const session = shareCardContext.session;
+    const data = buildRunShareCardData(session);
+    if (option === 'zones') {
+      const { hrStream, zoneTable: zt } = await runHRZoneStream(session);
+      blob = await renderRunZonesCard({ ...data, hrStream, zoneTable: zt });
+    } else {
+      blob = option === 'receipt' ? await renderRunReceiptCard(data) : await renderRunShareCard(data);
+    }
+  } else {
+    const { workout, workoutsForPRs, durationMs, newPRs } = shareCardContext;
+    if (option === 'muscle') {
+      blob = await renderMuscleBalanceCard({
+        workoutName: workout.name || null,
+        dateLabel: fmtDateLong(workout.date),
+        muscleDetailed: muscleSetBreakdownDetailed([workout], 'all', workout.date, allExercises()),
+      });
+    } else if (option === 'prs') {
+      const exerciseIds = [...new Set((workout.exercises || []).map((ex) => ex.exerciseId))];
+      const newPRIds = new Set(newPRs.map((p) => p.exerciseId));
+      const prs = exerciseIds.map((id) => {
+        const def = findExercise(id);
+        const pr = personalRecords(workoutsForPRs, id, allExercises(), bodyweightKg());
+        return def && pr ? {
+          name: def.name, maxWeight: pr.maxWeight, best1RM: pr.best1RM, isNew: newPRIds.has(id),
+        } : null;
+      }).filter(Boolean);
+      blob = await renderPRsCard({ workoutName: workout.name || null, dateLabel: fmtDateLong(workout.date), prs });
+    } else {
+      const data = {
+        workoutName: workout.name || null,
+        dateLabel: fmtDateLong(workout.date),
+        durationMs,
+        totalVolume: workoutVolume(workout, allExercises(), bodyweightKg()),
+        exerciseRows: workoutSummaryByExercise(workout, allExercises(), bodyweightKg()),
+        newPRs,
+      };
+      blob = option === 'receipt' ? await renderWorkoutReceiptCard(data) : await renderWorkoutShareCard(data);
+    }
+  }
+  shareCardBlobs[option] = blob;
+  return blob;
+}
+
+/** Renders `option`'s card into #shareCardSheet's preview <img>, generating
+ *  (and caching) it first if this is the first visit to that tab. */
+async function renderShareCardPreview(option) {
+  shareCardOption = option;
+  $('shareCardTabs').querySelectorAll('.scope').forEach((b) => {
+    b.setAttribute('aria-selected', String(b.dataset.option === option));
+  });
+  $('shareCardPreviewImg').hidden = true;
+  $('shareCardPreviewLoading').hidden = false;
+  try {
+    const blob = await buildShareCardBlob(option);
+    if (shareCardOption !== option) return; // superseded by a later tab tap while this was generating
+    if (shareCardObjectUrl) URL.revokeObjectURL(shareCardObjectUrl);
+    shareCardObjectUrl = URL.createObjectURL(blob);
+    $('shareCardPreviewImg').src = shareCardObjectUrl;
+    $('shareCardPreviewImg').hidden = false;
+  } catch (err) {
+    console.error('Failed to render share card preview', err);
+    toast('Could not generate that image');
+  } finally {
+    $('shareCardPreviewLoading').hidden = true;
+  }
+}
+
+/** Shows only the #shareCardTabs buttons whose data-kinds includes
+ *  `kind` - a workout gets all four (Summary/Muscles/PRs/Receipt), a run
+ *  just the two that apply to it (Summary/Receipt). */
+function setShareCardTabsForKind(kind) {
+  $('shareCardTabs').querySelectorAll('.scope').forEach((b) => {
+    b.hidden = !b.dataset.kinds.split(',').includes(kind);
+  });
+}
+
+/** Opens #shareCardSheet for `workout` (either an already-saved one, or a
+ *  synthetic in-progress record built from the live sheet's current form
+ *  state - either way its `id`/`date`/`exercises` shape is all any of the
+ *  four renderers need).
+ * @param {object} workout
+ * @param {object[]} workoutsForPRs full workouts list to compute PRs
+ *   against - see shareCardContext's own comment.
+ * @param {number|null} durationMs */
+function openShareCardSheetFor(workout, workoutsForPRs, durationMs) {
+  shareCardContext = {
+    kind: 'workout',
+    workout,
+    workoutsForPRs,
+    durationMs,
+    newPRs: newPRsInWorkout(workoutsForPRs, workout, allExercises(), bodyweightKg()),
+  };
+  shareCardBlobs = {};
+  setShareCardTabsForKind('workout');
+  $('scrim').hidden = false;
+  $('shareCardSheet').hidden = false;
+  $('shareCardSheet').scrollTop = 0;
+  renderShareCardPreview('summary');
+}
+
+/** Opens #shareCardSheet for a run session. */
+function openRunShareCardSheet(session) {
+  shareCardContext = { kind: 'run', session };
+  shareCardBlobs = {};
+  setShareCardTabsForKind('run');
+  $('scrim').hidden = false;
+  $('shareCardSheet').hidden = false;
+  $('shareCardSheet').scrollTop = 0;
+  renderShareCardPreview('summary');
+}
+
+function closeShareCardSheet() {
+  $('scrim').hidden = true;
+  $('shareCardSheet').hidden = true;
+  if (shareCardObjectUrl) { URL.revokeObjectURL(shareCardObjectUrl); shareCardObjectUrl = null; }
+  shareCardContext = null;
+  shareCardBlobs = {};
+}
+
+$('summaryShare').addEventListener('click', () => {
+  if (!lastFinishedWorkout) return;
+  openShareCardSheetFor(lastFinishedWorkout, workouts, lastFinishedDurationMs);
+});
+
+$('woSharePNG').addEventListener('click', () => {
+  if (workoutEditingId) {
+    const workout = workouts.find((w) => w.id === workoutEditingId);
+    if (!workout) return;
+    openShareCardSheetFor(workout, workouts, workout.durationMs ?? null);
+  } else if (liveSession) {
+    const data = readWorkoutForm();
+    if (data.exercises.length === 0) { toast('Add at least one exercise first'); return; }
+    const durationMs = Date.now() - new Date(liveSession.startedAt).getTime();
+    // Not persisted (the session isn't saved yet) - a throwaway id/record
+    // just so the PR/muscle-breakdown helpers, which all expect a workout
+    // shape, can include today's not-yet-saved sets in their totals.
+    const inProgress = { id: '__live_preview__', ...data };
+    openShareCardSheetFor(inProgress, [...workouts, inProgress], durationMs);
+  }
+});
+
+$('shareCardTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.scope');
+  if (!btn || !shareCardContext) return;
+  renderShareCardPreview(btn.dataset.option);
+});
+
+$('sessionSharePNG').addEventListener('click', () => {
+  const session = sessions.find((s) => s.id === editingId);
+  if (!session) return;
+  openRunShareCardSheet(session);
+});
+
+$('shareCardCancel').addEventListener('click', closeShareCardSheet);
+
+/** Shares (or, where navigator.share can't take image files - desktop
+ *  browsers, mainly - downloads) whichever card is currently previewed. */
+$('shareCardSave').addEventListener('click', async () => {
+  if (!shareCardContext) return;
+  const btn = $('shareCardSave');
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    const blob = await buildShareCardBlob(shareCardOption);
+    const date = shareCardContext.kind === 'run' ? shareCardContext.session.date : shareCardContext.workout.date;
+    const suffix = { summary: 'summary', muscle: 'muscles', prs: 'prs', zones: 'zones', receipt: 'receipt' }[shareCardOption];
+    const file = new File([blob], `hybrd-${shareCardContext.kind}-${date}-${suffix}.png`, { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: shareCardContext.kind === 'run' ? 'Run' : 'Workout' });
+    } else {
+      downloadFile(file.name, blob, 'image/png');
+      toast('Image saved - share it from your Photos/Downloads');
+    }
+  } catch (err) {
+    if (err?.name !== 'AbortError') { // the user cancelling the native share sheet isn't a failure
+      console.error('Failed to save share image', err);
+      toast('Could not save the image');
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+});
+
 function finishLiveWorkout(data) {
   const durationMs = Date.now() - new Date(liveSession.startedAt).getTime();
   const cleaned = {
     ...data,
+    durationMs, // persisted so a share-PNG card generated later still knows it
     exercises: data.exercises.map((ex) => ({
       ...ex,
       sets: ex.sets.map(({ done, ...rest }) => rest),
@@ -1862,6 +3278,11 @@ function finishLiveWorkout(data) {
   workouts = loadWorkouts();
   const newPRs = newPRsInWorkout(workouts, saved, allExercises(), bodyweightKg());
   syncWorkoutToGoogle(saved);
+  if (pendingWorkoutPlanId) {
+    deletePlannedActivity(pendingWorkoutPlanId);
+    pendingWorkoutPlanId = null;
+    plannedActivities = loadPlannedActivities();
+  }
   discardLiveWorkout();
   renderAll();
   openWorkoutSummarySheet(saved, durationMs, newPRs);
@@ -1886,6 +3307,8 @@ function resumeLiveWorkoutIfAny() {
   regroupSupersets();
   $('woPicker').hidden = true;
   $('woDelete').hidden = true;
+  $('woSaveRoutine').hidden = true;
+  $('woSharePNG').hidden = false;
   startLiveTimer();
   showLiveMiniBar();
 }
@@ -1900,6 +3323,7 @@ $('woCancel').addEventListener('click', () => {
     toast('Workout cancelled');
     return;
   }
+  pendingWorkoutPlanId = null;
   closeWorkoutSheet();
 });
 
@@ -1930,6 +3354,11 @@ $('workoutForm').addEventListener('submit', (e) => {
     if (newPRs.length > 0) toast(newPRToastMessage(newPRs), 3400);
     else toast('Workout saved');
     syncWorkoutToGoogle(saved);
+    if (pendingWorkoutPlanId) {
+      deletePlannedActivity(pendingWorkoutPlanId);
+      pendingWorkoutPlanId = null;
+      plannedActivities = loadPlannedActivities();
+    }
   }
   closeWorkoutSheet();
   renderAll();
@@ -1960,6 +3389,14 @@ $('woDelete').addEventListener('click', () => {
   closeWorkoutSheet();
   renderAll();
   toast('Workout deleted');
+});
+
+$('woSaveRoutine').addEventListener('click', () => {
+  const ids = [...new Set([...$('woExerciseList').querySelectorAll('.wo-exercise-block')].map((b) => b.dataset.exerciseId))];
+  if (ids.length === 0) { toast('Add at least one exercise first'); return; }
+  cancelWoExerciseDrag();
+  $('workoutSheet').hidden = true;
+  openRoutineBuilderSheet(ids);
 });
 
 /** Repaints the stat grid and both progress charts for the currently-open
@@ -2430,22 +3867,29 @@ function isoDateDaysAgo(days) {
   return d.toISOString().slice(0, 10);
 }
 
-/** Imports every not-yet-seen run out of `activities` (deduped by
- *  intervalsActivityId), returning how many were added. A date that
- *  already has a manually-logged run (no intervalsActivityId of its own)
- *  is skipped entirely, never touched - a run the user typed in by hand
- *  is never silently duplicated, overwritten, or replaced by an imported
- *  one, even if intervals.icu also has an activity for that same day.
- *  `vo2maxByDate` (optional, date -> number) fills in the watch's own
- *  VO2max estimate for that day, if any - see fetchVo2maxByDate. */
-function importNewIntervalsRunActivities(activities, vo2maxByDate = new Map()) {
+/** Imports every not-yet-seen RUN out of `activities` (deduped by
+ *  intervalsActivityId), returning how many were added. Only runs auto-sync
+ *  - cycling, stairmaster, elliptical, rowing, skiing, and anything else
+ *  intervals.icu might report are logged by hand instead (see the Session
+ *  type picker), so a non-run activity is classified (via classifyActivity
+ *  in intervals.js) just to filter it back out here. A date that already
+ *  has a manually-logged run (no intervalsActivityId of its own) skips
+ *  importing a synced run for that same date - a run the user typed in by
+ *  hand is never silently duplicated, overwritten, or replaced by an
+ *  imported one. `vo2maxByDate` (optional, date -> number) fills in the
+ *  watch's own VO2max estimate for a newly-imported run's day, if any - see
+ *  fetchVo2maxByDate. */
+function importNewIntervalsActivities(activities, vo2maxByDate = new Map()) {
   const existingIds = new Set(sessions.map((s) => s.intervalsActivityId).filter(Boolean));
-  const manualDates = new Set(sessions.filter((s) => !s.intervalsActivityId).map((s) => s.date));
+  const manualRunDates = new Set(
+    sessions.filter((s) => !s.intervalsActivityId && (s.sport ?? 'run') === 'run').map((s) => s.date),
+  );
   let count = 0;
   for (const activity of activities) {
-    if (!isIntervalsRunActivity(activity) || existingIds.has(activity.id)) continue;
+    if (existingIds.has(activity.id)) continue;
     const mapped = intervalsActivityToSession(activity);
-    if (manualDates.has(mapped.date)) continue;
+    if (mapped.sport !== 'run') continue;
+    if (manualRunDates.has(mapped.date)) continue;
     if (vo2maxByDate.has(mapped.date)) mapped.vo2max = vo2maxByDate.get(mapped.date);
     addSession(mapped);
     count += 1;
@@ -2470,12 +3914,13 @@ async function fetchVo2maxByDate(athleteId, apiKey, oldestIso) {
   }
 }
 
-/** Pulls new run activities from intervals.icu into local sessions. The
- *  first sync (no lastSyncedAt yet) backfills the last 90 days; every sync
- *  after that only asks for what's new. No OAuth here (see intervals.js) -
- *  a plain API-key GET, so unlike Strava/Google there's no token to
- *  refresh or redirect to handle, just "does the request succeed". */
-async function syncIntervalsRuns({ silent = false } = {}) {
+/** Pulls new runs from intervals.icu into local sessions. The first sync
+ *  (no lastSyncedAt yet) backfills the last 90 days; every sync after that
+ *  only asks for what's new. No OAuth here
+ *  (see intervals.js) - a plain API-key GET, so unlike Strava/Google
+ *  there's no token to refresh or redirect to handle, just "does the
+ *  request succeed". */
+async function syncIntervalsActivities({ silent = false } = {}) {
   const s = settings.intervals;
   if (!s?.enabled || !s?.athleteId || !s?.apiKey) return;
   let imported = null;
@@ -2484,7 +3929,7 @@ async function syncIntervalsRuns({ silent = false } = {}) {
     const oldest = s.lastSyncedAt || isoDateDaysAgo(90);
     const activities = await intervalsListActivities(s.athleteId, s.apiKey, oldest);
     const vo2maxByDate = await fetchVo2maxByDate(s.athleteId, s.apiKey, oldest);
-    imported = importNewIntervalsRunActivities(activities, vo2maxByDate);
+    imported = importNewIntervalsActivities(activities, vo2maxByDate);
     settings = { ...settings, intervals: { ...settings.intervals, lastSyncedAt: todayIso() } };
     saveSettings(settings);
     intervalsNeedsReconnect = false;
@@ -2556,7 +4001,7 @@ $('intervalsConnect').addEventListener('click', async () => {
     const vo2maxByDate = await fetchVo2maxByDate(athleteId, apiKey, isoDateDaysAgo(90));
     settings = { ...settings, intervals: { athleteId, apiKey, enabled: true, lastSyncedAt: todayIso() } };
     saveSettings(settings);
-    const imported = importNewIntervalsRunActivities(activities, vo2maxByDate);
+    const imported = importNewIntervalsActivities(activities, vo2maxByDate);
     intervalsNeedsReconnect = false;
     renderAll();
     renderIntervalsStatus();
@@ -2580,7 +4025,7 @@ $('intervalsDisconnect').addEventListener('click', () => {
   toast('Disconnected');
 });
 
-$('intervalsSyncNow').addEventListener('click', () => { syncIntervalsRuns(); });
+$('intervalsSyncNow').addEventListener('click', () => { syncIntervalsActivities(); });
 
 /* --------------------------------------------------------- WATCH SYNC */
 
@@ -2838,7 +4283,7 @@ renderAll();
 switchView('dashboard');
 resumeLiveWorkoutIfAny();
 if (settings.intervals.enabled) {
-  syncIntervalsRuns({ silent: true });
+  syncIntervalsActivities({ silent: true });
   syncIntervalsWellness();
 }
 if (settings.watchSync.enabled) {
@@ -2856,7 +4301,34 @@ if (bootSplash) {
 }
 
 if ('serviceWorker' in navigator) {
+  // 'controllerchange' also fires once on a page's very first-ever
+  // activation (uncontrolled -> controlled), not just on a genuine version
+  // swap - reloading for that case would be pointless (there's no newer
+  // content to pick up) and, worse, would land mid-boot on a first visit.
+  // Only a page that was *already* controlled by some service worker
+  // before this event is a real "a new version just took over" signal.
+  const hadController = Boolean(navigator.serviceWorker.controller);
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      // Force an update check on every load rather than waiting on the
+      // browser's own heuristic - iOS home-screen installs in particular
+      // can go a long time (sometimes indefinitely, until reinstalled)
+      // between automatic checks, leaving the app stuck on an old version
+      // even after a force-quit and relaunch.
+      reg.update().catch(() => {});
+    }).catch(() => {});
+  });
+
+  // sw.js calls skipWaiting()/clients.claim(), so a new service worker
+  // taking control of an already-controlled page means a fresh version
+  // just installed - reload once so it's actually applied immediately
+  // instead of leaving this page running on the stale JS/CSS it already
+  // loaded until the next full relaunch.
+  let refreshingForNewVersion = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || refreshingForNewVersion) return;
+    refreshingForNewVersion = true;
+    window.location.reload();
   });
 }

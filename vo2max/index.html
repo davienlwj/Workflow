@@ -79,18 +79,30 @@
 
     <div id="statGrid" class="stat-grid"></div>
 
-    <button type="button" id="startRunBtn" class="primary block">+ Log run</button>
+    <button type="button" id="startRunBtn" class="primary block">+ Log session</button>
 
-    <h2 class="section-title">VO<sub>2</sub>max trend</h2>
-    <div id="chartWrap" class="chart-wrap"></div>
+    <div class="section-title-row">
+      <h2 class="section-title">Races</h2>
+      <button type="button" id="mileagePlanEditBtn" class="ghost-btn small">Edit</button>
+    </div>
+    <div id="racesCard" class="mileage-plan-card">
+      <div id="raceInfoBlock"></div>
+      <div class="mileage-plan-sublabel">Mileage plan</div>
+      <div id="mileagePlanProgress"></div>
+      <details class="settings-details mileage-plan-guide">
+        <summary class="section-title">Training guide</summary>
+        <div id="trainingGuideBody" class="settings-details-body"></div>
+      </details>
+    </div>
 
-    <h2 class="section-title">Total mileage <span id="mileageTotal" class="mono"></span></h2>
+    <h2 class="section-title">Total mileage</h2>
     <div id="mileageScope" class="scopes" role="tablist" aria-label="Mileage range">
       <button type="button" class="scope" role="tab" data-scope="week" aria-selected="true">Week</button>
       <button type="button" class="scope" role="tab" data-scope="month" aria-selected="false">Month</button>
       <button type="button" class="scope" role="tab" data-scope="year" aria-selected="false">Year</button>
     </div>
     <div id="mileageChartWrap" class="chart-wrap"></div>
+    <p id="mileageTotal" class="mileage-total-footer mono"></p>
 
     <h2 class="section-title">All sessions</h2>
     <ul id="historyList" class="history-list"></ul>
@@ -239,7 +251,7 @@
     <details class="settings-details">
       <summary class="section-title">intervals.icu sync (via Zepp)</summary>
       <div class="settings-details-body form">
-        <p class="field-hint">Automatically imports your runs from intervals.icu, and shows your most recent Resting HR and Sleep as Dashboard stat tiles. Connect your Zepp/Amazfit account directly on a free intervals.icu account (intervals.icu → Settings → Amazfit → sign in with Zepp), then paste your intervals.icu API key below. Runs only - no equivalent to per-exercise lift data, so workouts still need to be logged by hand. No backend or paid API needed, just your own free API key - see the app's README.</p>
+        <p class="field-hint">Automatically imports your runs from intervals.icu, and shows your most recent Resting HR and Sleep as Dashboard stat tiles. Connect your Zepp/Amazfit account directly on a free intervals.icu account (intervals.icu → Settings → Amazfit → sign in with Zepp), then paste your intervals.icu API key below. Runs only - cycling, stairmaster, elliptical, rowing and skiing sessions aren't auto-imported, so log those (and any lift workouts) by hand from the Session type picker. No backend or paid API needed, just your own free API key - see the app's README.</p>
         <label class="field">
           <span>Athlete ID</span>
           <input id="intervalsAthleteId" type="text" placeholder="e.g. i123456" autocomplete="off" spellcheck="false">
@@ -324,13 +336,26 @@
     <label class="field">
       <span>Session type</span>
       <select id="editType">
-        <option value="interval">Interval (Norwegian 4x4)</option>
-        <option value="easy-run">Easy run</option>
-        <option value="long-run">Long run</option>
+        <option value="run">Run</option>
+        <option value="ride">Cycling</option>
+        <option value="stairmaster">Stairmaster</option>
+        <option value="elliptical">Elliptical</option>
+        <option value="row">RowErg</option>
+        <option value="ski">SkiErg</option>
       </select>
     </label>
 
-    <label class="field field-toggle">
+    <label class="field" id="editRunTypeField">
+      <span>Run type</span>
+      <select id="editRunType">
+        <option value="easy">Easy</option>
+        <option value="long">Long</option>
+        <option value="threshold">Threshold</option>
+        <option value="vo2max">VO2max</option>
+      </select>
+    </label>
+
+    <label class="field field-toggle" id="editWarmupToggleField">
       <span>Warm up</span>
       <input id="editWarmupToggle" type="checkbox">
     </label>
@@ -358,19 +383,24 @@
     </div>
 
     <div id="editRunFields" class="form">
+      <p id="editWorkoutLabel" class="field-section-label">Workout</p>
       <div class="row">
         <label class="field">
           <span>Duration (min)</span>
           <input id="editDurationMin" type="number" min="0" max="600">
         </label>
-        <label class="field">
-          <span>Avg pace (min/km)</span>
+        <label class="field" id="editAvgPaceField">
+          <span id="editAvgPaceLabel">Avg pace (min/km)</span>
           <input id="editAvgPace" type="text" placeholder="e.g. 5:25">
         </label>
       </div>
-      <label class="field">
-        <span>Distance (km) <em>(auto from duration + pace)</em></span>
+      <label class="field" id="editDistanceKmField">
+        <span>Distance (km) <em id="editDistanceHint">(auto from duration + pace)</em></span>
         <input id="editDistanceKm" type="number" step="0.01" min="0">
+      </label>
+      <label class="field" id="editDistanceMField" hidden>
+        <span>Distance (m)</span>
+        <input id="editDistanceM" type="number" min="0" step="1" placeholder="e.g. 2000">
       </label>
       <div class="row">
         <label class="field">
@@ -382,9 +412,10 @@
           <input id="editRunMaxHR" type="number" min="60" max="230">
         </label>
       </div>
+      <div id="editExtraFields" class="form"></div>
     </div>
 
-    <label class="field field-toggle">
+    <label class="field field-toggle" id="editCooldownToggleField">
       <span>Cool down</span>
       <input id="editCooldownToggle" type="checkbox">
     </label>
@@ -429,6 +460,7 @@
 
     <button type="button" id="editAddToCalendar" class="ghost-btn block">Add to Calendar</button>
     <button type="button" id="editViewActivityDetail" class="ghost-btn block" hidden>View HR zones &amp; graphs</button>
+    <button type="button" id="sessionSharePNG" class="ghost-btn block">Save PNG</button>
 
     <div class="actions">
       <button type="button" id="editDelete" class="danger-btn">Delete</button>
@@ -459,13 +491,26 @@
     <label class="field">
       <span>Session type</span>
       <select id="logType">
-        <option value="interval">Interval (Norwegian 4x4)</option>
-        <option value="easy-run">Easy run</option>
-        <option value="long-run">Long run</option>
+        <option value="run">Run</option>
+        <option value="ride">Cycling</option>
+        <option value="stairmaster">Stairmaster</option>
+        <option value="elliptical">Elliptical</option>
+        <option value="row">RowErg</option>
+        <option value="ski">SkiErg</option>
       </select>
     </label>
 
-    <label class="field field-toggle">
+    <label class="field" id="logRunTypeField">
+      <span>Run type</span>
+      <select id="logRunType">
+        <option value="easy">Easy</option>
+        <option value="long">Long</option>
+        <option value="threshold">Threshold</option>
+        <option value="vo2max">VO2max</option>
+      </select>
+    </label>
+
+    <label class="field field-toggle" id="logWarmupToggleField">
       <span>Warm up</span>
       <input id="logWarmupToggle" type="checkbox">
     </label>
@@ -493,19 +538,24 @@
     </div>
 
     <div id="logRunFields" class="form">
+      <p id="logWorkoutLabel" class="field-section-label">Workout</p>
       <div class="row">
         <label class="field">
           <span>Duration (min)</span>
           <input id="logDurationMin" type="number" min="0" max="600" placeholder="e.g. 45">
         </label>
-        <label class="field">
-          <span>Avg pace (min/km)</span>
+        <label class="field" id="logAvgPaceField">
+          <span id="logAvgPaceLabel">Avg pace (min/km)</span>
           <input id="logAvgPace" type="text" placeholder="e.g. 5:25">
         </label>
       </div>
-      <label class="field">
-        <span>Distance (km) <em>(auto from duration + pace)</em></span>
+      <label class="field" id="logDistanceKmField">
+        <span>Distance (km) <em id="logDistanceHint">(auto from duration + pace)</em></span>
         <input id="logDistanceKm" type="number" step="0.01" min="0" placeholder="e.g. 8.20">
+      </label>
+      <label class="field" id="logDistanceMField" hidden>
+        <span>Distance (m)</span>
+        <input id="logDistanceM" type="number" min="0" step="1" placeholder="e.g. 2000">
       </label>
       <div class="row">
         <label class="field">
@@ -517,9 +567,10 @@
           <input id="logRunMaxHR" type="number" min="60" max="230" placeholder="bpm">
         </label>
       </div>
+      <div id="logExtraFields" class="form"></div>
     </div>
 
-    <label class="field field-toggle">
+    <label class="field field-toggle" id="logCooldownToggleField">
       <span>Cool down</span>
       <input id="logCooldownToggle" type="checkbox">
     </label>
@@ -617,6 +668,9 @@
       <textarea id="woNotes" rows="3"></textarea>
     </label>
 
+    <button type="button" id="woSharePNG" class="ghost-btn block" hidden>Save PNG</button>
+    <button type="button" id="woSaveRoutine" class="ghost-btn block" hidden>Save as Routine</button>
+
     <div class="actions">
       <button type="button" id="woDelete" class="danger-btn" hidden>Delete</button>
       <button type="button" id="woCancel" class="ghost-btn">Cancel</button>
@@ -650,7 +704,7 @@
 <!-- Routine builder sheet (popup, name + pick exercises, opened from Routines or "Save as Routine") -->
 <section id="routineBuilderSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="New routine">
   <div class="grabber"></div>
-  <h2 class="view-title">New Routine</h2>
+  <h2 id="routineBuilderTitle" class="view-title">New Routine</h2>
   <form id="routineForm" class="form">
     <label class="field">
       <span>Routine name</span>
@@ -660,6 +714,7 @@
     <div id="routineSelectedList" class="routine-selected-list"></div>
     <p id="routineSelectedEmpty" class="empty" hidden>No exercises picked yet — search below to add some.</p>
 
+    <p id="routinePickerHint" class="wo-picker-hint" hidden></p>
     <input id="routinePickerSearch" type="text" class="wo-picker-search" placeholder="Search exercises…">
     <div id="routinePickerChips" class="wo-picker-chips"></div>
     <button type="button" id="routineNewExerciseBtn" class="ghost-btn block">+ Create new exercise</button>
@@ -685,7 +740,7 @@
 
     <div id="routinePickerResults" class="wo-picker-results"></div>
 
-    <div class="actions">
+    <div id="routineBuilderActions" class="actions">
       <button type="button" id="routineCancel" class="ghost-btn">Cancel</button>
       <button type="submit" id="routineSave" class="primary">Save routine</button>
     </div>
@@ -699,9 +754,153 @@
   <div id="summaryPRBanner" class="pr-banner" hidden></div>
   <div id="summaryDuration" class="summary-duration mono"></div>
   <div id="summaryExercises" class="summary-exercises"></div>
+  <button type="button" id="summaryShare" class="ghost-btn block">Save PNG</button>
   <div class="actions">
     <button type="button" id="summarySaveRoutine" class="ghost-btn block">Save as Routine</button>
     <button type="button" id="summaryDone" class="primary block">Done</button>
+  </div>
+</section>
+
+<!-- Run summary sheet (popup, shown right after saving a run) -->
+<section id="runSummarySheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Run summary">
+  <div class="grabber"></div>
+  <h2 class="view-title">Run complete</h2>
+  <div id="runSummaryDuration" class="summary-duration mono"></div>
+  <div id="runSummaryPhases" class="summary-exercises"></div>
+  <button type="button" id="runSummaryShare" class="ghost-btn block">Save PNG</button>
+  <div class="actions">
+    <button type="button" id="runSummaryDone" class="primary block">Done</button>
+  </div>
+</section>
+
+<!-- Edit races/mileage-plan sheet (popup, opened from the Run tab's Races card) -->
+<section id="mileagePlanEditSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Edit races">
+  <div class="grabber"></div>
+  <h2 class="view-title">Edit races</h2>
+  <form id="mileagePlanEditForm" class="form">
+    <p class="field-section-label">Target race</p>
+    <label class="field">
+      <span>Race name</span>
+      <input id="mileagePlanRaceName" type="text" placeholder="e.g. City Half Marathon">
+    </label>
+    <div class="row">
+      <label class="field">
+        <span>Date</span>
+        <input id="mileagePlanRaceDate" type="date">
+      </label>
+      <label class="field">
+        <span>Distance (km)</span>
+        <input id="mileagePlanRaceDistance" type="number" step="0.1" min="0">
+      </label>
+    </div>
+    <div class="row">
+      <label class="field">
+        <span>Location</span>
+        <input id="mileagePlanRaceLocation" type="text" placeholder="e.g. Singapore">
+      </label>
+      <label class="field">
+        <span>Goal time</span>
+        <input id="mileagePlanRaceGoalTime" type="text" placeholder="e.g. 1:45:00">
+      </label>
+    </div>
+    <label class="field">
+      <span>Notes <em>(optional)</em></span>
+      <input id="mileagePlanRaceNotes" type="text" placeholder="e.g. Boston qualifier attempt">
+    </label>
+
+    <p class="field-section-label">Mileage plan</p>
+    <label class="field mileage-plan-start-row">
+      <span>Start date (Monday of Week 1)</span>
+      <input id="mileagePlanStartDate" type="date" required>
+    </label>
+    <div id="mileagePlanWeekRows" class="mileage-plan-rows"></div>
+    <button type="button" id="mileagePlanAddWeek" class="ghost-btn block">+ Add week</button>
+    <button type="button" id="mileagePlanLoadDefault" class="ghost-btn block">Load default 22-week plan</button>
+    <div class="actions">
+      <button type="button" id="mileagePlanEditCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</section>
+
+<!-- Week breakdown sheet (popup, opened by tapping a week number in the Edit races sheet - stacks on top of it, doesn't close it) -->
+<section id="weekBreakdownSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Week breakdown">
+  <div class="grabber"></div>
+  <h2 class="view-title" id="weekBreakdownTitle">Week</h2>
+  <div id="weekBreakdownSummary" class="mileage-plan-longrun"></div>
+  <div id="weekBreakdownRows" class="week-breakdown-rows"></div>
+  <p class="week-breakdown-hint">Long run is set on the week row itself - these percentages split the rest of that week's total km across easy, tempo and interval running.</p>
+  <div id="weekBreakdownAccounted" class="week-breakdown-accounted mono"></div>
+  <div class="actions">
+    <button type="button" id="weekBreakdownCancel" class="ghost-btn">Cancel</button>
+    <button type="button" id="weekBreakdownSave" class="primary">Save</button>
+  </div>
+</section>
+
+<!-- Plan a run sheet (popup, opened from a calendar day's "+ Plan run") -->
+<section id="planRunSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Plan a run">
+  <div class="grabber"></div>
+  <h2 class="view-title">Plan a run</h2>
+  <div id="planRunDate" class="cal-day-panel-date mono"></div>
+  <form id="planRunForm" class="form">
+    <label class="field">
+      <span>Run type</span>
+      <select id="planRunType"></select>
+    </label>
+    <label class="field">
+      <span>Target distance (km) <em>(optional)</em></span>
+      <input id="planRunDistance" type="number" step="0.1" min="0">
+    </label>
+    <label class="field">
+      <span>Note <em>(optional)</em></span>
+      <input id="planRunNote" type="text" placeholder="e.g. easy shakeout">
+    </label>
+    <div class="actions">
+      <button type="button" id="planRunCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" class="primary">Save plan</button>
+    </div>
+  </form>
+</section>
+
+<!-- Plan a workout sheet (popup, opened from a calendar day's "+ Plan workout") -->
+<section id="planWorkoutSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Plan a workout">
+  <div class="grabber"></div>
+  <h2 class="view-title">Plan a workout</h2>
+  <div id="planWorkoutDate" class="cal-day-panel-date mono"></div>
+  <form id="planWorkoutForm" class="form">
+    <label class="field">
+      <span>Routine <em>(optional)</em></span>
+      <select id="planWorkoutRoutine"><option value="">No routine — start blank</option></select>
+    </label>
+    <label class="field">
+      <span>Note <em>(optional)</em></span>
+      <input id="planWorkoutNote" type="text" placeholder="e.g. focus on legs">
+    </label>
+    <div class="actions">
+      <button type="button" id="planWorkoutCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" class="primary">Save plan</button>
+    </div>
+  </form>
+</section>
+
+<!-- Save-PNG sheet (popup, preview + pick one of 3 share-card designs before saving/sharing) -->
+<section id="shareCardSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Save PNG">
+  <div class="grabber"></div>
+  <h2 class="view-title">Save PNG</h2>
+  <div id="shareCardTabs" class="scopes" role="tablist" aria-label="Which image to save">
+    <button type="button" class="scope" role="tab" data-option="summary" data-kinds="workout,run" aria-selected="true">Summary</button>
+    <button type="button" class="scope" role="tab" data-option="muscle" data-kinds="workout" aria-selected="false">Muscles</button>
+    <button type="button" class="scope" role="tab" data-option="prs" data-kinds="workout" aria-selected="false">PRs</button>
+    <button type="button" class="scope" role="tab" data-option="zones" data-kinds="run" aria-selected="false">Zones</button>
+    <button type="button" class="scope" role="tab" data-option="receipt" data-kinds="workout,run" aria-selected="false">Receipt</button>
+  </div>
+  <div class="share-card-preview-wrap">
+    <img id="shareCardPreviewImg" class="share-card-preview-img" alt="Share card preview" hidden>
+    <div id="shareCardPreviewLoading" class="share-card-preview-loading">Generating…</div>
+  </div>
+  <div class="actions">
+    <button type="button" id="shareCardCancel" class="ghost-btn">Close</button>
+    <button type="button" id="shareCardSave" class="primary">Save / Share</button>
   </div>
 </section>
 
@@ -740,7 +939,7 @@
   <div id="activityZoneChartWrap" class="chart-wrap"></div>
   <p class="chart-label">Heart Rate</p>
   <div id="activityHRChartWrap" class="chart-wrap"></div>
-  <p class="chart-label">Pace</p>
+  <p id="activityPaceChartLabel" class="chart-label">Pace</p>
   <div id="activityPaceChartWrap" class="chart-wrap"></div>
   <button type="button" id="activityDetailClose" class="ghost-btn block">Close</button>
 </section>
@@ -765,7 +964,7 @@
     <div id="exDetailChart" class="chart-wrap"></div>
     <p class="chart-label">Volume</p>
     <div id="exDetailVolumeChart" class="chart-wrap"></div>
-    <div class="actions">
+    <div id="exDetailActions" class="actions">
       <button type="button" id="exDetailEditCustom" class="ghost-btn" hidden>Edit exercise</button>
       <button type="button" id="exDetailDeleteCustom" class="danger-btn" hidden>Delete exercise</button>
       <button type="button" id="exDetailClose" class="ghost-btn block">Close</button>
@@ -794,11 +993,6 @@
 
 <div id="toast" class="toast" hidden></div>
 
-<!-- Vendored (not CDN, so it works offline like the rest of the shell) -
-     renders a DOM node to a canvas, used only for "Save PNG" on an exercise
-     card. Loaded as a plain script (not a module) so it runs before the
-     deferred module below and exposes window.html2canvas to app.js. -->
-<script src="./js/vendor/html2canvas.min.js"></script>
 <script type="module" src="./js/app.js"></script>
 </body>
 </html>

@@ -77,6 +77,18 @@ export function descriptionText(session) {
   }
   if (session.durationMin != null) lines.push(`Duration: ${session.durationMin} min`);
   if (session.avgPace != null) lines.push(`Avg pace: ${formatPaceMinKm(session.avgPace)} min/km`);
+  if (session.avgSpeedKmh != null) lines.push(`Avg speed: ${session.avgSpeedKmh} km/h`);
+  if (session.avgPace100m != null) lines.push(`Avg pace: ${formatPaceMinKm(session.avgPace100m)} min/100m`);
+  if (session.avgPace500m != null) lines.push(`Avg pace: ${formatPaceMinKm(session.avgPace500m)} min/500m`);
+  if (session.avgRpm != null) lines.push(`Avg cadence: ${session.avgRpm} rpm`);
+  if (session.avgStrokeRate != null) lines.push(`Stroke rate: ${session.avgStrokeRate} spm`);
+  if (session.avgPower != null) lines.push(`Avg power: ${session.avgPower} W`);
+  if (session.floorsClimbed != null) lines.push(`Floors climbed: ${session.floorsClimbed}`);
+  if (session.stepRate != null) lines.push(`Step rate: ${session.stepRate} steps/min`);
+  if (session.level != null) lines.push(`Level: ${session.level}`);
+  if (session.resistanceLevel != null) lines.push(`Resistance level: ${session.resistanceLevel}`);
+  if (session.incline != null) lines.push(`Incline: ${session.incline}%`);
+  if (session.strideRate != null) lines.push(`Stride rate: ${session.strideRate} spm`);
   if (session.distanceKm != null) lines.push(`Distance: ${session.distanceKm} km`);
   if (session.avgHR != null) lines.push(`Average HR: ${session.avgHR} bpm`);
   if (session.maxHR != null) lines.push(`Max HR: ${session.maxHR} bpm`);
@@ -86,22 +98,42 @@ export function descriptionText(session) {
   return lines.join('\n');
 }
 
-const typeLabel = { interval: '4x4', 'easy-run': 'Easy run', 'long-run': 'Long run' };
+// interval/easy-run/long-run are legacy keys (every run's type before the
+// Easy/Long/Threshold/VO2max split existed) - kept mapped rather than
+// migrated so old sessions keep displaying correctly. Mirrors app.js's own
+// typeLabel/ACTIVITY_LABEL/sessionBadgeLabel (kept as a local duplicate,
+// same as this file's other small label maps, so ics.js stays importable
+// standalone without a circular dependency on app.js).
+const typeLabel = {
+  interval: 'VO2max', 'easy-run': 'Easy', 'long-run': 'Long',
+  easy: 'Easy', long: 'Long', threshold: 'Threshold', vo2max: 'VO2max',
+};
+const activityLabel = {
+  run: 'Run', ride: 'Cycling', stairmaster: 'Stairmaster', elliptical: 'Elliptical',
+  row: 'RowErg', ski: 'SkiErg', swim: 'Swim', other: 'Activity',
+};
 
-// Sessions logged before the type field existed have no `type` at all — treat as interval.
-function typeOf(session) {
-  return session.type ?? 'interval';
+/** A run's own Easy/Long/Threshold/VO2max sub-classification, or another
+ *  sport's Activity label (Cycling, RowErg, ...) - preferring a legacy
+ *  synced session's specific stored `type` string over the generic
+ *  Activity label when both exist. */
+function badgeLabel(session) {
+  const sport = session.sport ?? 'run';
+  if (sport === 'run') {
+    const t = session.type ?? 'interval';
+    return typeLabel[t] ?? t;
+  }
+  return session.type || activityLabel[sport] || 'Activity';
 }
 
 export function summaryText(session) {
-  const type = typeOf(session);
   if (hasLegacyIntervalData(session)) {
     const recovery = recoveryLabel[session.recovery] ?? session.recovery;
     return `VO2max: ${session.intervalsCompleted} interval${session.intervalsCompleted === 1 ? '' : 's'} (${recovery})`;
   }
   const duration = session.durationMin != null ? `${session.durationMin}min` : 'run';
   const distance = session.distanceKm != null ? `, ${session.distanceKm}km` : '';
-  return `${typeLabel[type] ?? 'Run'}: ${duration}${distance}`;
+  return `${badgeLabel(session)}: ${duration}${distance}`;
 }
 
 export function sessionToICS(session) {
