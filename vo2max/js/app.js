@@ -33,7 +33,7 @@ import {
   fetchWellnessHistory as intervalsFetchWellnessHistory,
   fetchActivityStreams as intervalsFetchActivityStreams,
 } from './intervals.js';
-import { fetchWatchWorkouts } from './gistSync.js';
+import { fetchGistData } from './gistSync.js';
 import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
   exerciseById, searchExercises,
@@ -2553,6 +2553,26 @@ $('intervalsSyncNow').addEventListener('click', () => { syncIntervalsRuns(); });
 // by the next successful one - same purpose as intervalsNeedsReconnect above.
 let watchSyncNeedsReconnect = false;
 
+/** Registers any watch-added custom exercise (from the watch's own Watch
+ *  settings, synced alongside its workouts) that isn't already known here,
+ *  by id - so a workout referencing one resolves to a real name/entry
+ *  instead of showing up blank. addCustomExercise keeps a given id as-is
+ *  (see store.js) rather than generating a new one, which is what makes
+ *  this line up with the exerciseId the synced workout actually uses.
+ *  Deliberately minimal (name only) since the watch has no muscle-group
+ *  picker - edit it further here any time, same as one added by hand. */
+function registerWatchCustomExercises(watchCustomExercises) {
+  const existingIds = new Set(customExercises.map((e) => e.id));
+  let count = 0;
+  for (const e of watchCustomExercises) {
+    if (!e.id || !e.name || existingIds.has(e.id)) continue;
+    addCustomExercise({ id: e.id, name: e.name, equipment: 'Bodyweight', muscles: [] });
+    count += 1;
+  }
+  if (count > 0) customExercises = loadCustomExercises();
+  return count;
+}
+
 /** Imports every not-yet-seen watch workout (deduped by watchWorkoutId,
  *  the stable id the watch stamps on each finished workout - see
  *  hybrd-watch/utils/liveWorkout.js), returning how many were added. */
@@ -2574,7 +2594,8 @@ async function syncWatchWorkouts({ silent = false } = {}) {
   let imported = null;
   let failure = null;
   try {
-    const watchWorkouts = await fetchWatchWorkouts(s.gistId, s.token);
+    const { workouts: watchWorkouts, customExercises: watchCustomExercises } = await fetchGistData(s.gistId, s.token);
+    registerWatchCustomExercises(watchCustomExercises);
     imported = importNewWatchWorkouts(watchWorkouts);
     settings = { ...settings, watchSync: { ...settings.watchSync, lastSyncedAt: new Date().toISOString() } };
     saveSettings(settings);
@@ -2625,9 +2646,10 @@ $('watchSyncConnect').addEventListener('click', async () => {
   const token = $('watchSyncToken').value.trim();
   if (!gistId || !token) { toast('Fill in both the Gist ID and token first'); return; }
   try {
-    const watchWorkouts = await fetchWatchWorkouts(gistId, token);
+    const { workouts: watchWorkouts, customExercises: watchCustomExercises } = await fetchGistData(gistId, token);
     settings = { ...settings, watchSync: { gistId, token, enabled: true, lastSyncedAt: new Date().toISOString() } };
     saveSettings(settings);
+    registerWatchCustomExercises(watchCustomExercises);
     const imported = importNewWatchWorkouts(watchWorkouts);
     watchSyncNeedsReconnect = false;
     renderAll();

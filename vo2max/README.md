@@ -244,10 +244,16 @@ Gist.
 
 **What doesn't come across:** the watch logs a simplified version of a
 workout (weight, reps, and adjacent-pair supersets, no set-type marking, no
-machine brand, no per-set notes, and only from the built-in exercise
-library) - once it lands in your history here, though, it's a normal
-workout entry, editable with this app's full tools same as anything logged
-by hand.
+machine brand, no per-set notes) - once it lands in your history here,
+though, it's a normal workout entry, editable with this app's full tools
+same as anything logged by hand.
+
+**Custom exercises added on the watch** (from its own Zepp app settings,
+not this app) sync over too: the same Gist carries their id/name, and a
+workout referencing one that isn't already in your custom exercise list here
+gets it added automatically (as `Bodyweight`, no muscle group, since the
+watch has no picker for those) the first time such a workout comes in - edit
+it further in Settings anytime after, same as one you added by hand.
 
 ## Zone math
 

@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, MAX_WORKOUT_HISTORY } from '../utils/constants'
 import { pushWorkoutsToGist } from './gist'
 
 const WORKOUTS_KEY = 'watchWorkouts'
+const CUSTOM_EXERCISES_KEY = 'customExercises'
 
 function getSettings() {
   const settings = { ...DEFAULT_SETTINGS }
@@ -27,15 +28,34 @@ function saveWorkouts(workouts) {
   settingsLib.setItem(WORKOUTS_KEY, JSON.stringify(workouts))
 }
 
-/** Best-effort: pushes the full local history to the configured Gist.
- *  Never throws - a save always succeeds locally regardless of whether the
- *  network is reachable right now, and the next successful sync (after any
- *  future save) re-pushes the complete list anyway, so nothing is lost. */
+/** Exercises added from the phone's Watch settings page (see
+ *  setting/index.js) - stored there as the same JSON array under this key,
+ *  settingsStorage/settingsLib being the one thing both ends can read. */
+function loadCustomExercises() {
+  try {
+    const raw = settingsLib.getItem(CUSTOM_EXERCISES_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function getCustomExercises(res) {
+  res(null, { exercises: loadCustomExercises() })
+}
+
+/** Best-effort: pushes the full local history (and the current custom
+ *  exercise list, so the phone can register any it's missing) to the
+ *  configured Gist. Never throws - a save always succeeds locally
+ *  regardless of whether the network is reachable right now, and the next
+ *  successful sync (after any future save) re-pushes the complete list
+ *  anyway, so nothing is lost. */
 async function trySyncToGist(workouts) {
   const settings = getSettings()
   if (!settings.gistId || !settings.githubToken) return
   try {
-    await pushWorkoutsToGist(settings.gistId, settings.githubToken, workouts)
+    await pushWorkoutsToGist(settings.gistId, settings.githubToken, workouts, loadCustomExercises())
   } catch (err) {
     console.log(`gist sync failed: ${err.message}`)
   }
@@ -133,6 +153,8 @@ AppSideService(
         getWorkouts(res)
       } else if (req.method === 'GET_LAST_SET') {
         getLastSet(res, req.params)
+      } else if (req.method === 'GET_CUSTOM_EXERCISES') {
+        getCustomExercises(res)
       }
     },
     onRun() {},

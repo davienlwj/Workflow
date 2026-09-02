@@ -27,23 +27,44 @@ to piggyback on.
 - **Workout** — log a strength workout: tapping "Workout" (or
   "+ Add Exercise" once one is in progress) goes straight to picking an
   exercise from the full built-in library (grouped by body part,
-  scrollable), then a +/− weight/reps stepper per set. The stepper starts
-  from what you actually lifted last time for that exercise — the most
-  recent set within the current session if there is one, otherwise the last
-  time you logged it in any past workout — rather than a generic default,
-  so repeat sets (the common case) are often just "Add Set" with no
-  adjustment at all. Reorder or superset exercises from the
-  exercise-management screen, and watch a live timer and running volume
+  scrollable — plus a "Custom" group for exercises you've added from the
+  phone's Watch settings, see below), then a +/− weight/reps stepper per
+  set. The stepper starts from what you actually lifted last time for that
+  exercise — the most recent set within the current session if there is
+  one, otherwise the last time you logged it in any past workout — rather
+  than a generic default, so repeat sets (the common case) are often just
+  "Add Set" with no adjustment at all. Reorder or superset exercises from
+  the exercise-management screen, and watch a live timer and running volume
   total while you go. Finishing shows a quick summary (time, volume,
   exercises, sets) and syncs the workout to the phone app's history via a
   GitHub Gist — see "Workout sync" below.
 
-Only the built-in exercise library is loggable from the watch (not any custom
-exercises you've added on the phone), and each set only records weight, reps
-and a fixed "normal" set type — no warm-up/drop/failure marking, no machine
-brand, no per-set notes. Everything the phone app's fuller editor supports is
-still there once a workout arrives in your history; the watch is a fast
-logger, not a replacement for it.
+A workout in progress survives quitting the app: it's saved to the watch's
+own local storage on every change (not just on Finish), and restored when
+you reopen HYBR.D, timer included — the elapsed time is computed from when
+you started, not ticked while the app happens to be open, so it's correct
+whether you were gone ten seconds or ten minutes.
+
+Each set only records weight, reps and a fixed "normal" set type — no
+warm-up/drop/failure marking, no machine brand, no per-set notes. Everything
+the phone app's fuller editor supports is still there once a workout arrives
+in your history; the watch is a fast logger, not a replacement for it.
+
+### Custom exercises
+
+Not in the built-in library? Add it from the phone: Zepp app → this app's
+settings → **Custom Exercises** → type a name → it's saved immediately (no
+separate button - the field commits as you move away from it). It'll show up
+in a "Custom" group at the end of the watch's group list next time you open
+Workout.
+
+Kept deliberately simple to fit the phone settings page's plain text fields:
+name only, no muscle group or equipment picker. A workout that uses one
+still syncs to the phone app normally - the sync also carries along the
+custom exercise's definition, so the phone registers it in its own custom
+exercise list (as `Bodyweight`, no muscle group) the first time such a
+workout comes in, rather than showing up blank. Edit it further there
+anytime, same as one added by hand on the phone.
 
 ## Setup
 
@@ -123,12 +144,12 @@ report.
 ```
 app.json                    manifest — targets round, 466px-wide watches (the T-Rex 3 Pro 44mm's bucket; Zepp OS's build tooling resolves the exact device from this shape/width, not a per-model ID)
 app.js                      device-app entry point; owns globalData.liveWorkout, the in-progress workout
-app-side/index.js           side service: handles GET_LIFT_STATUS / SAVE_WORKOUT / GET_WORKOUTS / GET_LAST_SET
-app-side/gist.js            pushes the local workout history to the configured GitHub Gist
-setting/index.js            phone-side settings page: Gist ID and personal access token
+app-side/index.js           side service: handles GET_LIFT_STATUS / SAVE_WORKOUT / GET_WORKOUTS / GET_LAST_SET / GET_CUSTOM_EXERCISES
+app-side/gist.js            pushes the local workout history and custom exercises to the configured GitHub Gist
+setting/index.js            phone-side settings page: Gist ID/token, and adding or removing custom exercises
 utils/constants.js          shared defaults and colors
 utils/exercises.js          the built-in exercise library, generated from ../vo2max/js/exercises.js - id/name/group only, group precomputed from that file's RADAR_GROUP_FOR rollup; regenerate rather than hand-edit if the source library changes
-utils/liveWorkout.js        the in-progress workout: add/reorder/remove exercises, add sets, supersets, timer/volume math - all operating on app.js's globalData
+utils/liveWorkout.js        the in-progress workout: add/reorder/remove exercises, add sets, supersets, timer/volume math - operates on app.js's globalData, mirrored to a local file on every change so it survives quitting the app
 page/home/                  "Today" page: days/last workout/weekly volume, from local workout history
 page/workout/               workout hub: idle shows recent history + "Workout"; in progress shows the live timer, running volume, and the exercise list
 page/workout/groups/        muscle-group list (10 groups, scrollable) - the first step of adding an exercise

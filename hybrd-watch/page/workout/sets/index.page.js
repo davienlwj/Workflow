@@ -1,7 +1,6 @@
 import * as hmUI from '@zos/ui'
-import { back } from '@zos/router'
+import { replace } from '@zos/router'
 import { BasePage } from '@zeppos/zml/base-page'
-import { EXERCISES } from '../../../utils/exercises'
 import { addSet, lastSet, setCountFor } from '../../../utils/liveWorkout'
 import {
   TITLE_TEXT,
@@ -28,19 +27,20 @@ Page(
       weight: DEFAULT_WEIGHT,
       reps: DEFAULT_REPS,
     },
-    onInit(exerciseId) {
-      this.state.exerciseId = exerciseId
+    onInit(param) {
+      const sep = (param || '').indexOf('|')
+      this.state.exerciseId = sep === -1 ? param : param.slice(0, sep)
+      this.state.exerciseName = sep === -1 ? 'Exercise' : param.slice(sep + 1)
       // Same exercise already logged earlier in *this* session - reuse
       // instantly, no round trip needed (the common "another set at the
       // same weight" case).
-      const prev = lastSet(exerciseId)
+      const prev = lastSet(this.state.exerciseId)
       this.state.weight = prev?.weight ?? DEFAULT_WEIGHT
       this.state.reps = prev?.reps ?? DEFAULT_REPS
       this.state.needsHistoryLookup = !prev
     },
     build() {
-      const exercise = EXERCISES.find((e) => e.id === this.state.exerciseId)
-      hmUI.createWidget(hmUI.widget.TEXT, { ...TITLE_TEXT, text: exercise ? exercise.name : 'Exercise' })
+      hmUI.createWidget(hmUI.widget.TEXT, { ...TITLE_TEXT, text: this.state.exerciseName })
 
       hmUI.createWidget(hmUI.widget.TEXT, WEIGHT_LABEL)
       this.state.weightText = hmUI.createWidget(hmUI.widget.TEXT, {
@@ -63,7 +63,10 @@ Page(
         ...COUNT_TEXT,
         text: this.countLabel(),
       })
-      hmUI.createWidget(hmUI.widget.BUTTON, { ...DONE_BUTTON, click_func: () => back() })
+      hmUI.createWidget(hmUI.widget.BUTTON, {
+        ...DONE_BUTTON,
+        click_func: () => replace({ url: 'page/workout/index.page' }),
+      })
 
       // First time this exercise comes up in the session - check past
       // workouts for what was actually lifted last time, so the stepper
@@ -100,7 +103,11 @@ Page(
       this.state.repsText.setProperty(hmUI.prop.TEXT, String(this.state.reps))
     },
     addSet() {
-      addSet(this.state.exerciseId, { weight: this.state.weight, reps: this.state.reps, type: 'normal' })
+      addSet(this.state.exerciseId, this.state.exerciseName, {
+        weight: this.state.weight,
+        reps: this.state.reps,
+        type: 'normal',
+      })
       this.state.countText.setProperty(hmUI.prop.TEXT, this.countLabel())
       hmUI.showToast({ text: 'Set added' })
     },

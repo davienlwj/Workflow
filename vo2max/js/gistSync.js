@@ -35,19 +35,25 @@ async function apiGet(path, token) {
   return res.json();
 }
 
-/** Every workout currently sitting in the Gist, oldest sync state included
- *  ({watchWorkoutId, date, name, notes, exercises}) - the caller dedups.
- *  Handles the rare case a file's content comes back truncated (GitHub
- *  only inlines up to ~1MB) by re-fetching its raw_url. */
-export async function fetchWatchWorkouts(gistId, token) {
+/** Everything currently sitting in the Gist: workouts (oldest sync state
+ *  included - {watchWorkoutId, date, name, notes, exercises}, the caller
+ *  dedups) and customExercises ({id, name} pairs added from the watch's
+ *  own settings, which the caller should register locally by id before
+ *  importing workouts that reference them - see registerWatchCustomExercises
+ *  in app.js). Handles the rare case a file's content comes back truncated
+ *  (GitHub only inlines up to ~1MB) by re-fetching its raw_url. */
+export async function fetchGistData(gistId, token) {
   const gist = await apiGet(`/gists/${encodeURIComponent(gistId)}`, token);
   const file = gist.files?.[GIST_FILE];
-  if (!file) return [];
+  if (!file) return { workouts: [], customExercises: [] };
   let content = file.content;
   if (file.truncated) {
     const res = await fetch(file.raw_url);
     content = await res.text();
   }
   const data = JSON.parse(content || '{}');
-  return Array.isArray(data.workouts) ? data.workouts : [];
+  return {
+    workouts: Array.isArray(data.workouts) ? data.workouts : [],
+    customExercises: Array.isArray(data.customExercises) ? data.customExercises : [],
+  };
 }

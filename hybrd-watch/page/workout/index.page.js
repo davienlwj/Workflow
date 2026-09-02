@@ -1,7 +1,6 @@
 import * as hmUI from '@zos/ui'
-import { push } from '@zos/router'
+import { push, replace } from '@zos/router'
 import { BasePage } from '@zeppos/zml/base-page'
-import { EXERCISES } from '../../utils/exercises'
 import {
   getLiveWorkout,
   startLiveWorkout,
@@ -21,17 +20,15 @@ import {
   VOLUME_TEXT,
   EXERCISE_LIST_CONFIG,
   EMPTY_EXERCISES_TEXT,
-  PRIMARY_BUTTON,
+  IDLE_BUTTON,
   ADD_EXERCISE_BUTTON,
   FINISH_BUTTON,
   DISCARD_BUTTON,
 } from 'zosLoader:./index.page.[pf].layout.js'
 
 function exerciseLabel(exercise) {
-  const def = EXERCISES.find((e) => e.id === exercise.exerciseId)
-  const name = def ? def.name : exercise.exerciseId
   const tag = exercise.supersetId ? ' · superset' : ''
-  return `${name} · ${exercise.sets.length} set${exercise.sets.length === 1 ? '' : 's'}${tag}`
+  return `${exercise.name} · ${exercise.sets.length} set${exercise.sets.length === 1 ? '' : 's'}${tag}`
 }
 
 Page(
@@ -102,7 +99,7 @@ Page(
           data_type_config: [{ start: 0, end: dataArray.length, type_id: 1 }],
           data_type_config_count: 1,
           item_click_func: (list_, index) => {
-            push({ url: 'page/workout/manage/index.page', params: String(index) })
+            replace({ url: 'page/workout/manage/index.page', params: String(index) })
           },
         })
         this.state.dynamicWidgets.push(list)
@@ -111,7 +108,7 @@ Page(
       this.state.dynamicWidgets.push(
         hmUI.createWidget(hmUI.widget.BUTTON, {
           ...ADD_EXERCISE_BUTTON,
-          click_func: () => push({ url: 'page/workout/groups/index.page' }),
+          click_func: () => replace({ url: 'page/workout/groups/index.page' }),
         }),
         hmUI.createWidget(hmUI.widget.BUTTON, {
           ...FINISH_BUTTON,
@@ -144,12 +141,12 @@ Page(
       }
       this.state.dynamicWidgets.push(
         hmUI.createWidget(hmUI.widget.BUTTON, {
-          ...PRIMARY_BUTTON,
+          ...IDLE_BUTTON,
           click_func: () => {
             // Straight to picking the first exercise, skipping the empty
             // "0 exercises" in-progress screen this would otherwise land on.
             startLiveWorkout()
-            push({ url: 'page/workout/groups/index.page' })
+            replace({ url: 'page/workout/groups/index.page' })
           },
         })
       )

@@ -1,7 +1,6 @@
 import * as hmUI from '@zos/ui'
-import { push, back } from '@zos/router'
+import { replace } from '@zos/router'
 import { BasePage } from '@zeppos/zml/base-page'
-import { EXERCISES } from '../../../utils/exercises'
 import { getLiveWorkout, moveExercise, removeExercise, toggleSupersetWithNext } from '../../../utils/liveWorkout'
 import {
   TITLE_TEXT,
@@ -14,6 +13,10 @@ import {
   BACK_BUTTON,
 } from 'zosLoader:./index.page.[pf].layout.js'
 
+function backToHub() {
+  replace({ url: 'page/workout/index.page' })
+}
+
 Page(
   BasePage({
     state: {
@@ -25,16 +28,15 @@ Page(
     build() {
       const workout = getLiveWorkout()
       const exercise = workout?.exercises[this.state.index]
-      const def = exercise ? EXERCISES.find((e) => e.id === exercise.exerciseId) : null
 
-      hmUI.createWidget(hmUI.widget.TEXT, { ...TITLE_TEXT, text: def ? def.name : 'Exercise' })
+      hmUI.createWidget(hmUI.widget.TEXT, { ...TITLE_TEXT, text: exercise ? exercise.name : 'Exercise' })
       this.state.subtitleText = hmUI.createWidget(hmUI.widget.TEXT, SUBTITLE_TEXT)
 
       hmUI.createWidget(hmUI.widget.BUTTON, {
         ...ADD_SETS_BUTTON,
         click_func: () => {
           const current = getLiveWorkout()?.exercises[this.state.index]
-          if (current) push({ url: 'page/workout/sets/index.page', params: current.exerciseId })
+          if (current) replace({ url: 'page/workout/sets/index.page', params: `${current.exerciseId}|${current.name}` })
         },
       })
       hmUI.createWidget(hmUI.widget.BUTTON, {
@@ -65,10 +67,10 @@ Page(
         ...REMOVE_BUTTON,
         click_func: () => {
           removeExercise(this.state.index)
-          back()
+          backToHub()
         },
       })
-      hmUI.createWidget(hmUI.widget.BUTTON, { ...BACK_BUTTON, click_func: () => back() })
+      hmUI.createWidget(hmUI.widget.BUTTON, { ...BACK_BUTTON, click_func: () => backToHub() })
 
       this.refresh()
     },

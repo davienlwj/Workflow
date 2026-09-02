@@ -3,8 +3,38 @@
  * exercise and set-entry pages logging it. Lives in the app's globalData
  * (see app.js) rather than any one page's state, since Zepp OS tears a
  * page's own state down when you navigate away from it - globalData is the
- * one thing that survives push()/back() across that page chain.
+ * one thing that survives push()/back()/replace() across that page chain.
+ *
+ * It's also mirrored to a local file on every change (see persist() below)
+ * and restored from there in app.js's onCreate, so quitting the watch app
+ * mid-workout and reopening it picks back up where you left off instead of
+ * losing everything - globalData alone only survives while the app process
+ * itself is still alive, not a full quit/relaunch.
  */
+
+import { readFileSync, writeFileSync, rmSync, statSync } from '@zos/fs'
+
+const LIVE_WORKOUT_FILE = 'live-workout.json'
+
+function persist(workout) {
+  if (workout) {
+    writeFileSync({ path: LIVE_WORKOUT_FILE, data: JSON.stringify(workout), options: { encoding: 'utf8' } })
+  } else if (statSync({ path: LIVE_WORKOUT_FILE })) {
+    rmSync({ path: LIVE_WORKOUT_FILE })
+  }
+}
+
+/** Called once from app.js's onCreate to restore whatever was in progress
+ *  the last time the app quit (or crashed) mid-workout. */
+export function loadPersistedWorkout() {
+  if (!statSync({ path: LIVE_WORKOUT_FILE })) return null
+  try {
+    const raw = readFileSync({ path: LIVE_WORKOUT_FILE, options: { encoding: 'utf8' } })
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
 
 function today() {
   const d = new Date()
@@ -19,25 +49,30 @@ export function getLiveWorkout() {
 export function startLiveWorkout() {
   const workout = { date: today(), name: '', notes: '', exercises: [], startedAt: Date.now() }
   getApp()._options.globalData.liveWorkout = workout
+  persist(workout)
   return workout
 }
 
 export function discardLiveWorkout() {
   getApp()._options.globalData.liveWorkout = null
+  persist(null)
 }
 
 /** Adds one set to the given exercise within the live workout, creating
- *  that exercise's entry (at the end of the list) on first use. No-op if
- *  nothing is in progress. */
-export function addSet(exerciseId, set) {
+ *  that exercise's entry (at the end of the list) on first use - `name` is
+ *  only used then, so any later call for an exercise already in this
+ *  workout can pass whatever, it's ignored. No-op if nothing is in
+ *  progress. */
+export function addSet(exerciseId, name, set) {
   const workout = getLiveWorkout()
   if (!workout) return
   let exercise = workout.exercises.find((e) => e.exerciseId === exerciseId)
   if (!exercise) {
-    exercise = { exerciseId, supersetId: null, brand: null, sets: [] }
+    exercise = { exerciseId, name, supersetId: null, brand: null, sets: [] }
     workout.exercises.push(exercise)
   }
   exercise.sets.push(set)
+  persist(workout)
 }
 
 /** The most recently logged set for an exercise within the live workout,
@@ -87,12 +122,14 @@ export function moveExercise(index, direction) {
   if (target < 0 || target >= workout.exercises.length) return
   const [item] = workout.exercises.splice(index, 1)
   workout.exercises.splice(target, 0, item)
+  persist(workout)
 }
 
 export function removeExercise(index) {
   const workout = getLiveWorkout()
   if (!workout) return
   workout.exercises.splice(index, 1)
+  persist(workout)
 }
 
 /** Pairs exercise `index` with the NEXT one as a superset (same
@@ -115,6 +152,7 @@ export function toggleSupersetWithNext(index) {
     a.supersetId = id
     b.supersetId = id
   }
+  persist(workout)
 }
 
 function makeId() {
@@ -122,16 +160,22 @@ function makeId() {
 }
 
 /** Finalizes the live workout for saving - stamps a stable watchWorkoutId
- *  (see ../../vo2max/js/gistSync.js for how the phone dedups on this) and
- *  clears the in-progress state. Returns null if nothing was in progress
- *  or nothing was ever logged. Read whatever summary stats you need
- *  (elapsedMs(), totalVolume(), etc.) BEFORE calling this - they all
- *  return zero/empty once the live workout is cleared. */
+ *  (see ../../vo2max/js/gistSync.js for how the phone dedups on this),
+ *  drops the watch-only `name` field each exercise carries (the phone
+ *  resolves display names from exerciseId itself), and clears the
+ *  in-progress state. Returns null if nothing was in progress or nothing
+ *  was ever logged. Read whatever summary stats you need (elapsedMs(),
+ *  totalVolume(), etc.) BEFORE calling this - they all return zero/empty
+ *  once the live workout is cleared. */
 export function finishLiveWorkout() {
   const workout = getLiveWorkout()
   if (!workout || workout.exercises.length === 0) return null
   const { startedAt, ...rest } = workout
-  const finished = { ...rest, watchWorkoutId: makeId() }
+  const finished = {
+    ...rest,
+    exercises: rest.exercises.map(({ name, ...exercise }) => exercise),
+    watchWorkoutId: makeId(),
+  }
   discardLiveWorkout()
   return finished
 }

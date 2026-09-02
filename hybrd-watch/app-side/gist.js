@@ -11,7 +11,7 @@
 const GITHUB_API = 'https://api.github.com'
 const GIST_FILE = 'hybrd-workouts.json'
 
-export async function pushWorkoutsToGist(gistId, token, workouts) {
+export async function pushWorkoutsToGist(gistId, token, workouts, customExercises) {
   const res = await fetch({
     url: `${GITHUB_API}/gists/${gistId}`,
     method: 'PATCH',
@@ -24,7 +24,12 @@ export async function pushWorkoutsToGist(gistId, token, workouts) {
     body: JSON.stringify({
       files: {
         [GIST_FILE]: {
-          content: JSON.stringify({ workouts }, null, 2),
+          // customExercises travels alongside the workouts that reference
+          // them, so the phone can register any it doesn't already have
+          // (by id) before importing - otherwise a workout logged against
+          // a watch-only custom exercise would show up with a blank/unknown
+          // exercise name once synced.
+          content: JSON.stringify({ workouts, customExercises }, null, 2),
         },
       },
     }),
