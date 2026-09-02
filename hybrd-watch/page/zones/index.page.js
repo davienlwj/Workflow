@@ -36,7 +36,7 @@ Page(
         const row = this.state.rows[i]
         if (!row) return
         row.setProperty(hmUI.prop.MORE, {
-          text: `${zone.target ? '▸ ' : ''}${zone.name}  ${zone.low}–${zone.high}`,
+          text: `${zone.target ? '> ' : ''}${zone.name}  ${zone.low}–${zone.high}`,
           color: zone.target ? BRAND_ORANGE : WHITE,
         })
       })
