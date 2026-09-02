@@ -34,9 +34,9 @@
         }
       },
       "platforms": [
-        { "name": "t-rex-3-pro-44mm", "deviceSource": 10682624 },
-        { "name": "t-rex-3-pro-44mm", "deviceSource": 10682625 },
-        { "name": "t-rex-3-pro-44mm", "deviceSource": 10682627 }
+        { "name": "t-rex-3-pro-44mm", "deviceSource": 10682624, "st": "r" },
+        { "name": "t-rex-3-pro-44mm", "deviceSource": 10682625, "st": "r" },
+        { "name": "t-rex-3-pro-44mm", "deviceSource": 10682627, "st": "r" }
       ],
       "designWidth": 466
     }
