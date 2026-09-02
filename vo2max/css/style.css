@@ -1271,7 +1271,7 @@ button { font-family: var(--font-mono); }
   flex-shrink: 0;
 }
 
-.wo-exercise-remove, .wo-set-remove, .wo-superset-btn {
+.wo-exercise-remove, .wo-set-remove, .wo-superset-btn, .wo-exercise-save-png {
   background: transparent;
   border: 1px solid var(--line);
   border-radius: 8px;

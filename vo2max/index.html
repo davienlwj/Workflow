@@ -794,6 +794,11 @@
 
 <div id="toast" class="toast" hidden></div>
 
+<!-- Vendored (not CDN, so it works offline like the rest of the shell) -
+     renders a DOM node to a canvas, used only for "Save PNG" on an exercise
+     card. Loaded as a plain script (not a module) so it runs before the
+     deferred module below and exposes window.html2canvas to app.js. -->
+<script src="./js/vendor/html2canvas.min.js"></script>
 <script type="module" src="./js/app.js"></script>
 </body>
 </html>

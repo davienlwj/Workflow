@@ -1027,6 +1027,7 @@ function exerciseBlockHTML(exerciseId, sets, supersetId, brand) {
           <div class="wo-exercise-meta">${escapeHTML(exerciseMetaText(ex))}</div>
         </div>
         <div class="wo-exercise-header-actions">
+          <button type="button" class="wo-exercise-save-png" title="Save this card as PNG" aria-label="Save this card as PNG">⇩</button>
           ${supersetBtnHTML}
           <button type="button" class="wo-exercise-remove" aria-label="Remove exercise">✕</button>
         </div>
@@ -1228,7 +1229,40 @@ $('woPickerResults').addEventListener('click', (e) => {
   syncLiveWorkout();
 });
 
+/** Renders one exercise card (name, muscle diagram, sets - whatever's
+ *  currently in the DOM for it) to a PNG and downloads it, via the vendored
+ *  html2canvas (see index.html/sw.js) - there's no server and no canvas
+ *  representation of this card already, so a real DOM screenshot is the only
+ *  way to get an image out of it. */
+async function saveExerciseCardAsPng(block, exerciseName) {
+  if (!window.html2canvas) {
+    toast("Can't save PNG - image export didn't load");
+    return;
+  }
+  try {
+    const canvas = await window.html2canvas(block, {
+      backgroundColor: getComputedStyle(block).backgroundColor,
+      scale: Math.max(2, window.devicePixelRatio || 1),
+    });
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${exerciseName.replace(/[^a-z0-9]+/gi, '-')}-${todayIso()}.png`;
+    a.click();
+  } catch (err) {
+    console.error('save PNG failed', err);
+    toast("Couldn't save PNG");
+  }
+}
+
 $('woExerciseList').addEventListener('click', (e) => {
+  const savePngBtn = e.target.closest('.wo-exercise-save-png');
+  if (savePngBtn) {
+    const block = savePngBtn.closest('.wo-exercise-block');
+    const name = block.querySelector('.wo-exercise-name')?.textContent || 'exercise';
+    saveExerciseCardAsPng(block, name);
+    return;
+  }
   const doneBtn = e.target.closest('.wo-set-done');
   if (doneBtn) {
     const isDone = doneBtn.dataset.done === 'true';

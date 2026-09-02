@@ -87,6 +87,10 @@ Dashboard as the place they come together.
   region's artwork, e.g. all three chest groups highlight the same chest
   overlay), plus a "last time" hint recalled from your most recent session
   with that exercise. Log any number of weight × reps sets per exercise.
+  Each exercise card has its own **⇩ Save PNG** button (top right, next to
+  the superset/remove buttons) that renders just that card — name, muscle
+  diagram, sets — to a downloadable image, for sharing a lift outside the
+  app.
   *+ Create new exercise*, inside the same popup, adds your own: a name, an
   equipment type (Barbell/Dumbbell/Kettlebell/Cable/Machine/Bodyweight/Band),
   and any number of body parts it works — it's then searchable and loggable
@@ -298,6 +302,9 @@ js/intervals.js              intervals.icu API-key auth + activity fetch/mapping
                               (no backend needed - see the README's intervals.icu sync section)
 js/gistSync.js                GitHub Gist client for pulling in workouts logged on the watch app
                               (see the README's "Watch workout sync" section, and ../hybrd-watch/)
+js/vendor/html2canvas.min.js vendored (not CDN, so it works offline) - renders one exercise card
+                              to a canvas for the workout popup's "Save PNG" button; MIT license
+                              copied alongside as html2canvas.LICENSE.txt
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/icon-source.png        the orange wordmark logo the app icons are built from
