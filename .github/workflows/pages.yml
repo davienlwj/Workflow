@@ -11,7 +11,12 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  # Scoped per-branch, not one shared "pages" group - otherwise a push to
+  # any branch cancels whatever's running for every other branch,
+  # including a main deploy in progress (this happened while fixing this
+  # workflow: pushing the same fix to two other branches cancelled main's
+  # own deploy run mid-flight).
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
