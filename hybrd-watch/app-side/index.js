@@ -9,7 +9,11 @@ function getSettings() {
   const settings = { ...DEFAULT_SETTINGS }
   for (const key of Object.keys(DEFAULT_SETTINGS)) {
     const raw = settingsLib.getItem(key)
-    if (raw) settings[key] = raw
+    // Trimmed defensively - a pasted Gist ID or token with a stray
+    // leading/trailing space or newline (easy to pick up copying from a
+    // URL bar) silently breaks the GitHub API URL/header and shows up as
+    // a 404, not an obviously-a-typo error.
+    if (raw && raw.trim()) settings[key] = raw.trim()
   }
   return settings
 }
