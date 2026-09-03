@@ -4684,6 +4684,12 @@ async function refreshNotifications() {
 }
 
 document.querySelector('.menu-item[data-view="notifications"]').addEventListener('click', refreshNotifications);
+// Feed's own tab similarly re-fetches on every visit rather than just
+// re-rendering whatever's cached - otherwise a workout saved after the
+// last refresh (sign-in, or a follow/unfollow) stays invisible until
+// something else happens to trigger a refetch, which reads as "my own
+// post never showed up" even though it published fine.
+document.querySelector('.menu-item[data-view="feed"]').addEventListener('click', refreshFeed);
 
 $('notificationsList').addEventListener('click', async (e) => {
   const btn = e.target.closest('.history-item');
