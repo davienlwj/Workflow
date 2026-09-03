@@ -55,10 +55,9 @@ export const DEFAULT_SETTINGS = {
     lastSyncedAt: null, // ISO timestamp of the last successful check, shown in the status line
   },
   social: {
-    firebaseConfig: null, // the Firebase project config object, pasted whole from the Firebase console
-    googleClientId: '', // Google OAuth Web Client ID (Firebase console -> Authentication -> Sign-in
-    // method -> Google -> Web SDK configuration) - separate from firebaseConfig, used to render
-    // Google's own Sign-In button (see social.js's renderGoogleSignInButton for why)
+    // The Firebase project + OAuth client are fixed app-wide (see social.js's
+    // DEFAULT_FIREBASE_CONFIG/DEFAULT_GOOGLE_CLIENT_ID) so everyone lands in
+    // the same Firestore project and can actually follow each other.
     enabled: false, // true once signed in - workouts auto-publish/unpublish while this is true
     uid: null, // Firebase Auth uid, once signed in
     username: null, // the handle other people follow you by (chosen once, on first sign-in)

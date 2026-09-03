@@ -1,10 +1,14 @@
 /*
  * Client-only social feed: follow people, see their workouts. No backend
- * *I* run - the browser talks to Firebase directly (Auth + Firestore),
- * using a Firebase project the user creates and owns themselves (same
- * "bring your own project" shape as gcal.js's OAuth Client ID and
- * intervals.js's API key - see the README for the setup steps and the
- * exact Firestore Security Rules to paste into the Firebase console).
+ * *I* run - the browser talks to Firebase directly (Auth + Firestore).
+ * Unlike gcal.js/intervals.js, this is NOT "bring your own project": Social
+ * only works if everyone lands in the same Firestore project (otherwise
+ * nobody could ever follow anyone else), so the project + OAuth client
+ * below are fixed and shared by everyone using this app.
+ *
+ * These values aren't secrets - a Firebase web config is meant to be public
+ * (see Firebase's own docs); what actually protects the data is the
+ * Firestore Security Rules (see the README) plus Google Sign-In.
  *
  * A published workout is visible only to its owner and to whoever is in
  * that owner's `followers` subcollection - never public to the internet.
@@ -16,6 +20,17 @@ const SDK_VERSION = '10.14.1';
 const SDK_BASE = `https://www.gstatic.com/firebasejs/${SDK_VERSION}`;
 const FEED_LIMIT_PER_PERSON = 20;
 export const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+
+export const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyAig6TTmhteMVaMNgb8fexC_DemXSfbv0g',
+  authDomain: 'hybrd-app-e50c4.firebaseapp.com',
+  projectId: 'hybrd-app-e50c4',
+  storageBucket: 'hybrd-app-e50c4.firebasestorage.app',
+  messagingSenderId: '42353936182',
+  appId: '1:42353936182:web:659c753a2e49dff0439597',
+};
+
+export const DEFAULT_GOOGLE_CLIENT_ID = '42353936182-n6m4l21strlsfqqqqjaqllbc1qvv6u9n.apps.googleusercontent.com';
 
 let appMod, authMod, fsMod;
 let app = null;
@@ -48,58 +63,6 @@ export async function initApp(firebaseConfig) {
 
 function requireInit() {
   if (!app) throw new Error('Firebase not configured yet');
-}
-
-/** Parses the config object as shown verbatim in the Firebase console
- *  ("const firebaseConfig = { apiKey: \"...\", ... };") - not valid JSON
- *  (unquoted keys, a variable declaration wrapped around it), so this
- *  strips the wrapper and evaluates the object literal itself rather than
- *  asking the user to hand-convert it to JSON. Trusted input (the user's
- *  own paste into their own local app), same trust level as every other
- *  settings field. Tolerant of pasting more than just the object too - the
- *  whole snippet Firebase shows (import lines, comments, the
- *  initializeApp/getAnalytics calls after it) - by finding the first
- *  balanced {...} block in whatever was pasted and ignoring the rest,
- *  rather than requiring an exact "const firebaseConfig = ...;" shape. */
-export function parseFirebaseConfigInput(raw) {
-  const text = (raw || '').trim();
-  if (!text) throw new Error('Paste the firebaseConfig object from your Firebase project settings.');
-  const body = extractBalancedObjectLiteral(text);
-  if (!body) throw new Error("Couldn't read that - paste the whole firebaseConfig object, e.g. { apiKey: \"...\", ... }.");
-  let config;
-  try {
-    // eslint-disable-next-line no-new-func
-    config = Function(`"use strict"; return (${body});`)();
-  } catch {
-    throw new Error("Couldn't read that - paste the whole firebaseConfig object, e.g. { apiKey: \"...\", ... }.");
-  }
-  const required = ['apiKey', 'authDomain', 'projectId', 'appId'];
-  const missing = required.filter((k) => !config || typeof config[k] !== 'string' || !config[k]);
-  if (missing.length > 0) throw new Error(`Missing ${missing.join(', ')} in that config.`);
-  return config;
-}
-
-/** Returns the {...} object being assigned in `text` (brace-depth matched,
- *  so it's correct even with nested objects or trailing code that has its
- *  own braces) - or null if there's no balanced pair. Anchors on the first
- *  "= {" rather than just the first "{", since the full snippet Firebase
- *  shows starts with `import { initializeApp } from ...` - an unrelated
- *  balanced brace pair that would otherwise be mistaken for the config
- *  object. Falls back to the first "{" for a bare object literal with no
- *  "=" at all (e.g. pasting just `{ apiKey: ..., ... }`). */
-function extractBalancedObjectLiteral(text) {
-  const assignMatch = text.match(/=\s*\{/);
-  const start = assignMatch ? assignMatch.index + assignMatch[0].length - 1 : text.indexOf('{');
-  if (start === -1) return null;
-  let depth = 0;
-  for (let i = start; i < text.length; i++) {
-    if (text[i] === '{') depth++;
-    else if (text[i] === '}') {
-      depth--;
-      if (depth === 0) return text.slice(start, i + 1);
-    }
-  }
-  return null;
 }
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
