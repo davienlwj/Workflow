@@ -15,7 +15,7 @@ tools/muscle-chart-source.jpg (a front+back anatomy illustration):
 
 Requires Pillow, numpy and scipy (`pip install pillow numpy scipy`).
 
-    python3 vo2max/tools/gen-muscle-diagram.py
+    python3 hybrd-app/tools/gen-muscle-diagram.py
 """
 
 from pathlib import Path

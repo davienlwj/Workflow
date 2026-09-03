@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_PLAN_WEEKS, DEFAULT_RACE, defaultMileagePlan, currentWeekIndex, weekDateRange, weekProgress, daysUntilRace,
   weeksNeededForRace, resizeWeeks, defaultSplitsForWeek, weekSplits, weekSessionKm,
-} from '../vo2max/js/mileagePlan.js';
+} from '../hybrd-app/js/mileagePlan.js';
 
 const plan = {
   startDate: '2026-08-31', // a Monday

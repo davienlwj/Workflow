@@ -4,8 +4,8 @@ import {
   workoutVolume, lastPerformance, personalRecords, newPRsInWorkout, exerciseProgress, exerciseVolumeProgress, loggedBrandsForExercise,
   loggedExerciseIds, daysSinceLastWorkout, volumeSince, muscleSetBreakdown,
   muscleSetBreakdownDetailed, workoutSummaryByExercise,
-} from '../vo2max/js/workout.js';
-import { RADAR_GROUPS, MUSCLES, RADAR_GROUP_FOR } from '../vo2max/js/exercises.js';
+} from '../hybrd-app/js/workout.js';
+import { RADAR_GROUPS, MUSCLES, RADAR_GROUP_FOR } from '../hybrd-app/js/exercises.js';
 
 function makeWorkout(date, exercises) {
   return { id: date, date, exercises };

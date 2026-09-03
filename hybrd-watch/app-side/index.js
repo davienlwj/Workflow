@@ -70,7 +70,7 @@ async function addCustomExercise(res, name) {
 }
 
 /** Full two-way sync: first checks the Gist for any workout the phone has
- *  since deleted (see ../../vo2max/js/gistSync.js's markWorkoutDeleted)
+ *  since deleted (see ../../hybrd-app/js/gistSync.js's markWorkoutDeleted)
  *  and removes matching entries from local history, then pushes whatever's
  *  left (plus the current custom exercise list) back - always echoing the
  *  same deletedWorkoutIds back unchanged, so this push can never

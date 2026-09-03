@@ -2,17 +2,17 @@
 
 A [Zepp OS](https://docs.zepp.com) mini-app for the **Amazfit T-Rex 3 Pro
 (44mm)** that lets you log a strength workout right from the watch —
-exercise, weight, reps, sets — and syncs it into [HYBR.D](../vo2max/)'s
+exercise, weight, reps, sets — and syncs it into [HYBR.D](../hybrd-app/)'s
 history on your phone.
 
 This is a separate project from the two Home Screen web apps at the repo
-root and in `vo2max/` — a Zepp OS mini-app is a different kind of software
+root and in `hybrd-app/` — a Zepp OS mini-app is a different kind of software
 entirely (it runs on the watch's own OS, built and installed with Zepp's own
 tooling), not a web page.
 
 **Running stays on Zepp's own built-in workout tracking**, which already
 syncs to intervals.icu and from there into the phone app (see
-`../vo2max/README.md`'s "intervals.icu sync" section) — this app doesn't
+`../hybrd-app/README.md`'s "intervals.icu sync" section) — this app doesn't
 duplicate that. It's for strength training, which has no such cloud bridge
 to piggyback on.
 
@@ -56,7 +56,7 @@ Tap any entry in the recent-history list on the idle Workout hub to open it,
 then **Delete Workout**. This removes it from the watch immediately and
 marks it for the phone to remove too on its next sync (or the reverse: if
 you delete a synced workout on the phone first, the watch removes its own
-copy the next time it syncs - see `../vo2max/README.md`'s "Watch workout
+copy the next time it syncs - see `../hybrd-app/README.md`'s "Watch workout
 sync" section for how that direction works). Either way, deleting is
 two-way - it doesn't matter which end you delete from.
 
@@ -161,7 +161,7 @@ app-side/index.js           side service: GET_LIFT_STATUS / SAVE_WORKOUT / GET_W
 app-side/gist.js            pushes the local workout history, custom exercises and the (echoed-through) deletedWorkoutIds to the Gist; also reads deletedWorkoutIds back so the watch can act on a deletion made from the phone
 setting/index.js            phone-side settings page: Gist ID/token, and adding or removing custom exercises
 utils/constants.js          shared defaults and colors
-utils/exercises.js          the built-in exercise library, generated from ../vo2max/js/exercises.js - id/name/group only, group precomputed from that file's RADAR_GROUP_FOR rollup; regenerate rather than hand-edit if the source library changes
+utils/exercises.js          the built-in exercise library, generated from ../hybrd-app/js/exercises.js - id/name/group only, group precomputed from that file's RADAR_GROUP_FOR rollup; regenerate rather than hand-edit if the source library changes
 utils/liveWorkout.js        the in-progress workout: add/reorder/remove exercises, add sets, supersets, timer/volume math - operates on app.js's globalData, mirrored to a local file on every change so it survives quitting the app
 page/home/                  "Today" page: days/last workout/weekly volume, from local workout history
 page/workout/               workout hub: idle shows recent history + "Workout"; in progress shows the live timer, running volume, and the exercise list
@@ -179,5 +179,5 @@ assets/t-rex-3-pro.r/       app icon (the ".r" suffix is Zepp's round-screen ass
 The two other apps in this repo are installable web pages (PWAs) that run in
 a phone browser. A physical watch app is a fundamentally different runtime —
 Zepp OS's own JS engine, UI widget system, and phone↔watch messaging model —
-so it can't be "added" to `vo2max/`'s existing JS. What it *can* share is the
+so it can't be "added" to `hybrd-app/`'s existing JS. What it *can* share is the
 exercise library's shape, generated here rather than duplicated by hand.

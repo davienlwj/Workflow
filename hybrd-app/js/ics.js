@@ -145,7 +145,7 @@ export function sessionToICS(session) {
     'PRODID:-//VO2max Tracker//EN',
     'CALSCALE:GREGORIAN',
     'BEGIN:VEVENT',
-    `UID:${session.id}@vo2max-tracker`,
+    `UID:${session.id}@hybrd-app-tracker`,
     `DTSTAMP:${dtstampUTC()}`,
     `DTSTART;VALUE=DATE:${dateOnly(session.date)}`,
     `DTEND;VALUE=DATE:${nextDateOnly(session.date)}`,

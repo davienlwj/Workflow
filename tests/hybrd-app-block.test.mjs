@@ -4,7 +4,7 @@ import {
   daysSinceLastSession, averageSessionHR,
   mileageBuckets, totalMileage,
   parsePaceMinKm, formatPaceMinKm,
-} from '../vo2max/js/block.js';
+} from '../hybrd-app/js/block.js';
 
 test('parsePaceMinKm reads "m:ss" pace text into decimal minutes/km', () => {
   assert.equal(parsePaceMinKm('5:25'), 5 + 25 / 60);

@@ -1464,7 +1464,7 @@ $('editRPE').addEventListener('input', () => { $('editRPEOut').textContent = $('
 $('editAddToCalendar').addEventListener('click', () => {
   const session = sessions.find((s) => s.id === editingId);
   if (!session) return;
-  downloadFile(`vo2max-session-${session.date}.ics`, sessionToICS(session), 'text/calendar');
+  downloadFile(`hybrd-app-session-${session.date}.ics`, sessionToICS(session), 'text/calendar');
   toast('Calendar file downloaded');
 });
 
@@ -4234,7 +4234,7 @@ $('settingsForm').addEventListener('input', () => clearSaved($('settingsSaveBtn'
 $('settingsForm').addEventListener('change', () => clearSaved($('settingsSaveBtn')));
 
 $('sExport').addEventListener('click', () => {
-  downloadFile(`vo2max-export-${todayIso()}.json`, exportAll(), 'application/json');
+  downloadFile(`hybrd-app-export-${todayIso()}.json`, exportAll(), 'application/json');
 });
 
 $('sImport').addEventListener('click', () => $('sFile').click());

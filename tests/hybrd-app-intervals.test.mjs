@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchActivityStreams, classifyActivity, activityToSession } from '../vo2max/js/intervals.js';
+import { fetchActivityStreams, classifyActivity, activityToSession } from '../hybrd-app/js/intervals.js';
 
 function stubFetch(streams) {
   globalThis.fetch = async () => ({

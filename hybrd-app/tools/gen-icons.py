@@ -12,7 +12,7 @@ purpose:
 
 Requires Pillow and numpy (`pip install pillow numpy`).
 
-    python3 vo2max/tools/gen-icons.py
+    python3 hybrd-app/tools/gen-icons.py
 """
 
 from pathlib import Path

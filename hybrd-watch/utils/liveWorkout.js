@@ -160,7 +160,7 @@ function makeId() {
 }
 
 /** Finalizes the live workout for saving - stamps a stable watchWorkoutId
- *  (see ../../vo2max/js/gistSync.js for how the phone dedups on this),
+ *  (see ../../hybrd-app/js/gistSync.js for how the phone dedups on this),
  *  drops the watch-only `name` field each exercise carries (the phone
  *  resolves display names from exerciseId itself), and clears the
  *  in-progress state. Returns null if nothing was in progress or nothing
