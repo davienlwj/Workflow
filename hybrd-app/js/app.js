@@ -4649,8 +4649,10 @@ function notificationWho(n) {
 }
 
 function notificationText(n) {
+  const kindWord = n.activityKind === 'run' ? 'run' : 'workout';
   if (n.type === 'follow') return `${notificationWho(n)} started following you`;
-  if (n.type === 'like') return `${notificationWho(n)} liked your ${n.activityKind === 'run' ? 'run' : 'workout'}`;
+  if (n.type === 'like') return `${notificationWho(n)} liked your ${kindWord}`;
+  if (n.type === 'post') return `${notificationWho(n)} completed a ${kindWord}`;
   return `${notificationWho(n)} commented: "${n.text}"`;
 }
 
@@ -4700,12 +4702,14 @@ $('notificationsList').addEventListener('click', async (e) => {
     openProfile(n.fromUid, n.fromUsername, n.fromDisplayName);
     return;
   }
-  // A like/comment notification is always about one of MY OWN activities -
-  // make sure it's actually in feedCache (my own posts are included in it
-  // now) before asking openFeedWorkout to find it there.
+  // like/comment/post all point at a specific activity - activityOwnerUid
+  // is the poster (me, for like/comment; whoever I follow, for post), not
+  // necessarily fromUid (the liker/commenter). Refresh Feed first so it's
+  // actually in feedCache for openFeedWorkout to find - own posts are
+  // included in it, but only once Feed's actually been fetched this visit.
   switchView('feed');
   await refreshFeed();
-  openFeedWorkout(settings.social.uid, n.activityKind, n.activityId);
+  openFeedWorkout(n.activityOwnerUid, n.activityKind, n.activityId);
 });
 
 $('feedSearchBtn').addEventListener('click', async () => {

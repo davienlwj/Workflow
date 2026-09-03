@@ -434,21 +434,25 @@ export async function countLikesAndComments(ownerUid, kind, activityId) {
 
 const NOTIFICATIONS_LIMIT = 50;
 
-/** Everyone who followed me, liked one of my activities, or commented on
- *  one - merged newest-first, capped at NOTIFICATIONS_LIMIT total (not per
- *  type). Likes/comments are found via a collection-group query filtered
- *  to ownerUid == myUid (the field likeActivity/addComment embed on every
- *  doc) rather than querying per-activity, since there's no way to know in
- *  advance which of my activities anyone interacted with - see the
- *  Security Rules' `resource.data.ownerUid == request.auth.uid` branch,
- *  which is what makes this particular shape of query provable/allowed.
- *  Each of the three fetches degrades to an empty list on its own failure
- *  (e.g. the composite index a collection-group query needs not being
- *  created yet - see the README) rather than blanking the whole tab. */
+/** Everyone who followed me, liked or commented on one of my activities,
+ *  or (someone I follow) published a new one - merged newest-first, capped
+ *  at NOTIFICATIONS_LIMIT total (not per type). Likes/comments are found
+ *  via a collection-group query filtered to ownerUid == myUid (the field
+ *  likeActivity/addComment embed on every doc) rather than querying per-
+ *  activity, since there's no way to know in advance which of my
+ *  activities anyone interacted with - see the Security Rules'
+ *  `resource.data.ownerUid == request.auth.uid` branch, which is what
+ *  makes this particular shape of query provable/allowed. New-post
+ *  notifications reuse fetchActivitiesForOwner - same data the Feed
+ *  itself shows, just for people I follow specifically rather than merged
+ *  across all of them, and reframed as "X posted" instead of a feed card.
+ *  Every fetch degrades to an empty list on its own failure (e.g. the
+ *  composite index a collection-group query needs not being created yet -
+ *  see the README) rather than blanking the whole tab. */
 export async function fetchNotifications(myUid) {
   requireInit();
   const empty = { docs: [] };
-  const [followersSnap, likesSnap, commentsSnap] = await Promise.all([
+  const [followersSnap, likesSnap, commentsSnap, following] = await Promise.all([
     fsMod.getDocs(fsMod.query(
       fsMod.collection(db, 'users', myUid, 'followers'),
       fsMod.orderBy('followedAt', 'desc'),
@@ -466,6 +470,7 @@ export async function fetchNotifications(myUid) {
       fsMod.orderBy('createdAt', 'desc'),
       fsMod.limit(NOTIFICATIONS_LIMIT),
     )).catch((err) => { console.error('notifications: comments fetch failed', err); return empty; }),
+    fetchFollowing(myUid).catch((err) => { console.error('notifications: following fetch failed', err); return []; }),
   ]);
 
   const follows = followersSnap.docs.map((d) => ({
@@ -481,6 +486,7 @@ export async function fetchNotifications(myUid) {
     fromUid: d.id,
     fromUsername: d.data().likerUsername,
     fromDisplayName: d.data().likerDisplayName,
+    activityOwnerUid: myUid,
     activityKind: d.data().activityKind,
     activityId: d.data().activityId,
   }));
@@ -490,12 +496,25 @@ export async function fetchNotifications(myUid) {
     fromUid: d.data().authorUid,
     fromUsername: d.data().authorUsername,
     fromDisplayName: null,
+    activityOwnerUid: myUid,
     activityKind: d.data().activityKind,
     activityId: d.data().activityId,
     text: d.data().text,
   }));
 
-  return [...follows, ...likes, ...comments]
+  const followingActivities = (await Promise.all(following.map(fetchActivitiesForOwner))).flat();
+  const posts = followingActivities.map((item) => ({
+    type: 'post',
+    at: item.publishedAt,
+    fromUid: item.ownerUid,
+    fromUsername: item.ownerUsername,
+    fromDisplayName: item.ownerDisplayName,
+    activityOwnerUid: item.ownerUid,
+    activityKind: item.kind,
+    activityId: item.id,
+  }));
+
+  return [...follows, ...likes, ...comments, ...posts]
     .sort((a, b) => (b.at || '').localeCompare(a.at || ''))
     .slice(0, NOTIFICATIONS_LIMIT);
 }
