@@ -1207,12 +1207,22 @@ button.mileage-plan-row-open {
    (designed to sit on top of a photo elsewhere), not full-bleed photos, so
    "contain" is what keeps the panel itself fully visible at a small size
    rather than cropping into empty transparent space. */
+/* Sized to the share card's own 1080x1920 aspect ratio (not a fixed-width
+   box the image floats inside) - a wide box holding a tall, narrow image
+   under object-fit:contain left most of the box as dead gray padding on
+   both sides; matching the box to the content's shape removes that
+   padding instead of just centering within it. align-self: center opts
+   this one child out of .history-item's default flex stretch, which
+   would otherwise force it back to full card width regardless. */
 .feed-thumb-wrap {
+  align-self: center;
+  height: 180px;
+  width: auto;
+  aspect-ratio: 1080 / 1920;
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 10px;
   overflow: hidden;
-  height: 180px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1233,13 +1243,16 @@ button.mileage-plan-row-open {
 
 .feed-detail-thumb {
   display: block;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
+  height: auto;
   max-height: 40vh;
+  aspect-ratio: 1080 / 1920;
   object-fit: contain;
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 10px;
-  margin: 10px 0;
+  margin: 10px auto;
 }
 
 .feed-like-row { display: flex; gap: 8px; margin: 12px 0; }
@@ -1250,12 +1263,21 @@ button.mileage-plan-row-open {
   gap: 6px;
 }
 
+/* Solid accent fill (same "confirmed/active" treatment .primary buttons
+   use), not var(--panel-2) - the sheet this button sits on is *itself*
+   var(--panel-2), so that fill was invisible, leaving only a faint
+   border-color change as the only sign a like actually registered. */
 #feedLikeBtn[aria-pressed="true"] {
-  background: var(--panel-2);
-  color: var(--accent);
-  border-color: var(--accent-dim);
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
   font-weight: 700;
 }
+/* .glyph-icon sets its own explicit color (not inherited currentColor),
+   so the button's own color flip above doesn't reach it on its own -
+   without this, the heart stays var(--ink) - near-black in light mode -
+   against a now near-black background and all but disappears. */
+#feedLikeBtn[aria-pressed="true"] .glyph-icon { color: var(--bg); }
 
 .feed-comments-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 
