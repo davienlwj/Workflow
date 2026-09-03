@@ -4631,12 +4631,26 @@ function renderProfileActivities() {
  *  profileActivities, so liking/commenting/opening the detail sheet works
  *  identically from either list). */
 async function openProfile(uid, username, displayName) {
-  $('profileTitle').textContent = displayName ? `${displayName} (@${username})` : `@${username}`;
+  $('profileTitle').textContent = username ? (displayName ? `${displayName} (@${username})` : `@${username}`) : 'Profile';
   profileActivities = [];
   renderProfileActivities();
   switchView('profile');
   try {
-    profileActivities = await socialFetchUserActivities(uid, { username, displayName });
+    // A caller can only pass along whatever it already has cached - a
+    // follow notification from before followUser started embedding the
+    // follower's own username/displayName, say, comes through with both
+    // missing. getUserProfile is the actual source of truth and a cheap
+    // single-doc read, so fall back to it whenever the username's missing
+    // rather than trusting a caller that might be stale or incomplete.
+    let profile = { username, displayName };
+    if (!profile.username) {
+      const fetched = await socialGetUserProfile(uid);
+      if (fetched) profile = { username: fetched.username, displayName: fetched.displayName };
+    }
+    $('profileTitle').textContent = profile.username
+      ? (profile.displayName ? `${profile.displayName} (@${profile.username})` : `@${profile.username}`)
+      : 'Profile';
+    profileActivities = await socialFetchUserActivities(uid, profile);
     await enrichFeedCounts(profileActivities);
   } catch (err) {
     console.error('profile fetch failed', err);
