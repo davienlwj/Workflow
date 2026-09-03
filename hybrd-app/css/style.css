@@ -1194,6 +1194,73 @@ button.mileage-plan-row-open {
 .routine-row { display: flex; align-items: center; gap: 8px; }
 .routine-row .routine-item { flex: 1; }
 
+/* ----------------------------------------------------------------- feed */
+
+/* Feed cards' share-card thumbnail - same visual convention as
+   .share-card-preview-img (object-fit: contain on a panel-colored ground):
+   these PNGs are translucent stat panels floating on a transparent canvas
+   (designed to sit on top of a photo elsewhere), not full-bleed photos, so
+   "contain" is what keeps the panel itself fully visible at a small size
+   rather than cropping into empty transparent space. */
+.feed-thumb-wrap {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.feed-thumb-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.feed-thumb-img.loaded { opacity: 1; }
+
+.feed-engagement { display: flex; gap: 14px; font-size: 13px; color: var(--dim); }
+
+.feed-detail-thumb {
+  display: block;
+  width: 100%;
+  max-height: 40vh;
+  object-fit: contain;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 10px 0;
+}
+
+.feed-like-row { margin: 12px 0; }
+
+#feedLikeBtn[aria-pressed="true"] {
+  background: var(--panel-2);
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  font-weight: 700;
+}
+
+.feed-comments-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.feed-comment {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.feed-comment-body { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.feed-comment-author { font-size: 12px; font-weight: 700; color: var(--dim); }
+
 /* "Routines" needs a bit more room than the standard section-title gap
    (10px) gives, and the list sits directly against "+ Create Routine"
    with no title element between them to carry any spacing at all. */

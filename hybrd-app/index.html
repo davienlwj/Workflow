@@ -1041,8 +1041,23 @@
   <div class="grabber"></div>
   <h2 id="feedWorkoutTitle" class="view-title"></h2>
   <p id="feedWorkoutMeta" class="exercise-summary-meta"></p>
+  <img id="feedWorkoutThumb" class="feed-detail-thumb" alt="">
   <div id="feedWorkoutExercises"></div>
+  <div id="feedRunStats" class="history-meta" hidden></div>
   <p id="feedWorkoutNotes" class="wo-last-performance" hidden></p>
+
+  <div class="feed-like-row">
+    <button type="button" id="feedLikeBtn" class="ghost-btn" aria-pressed="false">♥ <span id="feedLikeCount">0</span></button>
+  </div>
+
+  <h2 class="section-title">Comments</h2>
+  <ul id="feedCommentsList" class="feed-comments-list"></ul>
+  <p id="feedCommentsEmpty" class="empty" hidden>No comments yet.</p>
+  <div class="row">
+    <input id="feedCommentInput" type="text" placeholder="Add a comment…" autocomplete="off" spellcheck="true" maxlength="500">
+    <button type="button" id="feedCommentSend" class="ghost-btn">Send</button>
+  </div>
+
   <div class="actions">
     <button type="button" id="feedWorkoutClose" class="ghost-btn block">Close</button>
   </div>
