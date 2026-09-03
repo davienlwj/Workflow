@@ -48,6 +48,7 @@
     <button type="button" class="menu-item" data-view="run" role="menuitem" aria-selected="false">Run</button>
     <button type="button" class="menu-item" data-view="workout" role="menuitem" aria-selected="false">Lift</button>
     <button type="button" class="menu-item" data-view="feed" role="menuitem" aria-selected="false">Feed</button>
+    <button type="button" class="menu-item" data-view="notifications" role="menuitem" aria-selected="false">Notifications</button>
     <button type="button" class="menu-item" data-view="account" role="menuitem" aria-selected="false">Account</button>
     <button type="button" class="menu-item" data-view="settings" role="menuitem" aria-selected="false">Settings</button>
   </nav>
@@ -181,6 +182,14 @@
     <h1 id="profileTitle" class="view-title"></h1>
     <ul id="profileActivityList" class="history-list"></ul>
     <p id="profileActivityEmpty" class="empty" hidden>No activity yet.</p>
+  </section>
+
+  <!-- NOTIFICATIONS -->
+  <section id="view-notifications" class="view" hidden>
+    <h1 class="view-title">Notifications</h1>
+    <p id="notificationsSignedOut" class="empty" hidden>Sign in (menu → Account) to see who's following, liking, and commenting on your posts.</p>
+    <ul id="notificationsList" class="history-list"></ul>
+    <p id="notificationsEmpty" class="empty" hidden>Nothing yet - follows, likes, and comments on your posts show up here.</p>
   </section>
 
   <!-- ACCOUNT -->

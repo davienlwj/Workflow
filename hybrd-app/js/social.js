@@ -192,7 +192,7 @@ export async function findUserByUsername(rawUsername) {
  *  my own `following` entry and their `followers` entry in one batch - the
  *  latter is what the Security Rules check to decide whether I can read
  *  their workouts, so the two must never go out of sync. */
-export async function followUser(myUid, target) {
+export async function followUser(myUid, myProfile, target) {
   requireInit();
   const batch = fsMod.writeBatch(db);
   const followedAt = new Date().toISOString();
@@ -202,7 +202,13 @@ export async function followUser(myUid, target) {
     photoURL: target.photoURL ?? null,
     followedAt,
   });
-  batch.set(fsMod.doc(db, 'users', target.uid, 'followers', myUid), { followedAt });
+  // My own username/displayName embedded here (not just my uid as the doc
+  // id) so target's "new followers" notifications can render a name
+  // without a lookup per follower - same reasoning as every other embed
+  // in this file (publishWorkout's exercise defs, addComment's author).
+  batch.set(fsMod.doc(db, 'users', target.uid, 'followers', myUid), {
+    followedAt, followerUsername: myProfile.username, followerDisplayName: myProfile.displayName ?? null,
+  });
   await batch.commit();
 }
 
@@ -353,10 +359,21 @@ export async function isLikedByMe(ownerUid, kind, activityId, myUid) {
   return snap.exists();
 }
 
-export async function likeActivity(ownerUid, kind, activityId, myUid) {
+/** @param {{uid, username, displayName}} liker - username/displayName and
+ *   ownerUid/activityKind/activityId are all embedded on the like doc
+ *   itself (not just implied by its path) so fetchNotifications can
+ *   collection-group-query every like across every activity of mine
+ *   without a lookup per result - same reasoning as every other embed in
+ *   this file. */
+export async function likeActivity(ownerUid, kind, activityId, liker) {
   requireInit();
-  await fsMod.setDoc(fsMod.doc(db, 'users', ownerUid, activityCollection(kind), activityId, 'likes', myUid), {
+  await fsMod.setDoc(fsMod.doc(db, 'users', ownerUid, activityCollection(kind), activityId, 'likes', liker.uid), {
     likedAt: new Date().toISOString(),
+    ownerUid,
+    activityKind: kind,
+    activityId,
+    likerUsername: liker.username,
+    likerDisplayName: liker.displayName ?? null,
   });
 }
 
@@ -384,6 +401,12 @@ export async function addComment(ownerUid, kind, activityId, author, text) {
     authorUsername: author.username,
     text,
     createdAt: new Date().toISOString(),
+    // Embedded (not just implied by this doc's path) for the same reason
+    // likeActivity embeds them - lets fetchNotifications collection-group
+    // query every comment across every activity of mine.
+    ownerUid,
+    activityKind: kind,
+    activityId,
   });
   return ref.id;
 }
@@ -407,4 +430,72 @@ export async function countLikesAndComments(ownerUid, kind, activityId) {
     fsMod.getCountFromServer(fsMod.collection(activityRef, 'comments')),
   ]);
   return { likeCount: likes.data().count, commentCount: comments.data().count };
+}
+
+const NOTIFICATIONS_LIMIT = 50;
+
+/** Everyone who followed me, liked one of my activities, or commented on
+ *  one - merged newest-first, capped at NOTIFICATIONS_LIMIT total (not per
+ *  type). Likes/comments are found via a collection-group query filtered
+ *  to ownerUid == myUid (the field likeActivity/addComment embed on every
+ *  doc) rather than querying per-activity, since there's no way to know in
+ *  advance which of my activities anyone interacted with - see the
+ *  Security Rules' `resource.data.ownerUid == request.auth.uid` branch,
+ *  which is what makes this particular shape of query provable/allowed.
+ *  Each of the three fetches degrades to an empty list on its own failure
+ *  (e.g. the composite index a collection-group query needs not being
+ *  created yet - see the README) rather than blanking the whole tab. */
+export async function fetchNotifications(myUid) {
+  requireInit();
+  const empty = { docs: [] };
+  const [followersSnap, likesSnap, commentsSnap] = await Promise.all([
+    fsMod.getDocs(fsMod.query(
+      fsMod.collection(db, 'users', myUid, 'followers'),
+      fsMod.orderBy('followedAt', 'desc'),
+      fsMod.limit(NOTIFICATIONS_LIMIT),
+    )).catch((err) => { console.error('notifications: followers fetch failed', err); return empty; }),
+    fsMod.getDocs(fsMod.query(
+      fsMod.collectionGroup(db, 'likes'),
+      fsMod.where('ownerUid', '==', myUid),
+      fsMod.orderBy('likedAt', 'desc'),
+      fsMod.limit(NOTIFICATIONS_LIMIT),
+    )).catch((err) => { console.error('notifications: likes fetch failed', err); return empty; }),
+    fsMod.getDocs(fsMod.query(
+      fsMod.collectionGroup(db, 'comments'),
+      fsMod.where('ownerUid', '==', myUid),
+      fsMod.orderBy('createdAt', 'desc'),
+      fsMod.limit(NOTIFICATIONS_LIMIT),
+    )).catch((err) => { console.error('notifications: comments fetch failed', err); return empty; }),
+  ]);
+
+  const follows = followersSnap.docs.map((d) => ({
+    type: 'follow',
+    at: d.data().followedAt,
+    fromUid: d.id,
+    fromUsername: d.data().followerUsername,
+    fromDisplayName: d.data().followerDisplayName,
+  }));
+  const likes = likesSnap.docs.map((d) => ({
+    type: 'like',
+    at: d.data().likedAt,
+    fromUid: d.id,
+    fromUsername: d.data().likerUsername,
+    fromDisplayName: d.data().likerDisplayName,
+    activityKind: d.data().activityKind,
+    activityId: d.data().activityId,
+  }));
+  const comments = commentsSnap.docs.map((d) => ({
+    type: 'comment',
+    at: d.data().createdAt,
+    fromUid: d.data().authorUid,
+    fromUsername: d.data().authorUsername,
+    fromDisplayName: null,
+    activityKind: d.data().activityKind,
+    activityId: d.data().activityId,
+    text: d.data().text,
+  }));
+
+  return [...follows, ...likes, ...comments]
+    .sort((a, b) => (b.at || '').localeCompare(a.at || ''))
+    .slice(0, NOTIFICATIONS_LIMIT);
 }

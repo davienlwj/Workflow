@@ -53,7 +53,7 @@ import {
   fetchFeed as socialFetchFeed, fetchUserActivities as socialFetchUserActivities,
   isLikedByMe as socialIsLikedByMe, likeActivity as socialLikeActivity, unlikeActivity as socialUnlikeActivity,
   fetchComments as socialFetchComments, addComment as socialAddComment, deleteComment as socialDeleteComment,
-  countLikesAndComments as socialCountLikesAndComments,
+  countLikesAndComments as socialCountLikesAndComments, fetchNotifications as socialFetchNotifications,
 } from './social.js';
 import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
@@ -177,7 +177,8 @@ function bodyweightKg() {
 /* ------------------------------------------------------------- tab views */
 
 const VIEW_LABEL = {
-  dashboard: 'Dashboard', run: 'Run', workout: 'Lift', feed: 'Feed', profile: 'Profile', account: 'Account', settings: 'Settings',
+  dashboard: 'Dashboard', run: 'Run', workout: 'Lift', feed: 'Feed', profile: 'Profile',
+  notifications: 'Notifications', account: 'Account', settings: 'Settings',
 };
 
 const menuItems = document.querySelectorAll('.menu-item');
@@ -4638,6 +4639,68 @@ async function openProfile(uid, username, displayName) {
 
 $('profileBack').addEventListener('click', () => switchView('feed'));
 
+/* ---------------------------------------------------------- notifications */
+
+let notifications = []; // whoever followed/liked/commented on my own posts, newest first
+
+function notificationWho(n) {
+  return n.fromDisplayName || (n.fromUsername ? `@${n.fromUsername}` : 'Someone');
+}
+
+function notificationText(n) {
+  if (n.type === 'follow') return `${notificationWho(n)} started following you`;
+  if (n.type === 'like') return `${notificationWho(n)} liked your ${n.activityKind === 'run' ? 'run' : 'workout'}`;
+  return `${notificationWho(n)} commented: "${n.text}"`;
+}
+
+function renderNotificationsTab() {
+  const signedIn = Boolean(settings.social.enabled && settings.social.username && !socialNeedsReconnect);
+  $('notificationsSignedOut').hidden = signedIn;
+  if (!signedIn) { $('notificationsList').innerHTML = ''; $('notificationsEmpty').hidden = true; return; }
+  $('notificationsList').innerHTML = notifications.map((n, i) => `
+    <li>
+      <button type="button" class="history-item" data-index="${i}">
+        <div class="history-top"><span class="history-date">${escapeHTML(notificationText(n))}</span></div>
+        <div class="history-meta"><span>${fmtDateLong((n.at || '').slice(0, 10))}</span></div>
+      </button>
+    </li>
+  `).join('');
+  $('notificationsEmpty').hidden = notifications.length > 0;
+}
+
+async function refreshNotifications() {
+  if (!settings.social.enabled || !settings.social.username || socialNeedsReconnect) {
+    notifications = [];
+    renderNotificationsTab();
+    return;
+  }
+  try {
+    notifications = await socialFetchNotifications(settings.social.uid);
+  } catch (err) {
+    console.error('notifications refresh failed', err);
+  }
+  renderNotificationsTab();
+}
+
+document.querySelector('.menu-item[data-view="notifications"]').addEventListener('click', refreshNotifications);
+
+$('notificationsList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.history-item');
+  if (!btn) return;
+  const n = notifications[Number(btn.dataset.index)];
+  if (!n) return;
+  if (n.type === 'follow') {
+    openProfile(n.fromUid, n.fromUsername, n.fromDisplayName);
+    return;
+  }
+  // A like/comment notification is always about one of MY OWN activities -
+  // make sure it's actually in feedCache (my own posts are included in it
+  // now) before asking openFeedWorkout to find it there.
+  switchView('feed');
+  await refreshFeed();
+  openFeedWorkout(settings.social.uid, n.activityKind, n.activityId);
+});
+
 $('feedSearchBtn').addEventListener('click', async () => {
   const name = $('feedSearchInput').value.trim();
   if (!name) return;
@@ -4648,7 +4711,7 @@ $('feedSearchBtn').addEventListener('click', async () => {
     const user = await socialFindUserByUsername(name);
     if (!user) { $('feedSearchStatus').textContent = 'No one with that username.'; return; }
     if (followingCache.some((f) => f.uid === user.uid)) { $('feedSearchStatus').textContent = `Already following @${user.username}.`; return; }
-    await socialFollowUser(settings.social.uid, user);
+    await socialFollowUser(settings.social.uid, { username: settings.social.username, displayName: settings.social.displayName }, user);
     $('feedSearchInput').value = '';
     $('feedSearchStatus').hidden = true;
     toast(`Following @${user.username}`);
@@ -4829,8 +4892,13 @@ $('feedLikeBtn').addEventListener('click', async () => {
   $('feedLikeCount').textContent = item.likeCount;
   updateFeedCardCounts(item);
   try {
-    if (wasLiked) await socialUnlikeActivity(item.ownerUid, item.kind, item.id, settings.social.uid);
-    else await socialLikeActivity(item.ownerUid, item.kind, item.id, settings.social.uid);
+    if (wasLiked) {
+      await socialUnlikeActivity(item.ownerUid, item.kind, item.id, settings.social.uid);
+    } else {
+      await socialLikeActivity(item.ownerUid, item.kind, item.id, {
+        uid: settings.social.uid, username: settings.social.username, displayName: settings.social.displayName,
+      });
+    }
   } catch (err) {
     console.error('like toggle failed', err);
     feedDetailLikedByMe = wasLiked;
