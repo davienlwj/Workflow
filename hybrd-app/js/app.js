@@ -9,7 +9,7 @@ import {
   loadCustomSessionTypes, addCustomSessionType,
   loadMileagePlan, saveMileagePlan,
   loadPlannedActivities, addOrReplacePlannedActivity, deletePlannedActivity,
-  loadShoes, addShoe, deleteShoe,
+  loadShoes, addShoe, updateShoe, deleteShoe,
   exportAll, importAll,
 } from './store.js';
 import {
@@ -1569,31 +1569,63 @@ function renderRunTab() {
   renderShoeMileage();
 }
 
-/** Total distance logged against each shoe (any session with that shoeId,
- *  not just sport 'run' - a shoe could reasonably get reused for a
- *  stairmaster session etc.). No graphs, just name + km, per the ask. */
+/** Total distance logged against each shoe: its startKm offset (mileage it
+ *  already had before being tracked here, set via the edit button) plus
+ *  any session with that shoeId (not just sport 'run' - a shoe could
+ *  reasonably get reused for a stairmaster session etc.). No graphs, just
+ *  name + km, per the ask. */
+function shoeMileageKm(shoe) {
+  const logged = sessions
+    .filter((s) => s.shoeId === shoe.id)
+    .reduce((sum, s) => sum + (s.distanceKm || 0), 0);
+  return (shoe.startKm || 0) + logged;
+}
+
 function renderShoeMileage() {
-  $('shoeMileageList').innerHTML = shoes.map((shoe) => {
-    const km = sessions
-      .filter((s) => s.shoeId === shoe.id)
-      .reduce((sum, s) => sum + (s.distanceKm || 0), 0);
-    return `
+  $('shoeMileageList').innerHTML = shoes.map((shoe) => `
       <li class="routine-row">
         <div class="history-item history-item-static">
           <div class="history-top"><span class="history-date">${escapeHTML(shoe.name)}</span></div>
-          <div class="history-meta"><span class="mono">${Math.round(km * 100) / 100}km</span></div>
+          <div class="history-meta"><span class="mono">${Math.round(shoeMileageKm(shoe) * 100) / 100}km</span></div>
         </div>
+        <button type="button" class="routine-edit" data-id="${shoe.id}" aria-label="Edit ${escapeHTML(shoe.name)}">✎</button>
         <button type="button" class="routine-delete" data-id="${shoe.id}" aria-label="Delete ${escapeHTML(shoe.name)}">✕</button>
       </li>
-    `;
-  }).join('');
+  `).join('');
   $('shoeMileageEmpty').hidden = shoes.length > 0;
 }
 
+$('addShoeBtn').addEventListener('click', () => {
+  const name = window.prompt('Shoe name:')?.trim();
+  if (!name) return;
+  const shoe = addShoe(name);
+  shoes = loadShoes();
+  renderShoeMileage();
+  toast(`Added ${shoe.name}`);
+});
+
 $('shoeMileageList').addEventListener('click', (e) => {
-  const btn = e.target.closest('.routine-delete');
-  if (!btn) return;
-  const shoe = shoes.find((s) => s.id === btn.dataset.id);
+  const editBtn = e.target.closest('.routine-edit');
+  if (editBtn) {
+    const shoe = shoes.find((s) => s.id === editBtn.dataset.id);
+    if (!shoe) return;
+    const name = window.prompt('Shoe name:', shoe.name)?.trim();
+    if (!name) return;
+    const startKmInput = window.prompt(
+      'Starting mileage (km) - any distance this shoe already had before you started tracking it here:',
+      String(shoe.startKm || 0),
+    );
+    if (startKmInput == null) return;
+    const startKm = numOrNull(startKmInput) ?? 0;
+    updateShoe(shoe.id, { name, startKm });
+    shoes = loadShoes();
+    renderShoeMileage();
+    toast(`Updated ${name}`);
+    return;
+  }
+  const deleteBtn = e.target.closest('.routine-delete');
+  if (!deleteBtn) return;
+  const shoe = shoes.find((s) => s.id === deleteBtn.dataset.id);
   if (!shoe) return;
   if (!confirm(`Delete "${shoe.name}"? Runs already logged against it keep their mileage, they just won't show a shoe anymore.`)) return;
   deleteShoe(shoe.id);
