@@ -1446,6 +1446,7 @@ function closeEditSheet() {
 
 function closeAllSheets() {
   closeEditSheet();
+  closeShoeSheet();
   closeLogSheet();
   closeWorkoutSheet();
   closeExerciseSheet();
@@ -1583,53 +1584,73 @@ function shoeMileageKm(shoe) {
 
 function renderShoeMileage() {
   $('shoeMileageList').innerHTML = shoes.map((shoe) => `
-      <li class="routine-row">
-        <div class="history-item history-item-static">
+      <li>
+        <button type="button" class="history-item shoe-open" data-id="${shoe.id}">
           <div class="history-top"><span class="history-date">${escapeHTML(shoe.name)}</span></div>
           <div class="history-meta"><span class="mono">${Math.round(shoeMileageKm(shoe) * 100) / 100}km</span></div>
-        </div>
-        <button type="button" class="routine-edit" data-id="${shoe.id}" aria-label="Edit ${escapeHTML(shoe.name)}">✎</button>
-        <button type="button" class="routine-delete" data-id="${shoe.id}" aria-label="Delete ${escapeHTML(shoe.name)}">✕</button>
+        </button>
       </li>
   `).join('');
   $('shoeMileageEmpty').hidden = shoes.length > 0;
 }
 
-$('addShoeBtn').addEventListener('click', () => {
-  const name = window.prompt('Shoe name:')?.trim();
-  if (!name) return;
-  const shoe = addShoe(name);
-  shoes = loadShoes();
-  renderShoeMileage();
-  toast(`Added ${shoe.name}`);
-});
+// null while adding a new shoe (no Delete button, blank fields), the
+// shoe's id while editing an existing one - same "what am I acting on"
+// role editingId plays for the session edit sheet above.
+let editingShoeId = null;
+
+function openShoeSheet(shoe) {
+  editingShoeId = shoe?.id ?? null;
+  $('shoeName').value = shoe?.name ?? '';
+  $('shoeStartKm').value = shoe?.startKm || '';
+  $('shoeDelete').hidden = !shoe;
+  $('scrim').hidden = false;
+  $('shoeSheet').hidden = false;
+  $('shoeSheet').scrollTop = 0;
+}
+
+function closeShoeSheet() {
+  editingShoeId = null;
+  $('scrim').hidden = true;
+  $('shoeSheet').hidden = true;
+}
+
+$('addShoeBtn').addEventListener('click', () => openShoeSheet(null));
 
 $('shoeMileageList').addEventListener('click', (e) => {
-  const editBtn = e.target.closest('.routine-edit');
-  if (editBtn) {
-    const shoe = shoes.find((s) => s.id === editBtn.dataset.id);
-    if (!shoe) return;
-    const name = window.prompt('Shoe name:', shoe.name)?.trim();
-    if (!name) return;
-    const startKmInput = window.prompt(
-      'Starting mileage (km) - any distance this shoe already had before you started tracking it here:',
-      String(shoe.startKm || 0),
-    );
-    if (startKmInput == null) return;
-    const startKm = numOrNull(startKmInput) ?? 0;
-    updateShoe(shoe.id, { name, startKm });
-    shoes = loadShoes();
-    renderShoeMileage();
+  const btn = e.target.closest('.shoe-open');
+  if (!btn) return;
+  const shoe = shoes.find((s) => s.id === btn.dataset.id);
+  if (!shoe) return;
+  openShoeSheet(shoe);
+});
+
+$('shoeCancel').addEventListener('click', closeShoeSheet);
+
+$('shoeForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = $('shoeName').value.trim();
+  if (!name) { toast('Enter a shoe name'); return; }
+  const startKm = numOrNull($('shoeStartKm').value) ?? 0;
+  if (editingShoeId) {
+    updateShoe(editingShoeId, { name, startKm });
     toast(`Updated ${name}`);
-    return;
+  } else {
+    addShoe(name, startKm);
+    toast(`Added ${name}`);
   }
-  const deleteBtn = e.target.closest('.routine-delete');
-  if (!deleteBtn) return;
-  const shoe = shoes.find((s) => s.id === deleteBtn.dataset.id);
+  shoes = loadShoes();
+  closeShoeSheet();
+  renderShoeMileage();
+});
+
+$('shoeDelete').addEventListener('click', () => {
+  const shoe = shoes.find((s) => s.id === editingShoeId);
   if (!shoe) return;
   if (!confirm(`Delete "${shoe.name}"? Runs already logged against it keep their mileage, they just won't show a shoe anymore.`)) return;
   deleteShoe(shoe.id);
   shoes = loadShoes();
+  closeShoeSheet();
   renderShoeMileage();
 });
 
