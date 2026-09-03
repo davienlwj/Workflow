@@ -4541,8 +4541,14 @@ async function hydrateFeedThumbnails(items) {
     try {
       const url = await renderFeedThumbnailBlob(item);
       if (feedThumbGen !== gen) return;
-      const img = document.querySelector(`.feed-thumb-img[data-thumb-key="${item.kind}:${item.id}"]`);
-      if (img) { img.src = url; img.classList.add('loaded'); }
+      // querySelectorAll, not just the first match - the same activity can
+      // be in both the main Feed and a profile page's list at once (one
+      // hidden, one visible - hidden .view sections stay in the DOM), same
+      // reasoning as updateFeedCardCounts below.
+      document.querySelectorAll(`.feed-thumb-img[data-thumb-key="${item.kind}:${item.id}"]`).forEach((img) => {
+        img.src = url;
+        img.classList.add('loaded');
+      });
     } catch (err) {
       console.error('feed thumbnail render failed', err);
     }
