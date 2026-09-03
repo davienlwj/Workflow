@@ -369,7 +369,15 @@ Calendar and intervals.icu integrations above.
 1. [console.firebase.google.com](https://console.firebase.google.com) →
    **Add project** (the free Spark plan is plenty for personal use).
 2. **Build → Authentication → Get started**, enable the **Google**
-   sign-in provider.
+   sign-in provider. Click into that Google row once enabled and note the
+   **Web SDK configuration → Web client ID** shown there - a separate
+   value from the `firebaseConfig` you'll copy later, needed for step 2
+   below. (Sign-in here goes through Google's own Sign-In button, not
+   Firebase's own popup/redirect helpers - those route through
+   `<project>.firebaseapp.com` as an intermediary, which breaks on an
+   installed iOS Home Screen app; Google's own button talks to
+   `accounts.google.com` directly and hands the result to Firebase
+   locally, sidestepping that entirely.)
 3. Still in Authentication, **Settings → Authorized domains** → **Add
    domain** → add the domain the app is actually served from (e.g.
    `<username>.github.io`). Firebase only auto-authorizes `localhost` and
@@ -424,11 +432,12 @@ Calendar and intervals.icu integrations above.
 
 **Settings → Social**, paste the whole `firebaseConfig` object (exactly as
 Firebase showed it - the full snippet with the import lines and comments
-is fine too, not just the bare object), then **Sign in with Google**. This
-sends the whole page to Google's sign-in and back (not a popup - popups
-are unreliable on mobile Safari/PWAs), so expect the app to briefly
-navigate away and reload. First time in, pick a username - this is how
-people find you to follow you (there's no browsing/discovery, only
+is fine too, not just the bare object) into **Firebase config**, and the
+**Web client ID** from step 2 above into **Google OAuth Client ID** -
+these are two different values, both needed. Tap **Continue**, which
+reveals Google's own Sign-In button below the field - tap that one to
+actually sign in. First time in, pick a username - this is how people
+find you to follow you (there's no browsing/discovery, only
 exact-username lookup, so you'll need to share yours out of band, same as
 a phone number).
 

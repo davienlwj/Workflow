@@ -102,28 +102,62 @@ function extractBalancedObjectLiteral(text) {
   return null;
 }
 
-/** Starts sign-in via a full-page redirect to Google, not a popup - popups
- *  are unreliable on mobile Safari/PWAs (there's an async gap while the SDK
- *  loads between the tap and the popup opening, which can break the
- *  popup's channel back to the opener and surface as an opaque "requested
- *  action is invalid" page). The page navigates away here; this promise
- *  never resolves in the normal case. Call completeRedirectSignIn() on the
- *  next load to pick up the result once Google sends the user back. */
-export async function signInWithGoogle() {
-  requireInit();
-  const provider = new authMod.GoogleAuthProvider();
-  await authMod.signInWithRedirect(auth, provider);
+const GIS_SRC = 'https://accounts.google.com/gsi/client';
+let gisLoadPromise = null;
+
+function loadGis() {
+  if (gisLoadPromise) return gisLoadPromise;
+  gisLoadPromise = new Promise((resolve, reject) => {
+    if (window.google?.accounts?.id) { resolve(); return; }
+    const script = document.createElement('script');
+    script.src = GIS_SRC;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Google Identity Services'));
+    document.head.appendChild(script);
+  });
+  return gisLoadPromise;
 }
 
-/** Call once at startup (after initApp): resolves with the signed-in user
- *  if this load is Google redirecting back after signInWithGoogle(), or
- *  null on an ordinary load. */
-export async function completeRedirectSignIn() {
+/** Renders Google's own "Sign in with Google" button into the element at
+ *  `containerId`. Deliberately NOT using Firebase's own signInWithPopup/
+ *  signInWithRedirect - both route the OAuth handshake through
+ *  <project>.firebaseapp.com as an intermediary, and that cross-origin hop
+ *  is unreliable in an installed iOS Home Screen app (confirmed live,
+ *  twice): Safari's storage partitioning for the hop breaks the handoff
+ *  back to the app, as either a popup or a full redirect. Google's own
+ *  Identity Services button completes the whole exchange between this
+ *  origin and accounts.google.com directly, with no Firebase-hosted page
+ *  in the loop - the ID token it returns is then handed to Firebase
+ *  locally via signInWithCredential, a plain in-memory call with no
+ *  navigation of its own.
+ * @param {string} googleClientId Google OAuth Web Client ID - NOT the
+ *   Firebase config; find it at Firebase Console -> Authentication ->
+ *   Sign-in method -> Google -> Web SDK configuration (see the README).
+ * @param {string} containerId id of an empty element for Google to render
+ *   its button into.
+ * @param {(user: {uid, displayName, photoURL}) => void} onSuccess
+ * @param {(err: Error) => void} onError */
+export async function renderGoogleSignInButton(googleClientId, containerId, onSuccess, onError) {
   requireInit();
-  const result = await authMod.getRedirectResult(auth);
-  if (!result) return null;
-  const { user } = result;
-  return { uid: user.uid, displayName: user.displayName, photoURL: user.photoURL };
+  await loadGis();
+  window.google.accounts.id.initialize({
+    client_id: googleClientId,
+    callback: async (response) => {
+      try {
+        if (!response?.credential) throw new Error('Google sign-in did not return a credential');
+        const credential = authMod.GoogleAuthProvider.credential(response.credential);
+        const { user } = await authMod.signInWithCredential(auth, credential);
+        onSuccess({ uid: user.uid, displayName: user.displayName, photoURL: user.photoURL });
+      } catch (err) {
+        onError(err);
+      }
+    },
+  });
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  window.google.accounts.id.renderButton(container, { type: 'standard', theme: 'outline', size: 'large', width: 300 });
 }
 
 export async function signOutSocial() {
