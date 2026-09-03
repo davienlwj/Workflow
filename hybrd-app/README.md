@@ -378,6 +378,19 @@ Calendar and intervals.icu integrations above.
    installed iOS Home Screen app; Google's own button talks to
    `accounts.google.com` directly and hands the result to Firebase
    locally, sidestepping that entirely.)
+
+   That Web client ID also needs its own, separate authorization step -
+   a "400: origin_mismatch" page when you actually try to sign in means
+   this step is still missing. At
+   [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)
+   (same project as the Firebase one, auto-linked), open that same Web
+   client under **OAuth 2.0 Client IDs**, and under **Authorized
+   JavaScript origins** add the domain the app is served from, as a full
+   origin this time - `https://<username>.github.io` (no trailing slash,
+   no path). This is a different allowlist from Firebase's own
+   "Authorized domains" in step 3 below - both are needed, one for each
+   piece (Firebase's own handler vs. Google's JS SDK talking to
+   `accounts.google.com` directly).
 3. Still in Authentication, **Settings → Authorized domains** → **Add
    domain** → add the domain the app is actually served from (e.g.
    `<username>.github.io`). Firebase only auto-authorizes `localhost` and
