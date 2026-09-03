@@ -4211,6 +4211,7 @@ $('settingsForm').addEventListener('submit', (e) => {
     theme: settings.theme,
     googleCalendar: settings.googleCalendar,
     intervals: settings.intervals,
+    watchSync: settings.watchSync,
     profile: {
       name: $('sName').value.trim(),
       dob: $('sDob').value,
