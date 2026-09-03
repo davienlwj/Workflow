@@ -453,7 +453,8 @@ This only needs doing once, by whoever's Firebase project backs the app
            match /likes/{likerUid} {
              allow read: if request.auth != null
                && (request.auth.uid == uid
-                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid))
+                 || resource.data.ownerUid == request.auth.uid);
              allow create, delete: if request.auth != null && request.auth.uid == likerUid
                && (request.auth.uid == uid
                  || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
@@ -461,7 +462,8 @@ This only needs doing once, by whoever's Firebase project backs the app
            match /comments/{commentId} {
              allow read: if request.auth != null
                && (request.auth.uid == uid
-                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid))
+                 || resource.data.ownerUid == request.auth.uid);
              allow create: if request.auth != null
                && request.resource.data.authorUid == request.auth.uid
                && (request.auth.uid == uid
@@ -478,7 +480,8 @@ This only needs doing once, by whoever's Firebase project backs the app
            match /likes/{likerUid} {
              allow read: if request.auth != null
                && (request.auth.uid == uid
-                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid))
+                 || resource.data.ownerUid == request.auth.uid);
              allow create, delete: if request.auth != null && request.auth.uid == likerUid
                && (request.auth.uid == uid
                  || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
@@ -486,7 +489,8 @@ This only needs doing once, by whoever's Firebase project backs the app
            match /comments/{commentId} {
              allow read: if request.auth != null
                && (request.auth.uid == uid
-                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid))
+                 || resource.data.ownerUid == request.auth.uid);
              allow create: if request.auth != null
                && request.resource.data.authorUid == request.auth.uid
                && (request.auth.uid == uid
@@ -500,11 +504,25 @@ This only needs doing once, by whoever's Firebase project backs the app
    }
    ```
 
-   If you set Social up before runs/likes/comments existed, you already
-   have the `usernames`/`users`/`following`/`followers`/`workouts` rules
-   above - this just adds the new `runs` collection and each activity's
-   `likes`/`comments` subcollections. Paste the whole block again; it's
-   safe to replace the existing rules outright rather than hand-merge.
+   If you already had Social set up before, you're missing whichever of
+   these came later than your last paste - `runs`, `likes`/`comments`, or
+   the `resource.data.ownerUid == request.auth.uid` branch each of those
+   two reads now also allows (needed for the Notifications tab's
+   collection-group queries below). Paste the whole block again regardless
+   of which parts you already have; it's safe to replace the existing
+   rules outright rather than hand-merge.
+
+   The Notifications tab also needs two **composite indexes** the Rules
+   above don't create by themselves - Firestore builds these lazily, so
+   the first time you open Notifications, check the browser console for a
+   `failed-precondition` error; it includes a direct link that creates the
+   exact index needed in one click. If you'd rather set them up ahead of
+   time: **Firestore Database → Indexes → Composite → Add index**, twice -
+   collection group `likes` with fields `ownerUid` (Ascending) then
+   `likedAt` (Descending); collection group `comments` with `ownerUid`
+   (Ascending) then `createdAt` (Descending). Without these, Notifications
+   just quietly shows fewer results (new followers still work - that one's
+   a plain, not collection-group, query) rather than failing outright.
 
 6. **Project settings** (gear icon) → **Your apps** → **Web app** (the
    `</>` icon) → register one → copy the `firebaseConfig` object shown, and

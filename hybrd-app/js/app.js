@@ -9,6 +9,7 @@ import {
   loadCustomSessionTypes, addCustomSessionType,
   loadMileagePlan, saveMileagePlan,
   loadPlannedActivities, addOrReplacePlannedActivity, deletePlannedActivity,
+  loadShoes, addShoe, deleteShoe,
   exportAll, importAll,
 } from './store.js';
 import {
@@ -48,10 +49,11 @@ import {
   getUserProfile as socialGetUserProfile, findUserByUsername as socialFindUserByUsername,
   followUser as socialFollowUser, unfollowUser as socialUnfollowUser, fetchFollowing as socialFetchFollowing,
   publishWorkout as socialPublishWorkout, unpublishWorkout as socialUnpublishWorkout,
-  publishRun as socialPublishRun, unpublishRun as socialUnpublishRun, fetchFeed as socialFetchFeed,
+  publishRun as socialPublishRun, unpublishRun as socialUnpublishRun,
+  fetchFeed as socialFetchFeed, fetchUserActivities as socialFetchUserActivities,
   isLikedByMe as socialIsLikedByMe, likeActivity as socialLikeActivity, unlikeActivity as socialUnlikeActivity,
   fetchComments as socialFetchComments, addComment as socialAddComment, deleteComment as socialDeleteComment,
-  countLikesAndComments as socialCountLikesAndComments,
+  countLikesAndComments as socialCountLikesAndComments, fetchNotifications as socialFetchNotifications,
 } from './social.js';
 import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
@@ -92,6 +94,7 @@ let customBrands = loadCustomBrands();
 let customSessionTypes = loadCustomSessionTypes();
 let mileagePlan = loadMileagePlan();
 let plannedActivities = loadPlannedActivities();
+let shoes = loadShoes();
 let planTargetDate = null; // the date #planRunSheet/#planWorkoutSheet is currently editing a plan for
 // Set right before opening the real Log/Workout form from a planned
 // entry's "Start" - the plan is only actually deleted once that real
@@ -173,7 +176,10 @@ function bodyweightKg() {
 
 /* ------------------------------------------------------------- tab views */
 
-const VIEW_LABEL = { dashboard: 'Dashboard', run: 'Run', workout: 'Lift', feed: 'Feed', account: 'Account', settings: 'Settings' };
+const VIEW_LABEL = {
+  dashboard: 'Dashboard', run: 'Run', workout: 'Lift', feed: 'Feed', profile: 'Profile',
+  notifications: 'Notifications', account: 'Account', settings: 'Settings',
+};
 
 const menuItems = document.querySelectorAll('.menu-item');
 menuItems.forEach((btn) => {
@@ -388,6 +394,18 @@ function readExtraFields(prefix, sport) {
  *  toggles (run-only). `session` is the data to populate from - {} for a
  *  freshly reset Log form or when the user switches Activity mid-entry,
  *  since a different sport's fields don't carry over. */
+/** Fills a Shoe <select> with "No shoe", every saved shoe, then "+ Add new
+ *  shoe…" - falls back to "No shoe" if `selectedId` doesn't match any
+ *  (e.g. the shoe was since deleted). */
+function populateShoeSelect(select, selectedId) {
+  select.innerHTML = [
+    '<option value="">No shoe</option>',
+    ...shoes.map((s) => `<option value="${s.id}">${escapeHTML(s.name)}</option>`),
+    '<option value="__new__">+ Add new shoe…</option>',
+  ].join('');
+  select.value = selectedId && shoes.some((s) => s.id === selectedId) ? selectedId : '';
+}
+
 function applySportFieldsToForm(prefix, sport, session = {}) {
   setMetricField(prefix, sport, session);
   setExtraFields(prefix, sport, session);
@@ -404,6 +422,9 @@ function applySportFieldsToForm(prefix, sport, session = {}) {
   $(`${prefix}WorkoutLabel`).hidden = sport !== 'run';
   const hint = $(`${prefix}DistanceHint`);
   if (hint) hint.hidden = sport !== 'run';
+  $(`${prefix}ShoeField`).hidden = sport !== 'run';
+  $(`${prefix}NewShoeRow`).hidden = true;
+  if (sport === 'run') populateShoeSelect($(`${prefix}ShoeSelect`), session.shoeId ?? null);
 }
 
 // Warm up / cool down are optional phases toggled on/off per session, each
@@ -444,6 +465,24 @@ for (const prefix of ['log', 'edit']) {
       $(`${prefix}${phase}Fields`).hidden = !$(`${prefix}${phase}Toggle`).checked;
     });
   }
+
+  $(`${prefix}ShoeSelect`).addEventListener('change', () => {
+    const revealNewShoe = $(`${prefix}ShoeSelect`).value === '__new__';
+    $(`${prefix}NewShoeRow`).hidden = !revealNewShoe;
+    if (revealNewShoe) $(`${prefix}NewShoeName`).focus();
+  });
+
+  $(`${prefix}NewShoeAdd`).addEventListener('click', () => {
+    const name = $(`${prefix}NewShoeName`).value.trim();
+    if (!name) { toast('Enter a shoe name'); return; }
+    const shoe = addShoe(name);
+    shoes = loadShoes();
+    $(`${prefix}NewShoeName`).value = '';
+    $(`${prefix}NewShoeRow`).hidden = true;
+    populateShoeSelect($(`${prefix}ShoeSelect`), shoe.id);
+    renderShoeMileage();
+    toast(`Added ${shoe.name}`);
+  });
 }
 
 function resetLogForm() {
@@ -514,11 +553,13 @@ function readSessionForm(prefix) {
     maxHR: numOrNull($(`${prefix}RunMaxHR`).value),
   };
   if (sport === 'run') {
+    const shoeVal = $(`${prefix}ShoeSelect`).value;
     return {
       ...base,
       avgPace: parsePaceMinKm($(`${prefix}AvgPace`).value),
       warmup: readPhaseFields(prefix, 'Warmup'),
       cooldown: readPhaseFields(prefix, 'Cooldown'),
+      shoeId: shoeVal && shoeVal !== '__new__' ? shoeVal : null,
     };
   }
   if (sport === 'ride') return { ...base, avgSpeedKmh: numOrNull($(`${prefix}AvgPace`).value), ...readExtraFields(prefix, sport) };
@@ -1524,7 +1565,40 @@ function renderRunTab() {
   $('mileageTotal').textContent = `${totalMileage(sessions)} km total`;
 
   renderRacesCard();
+  renderShoeMileage();
 }
+
+/** Total distance logged against each shoe (any session with that shoeId,
+ *  not just sport 'run' - a shoe could reasonably get reused for a
+ *  stairmaster session etc.). No graphs, just name + km, per the ask. */
+function renderShoeMileage() {
+  $('shoeMileageList').innerHTML = shoes.map((shoe) => {
+    const km = sessions
+      .filter((s) => s.shoeId === shoe.id)
+      .reduce((sum, s) => sum + (s.distanceKm || 0), 0);
+    return `
+      <li class="routine-row">
+        <div class="history-item" style="cursor:default">
+          <div class="history-top"><span class="history-date">${escapeHTML(shoe.name)}</span></div>
+          <div class="history-meta"><span class="mono">${Math.round(km * 100) / 100}km</span></div>
+        </div>
+        <button type="button" class="routine-delete" data-id="${shoe.id}" aria-label="Delete ${escapeHTML(shoe.name)}">✕</button>
+      </li>
+    `;
+  }).join('');
+  $('shoeMileageEmpty').hidden = shoes.length > 0;
+}
+
+$('shoeMileageList').addEventListener('click', (e) => {
+  const btn = e.target.closest('.routine-delete');
+  if (!btn) return;
+  const shoe = shoes.find((s) => s.id === btn.dataset.id);
+  if (!shoe) return;
+  if (!confirm(`Delete "${shoe.name}"? Runs already logged against it keep their mileage, they just won't show a shoe anymore.`)) return;
+  deleteShoe(shoe.id);
+  shoes = loadShoes();
+  renderShoeMileage();
+});
 
 /** The Run tab's target-race line: name/date/countdown plus whichever of
  *  location/distance/goal time/notes were actually filled in - empty
@@ -4486,6 +4560,32 @@ function feedCardMetaHTML(item) {
   return `<span>${exCount} exercise${exCount === 1 ? '' : 's'}</span><span class="mono">${feedWorkoutVolume(item)}kg volume</span>`;
 }
 
+/** One activity card - shared by the main Feed list and a profile page's
+ *  activity list, since both are "a feed, just scoped differently" and
+ *  need the exact same thumbnail/like/comment wiring (openFeedWorkout
+ *  finds the tapped item by owner+kind+id across whichever list is
+ *  currently showing it - see its own comment). */
+function feedCardHTML(item) {
+  const title = item.kind === 'run' ? sessionBadgeLabel(item) : (item.name || '');
+  return `
+    <li>
+      <button type="button" class="history-item feed-item" data-owner="${item.ownerUid}" data-id="${item.id}" data-kind="${item.kind}">
+        <div class="feed-thumb-wrap"><img class="feed-thumb-img" data-thumb-key="${item.kind}:${item.id}" alt=""></div>
+        <div class="history-top">
+          <span class="history-date">${fmtDateLong(item.date)}</span>
+          <span class="pill pill-type">@${escapeHTML(item.ownerUsername)}</span>
+        </div>
+        <div class="history-meta">${feedCardMetaHTML(item)}</div>
+        ${title ? `<div class="history-notes">${escapeHTML(title)}</div>` : ''}
+        <div class="feed-engagement">
+          <span>♥ ${item.likeCount || 0}</span>
+          <span>💬 ${item.commentCount || 0}</span>
+        </div>
+      </button>
+    </li>
+  `;
+}
+
 function renderFeedTab() {
   const signedIn = Boolean(settings.social.enabled && settings.social.username && !socialNeedsReconnect);
   $('feedSignedOut').hidden = signedIn;
@@ -4493,39 +4593,113 @@ function renderFeedTab() {
   if (!signedIn) return;
 
   $('followingList').innerHTML = followingCache.map((f) => `
-    <li>
-      <div class="history-item">
+    <li class="routine-row">
+      <button type="button" class="history-item follow-open" data-uid="${f.uid}" data-username="${escapeHTML(f.username)}" data-display-name="${escapeHTML(f.displayName || '')}">
         <div class="history-top"><span class="history-date">@${escapeHTML(f.username)}</span></div>
         ${f.displayName ? `<div class="history-meta"><span>${escapeHTML(f.displayName)}</span></div>` : ''}
-      </div>
+      </button>
       <button type="button" class="routine-delete" data-uid="${f.uid}" aria-label="Unfollow @${escapeHTML(f.username)}">✕</button>
     </li>
   `).join('');
   $('followingEmpty').hidden = followingCache.length > 0;
 
-  $('feedList').innerHTML = feedCache.map((item) => {
-    const title = item.kind === 'run' ? sessionBadgeLabel(item) : (item.name || '');
-    return `
-      <li>
-        <button type="button" class="history-item feed-item" data-owner="${item.ownerUid}" data-id="${item.id}" data-kind="${item.kind}">
-          <div class="feed-thumb-wrap"><img class="feed-thumb-img" data-thumb-key="${item.kind}:${item.id}" alt=""></div>
-          <div class="history-top">
-            <span class="history-date">${fmtDateLong(item.date)}</span>
-            <span class="pill pill-type">@${escapeHTML(item.ownerUsername)}</span>
-          </div>
-          <div class="history-meta">${feedCardMetaHTML(item)}</div>
-          ${title ? `<div class="history-notes">${escapeHTML(title)}</div>` : ''}
-          <div class="feed-engagement">
-            <span>♥ ${item.likeCount || 0}</span>
-            <span>💬 ${item.commentCount || 0}</span>
-          </div>
-        </button>
-      </li>
-    `;
-  }).join('');
+  $('feedList').innerHTML = feedCache.map(feedCardHTML).join('');
   $('feedEmpty').hidden = feedCache.length > 0;
   hydrateFeedThumbnails(feedCache);
 }
+
+/* --------------------------------------------------------------- profile */
+
+let profileActivities = []; // whoever's #view-profile is currently showing
+
+function renderProfileActivities() {
+  $('profileActivityList').innerHTML = profileActivities.map(feedCardHTML).join('');
+  $('profileActivityEmpty').hidden = profileActivities.length > 0;
+  hydrateFeedThumbnails(profileActivities);
+}
+
+/** Opens #view-profile for one followed person - every run/workout
+ *  they've published, newest first, in the same card format as the main
+ *  Feed (openFeedWorkout looks a tapped card up in feedCache OR
+ *  profileActivities, so liking/commenting/opening the detail sheet works
+ *  identically from either list). */
+async function openProfile(uid, username, displayName) {
+  $('profileTitle').textContent = displayName ? `${displayName} (@${username})` : `@${username}`;
+  profileActivities = [];
+  renderProfileActivities();
+  switchView('profile');
+  try {
+    profileActivities = await socialFetchUserActivities(uid, { username, displayName });
+    await enrichFeedCounts(profileActivities);
+  } catch (err) {
+    console.error('profile fetch failed', err);
+  }
+  renderProfileActivities();
+}
+
+$('profileBack').addEventListener('click', () => switchView('feed'));
+
+/* ---------------------------------------------------------- notifications */
+
+let notifications = []; // whoever followed/liked/commented on my own posts, newest first
+
+function notificationWho(n) {
+  return n.fromDisplayName || (n.fromUsername ? `@${n.fromUsername}` : 'Someone');
+}
+
+function notificationText(n) {
+  if (n.type === 'follow') return `${notificationWho(n)} started following you`;
+  if (n.type === 'like') return `${notificationWho(n)} liked your ${n.activityKind === 'run' ? 'run' : 'workout'}`;
+  return `${notificationWho(n)} commented: "${n.text}"`;
+}
+
+function renderNotificationsTab() {
+  const signedIn = Boolean(settings.social.enabled && settings.social.username && !socialNeedsReconnect);
+  $('notificationsSignedOut').hidden = signedIn;
+  if (!signedIn) { $('notificationsList').innerHTML = ''; $('notificationsEmpty').hidden = true; return; }
+  $('notificationsList').innerHTML = notifications.map((n, i) => `
+    <li>
+      <button type="button" class="history-item" data-index="${i}">
+        <div class="history-top"><span class="history-date">${escapeHTML(notificationText(n))}</span></div>
+        <div class="history-meta"><span>${fmtDateLong((n.at || '').slice(0, 10))}</span></div>
+      </button>
+    </li>
+  `).join('');
+  $('notificationsEmpty').hidden = notifications.length > 0;
+}
+
+async function refreshNotifications() {
+  if (!settings.social.enabled || !settings.social.username || socialNeedsReconnect) {
+    notifications = [];
+    renderNotificationsTab();
+    return;
+  }
+  try {
+    notifications = await socialFetchNotifications(settings.social.uid);
+  } catch (err) {
+    console.error('notifications refresh failed', err);
+  }
+  renderNotificationsTab();
+}
+
+document.querySelector('.menu-item[data-view="notifications"]').addEventListener('click', refreshNotifications);
+
+$('notificationsList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.history-item');
+  if (!btn) return;
+  const n = notifications[Number(btn.dataset.index)];
+  if (!n) return;
+  if (n.type === 'follow') {
+    openProfile(n.fromUid, n.fromUsername, n.fromDisplayName);
+    return;
+  }
+  // A like/comment notification is always about one of MY OWN activities -
+  // make sure it's actually in feedCache (my own posts are included in it
+  // now) before asking openFeedWorkout to find it there.
+  switchView('feed');
+  await refreshFeed();
+  openFeedWorkout(settings.social.uid, n.activityKind, n.activityId);
+});
 
 $('feedSearchBtn').addEventListener('click', async () => {
   const name = $('feedSearchInput').value.trim();
@@ -4537,7 +4711,7 @@ $('feedSearchBtn').addEventListener('click', async () => {
     const user = await socialFindUserByUsername(name);
     if (!user) { $('feedSearchStatus').textContent = 'No one with that username.'; return; }
     if (followingCache.some((f) => f.uid === user.uid)) { $('feedSearchStatus').textContent = `Already following @${user.username}.`; return; }
-    await socialFollowUser(settings.social.uid, user);
+    await socialFollowUser(settings.social.uid, { username: settings.social.username, displayName: settings.social.displayName }, user);
     $('feedSearchInput').value = '';
     $('feedSearchStatus').hidden = true;
     toast(`Following @${user.username}`);
@@ -4549,10 +4723,15 @@ $('feedSearchBtn').addEventListener('click', async () => {
 });
 
 $('followingList').addEventListener('click', async (e) => {
-  const btn = e.target.closest('.routine-delete');
-  if (!btn) return;
-  await socialUnfollowUser(settings.social.uid, btn.dataset.uid);
-  await refreshFeed();
+  const deleteBtn = e.target.closest('.routine-delete');
+  if (deleteBtn) {
+    await socialUnfollowUser(settings.social.uid, deleteBtn.dataset.uid);
+    await refreshFeed();
+    return;
+  }
+  const openBtn = e.target.closest('.follow-open');
+  if (!openBtn) return;
+  openProfile(openBtn.dataset.uid, openBtn.dataset.username, openBtn.dataset.displayName || null);
 });
 
 // The feed item currently open in #feedWorkoutSheet, so the like/comment
@@ -4564,10 +4743,15 @@ let feedDetailItem = null;
 let feedDetailLikedByMe = false;
 
 function updateFeedCardCounts(item) {
-  const row = document.querySelector(
+  // querySelectorAll, not just the first match - the same card can be on
+  // screen in both the main Feed and a profile page's activity list at
+  // once (one hidden, one visible), and hidden .view sections stay in the
+  // DOM rather than being removed.
+  document.querySelectorAll(
     `.feed-item[data-owner="${item.ownerUid}"][data-id="${item.id}"][data-kind="${item.kind}"] .feed-engagement`,
-  );
-  if (row) row.innerHTML = `<span>♥ ${item.likeCount || 0}</span><span>💬 ${item.commentCount || 0}</span>`;
+  ).forEach((row) => {
+    row.innerHTML = `<span>♥ ${item.likeCount || 0}</span><span>💬 ${item.commentCount || 0}</span>`;
+  });
 }
 
 function renderFeedComments(comments) {
@@ -4605,7 +4789,8 @@ async function refreshFeedDetailEngagement(item) {
 }
 
 function openFeedWorkout(ownerUid, kind, id) {
-  const item = feedCache.find((x) => x.ownerUid === ownerUid && x.kind === kind && x.id === id);
+  const matches = (x) => x.ownerUid === ownerUid && x.kind === kind && x.id === id;
+  const item = feedCache.find(matches) || profileActivities.find(matches);
   if (!item) return;
   feedDetailItem = item;
   feedDetailLikedByMe = false;
@@ -4691,6 +4876,12 @@ $('feedList').addEventListener('click', (e) => {
   openFeedWorkout(btn.dataset.owner, btn.dataset.kind, btn.dataset.id);
 });
 
+$('profileActivityList').addEventListener('click', (e) => {
+  const btn = e.target.closest('.history-item');
+  if (!btn) return;
+  openFeedWorkout(btn.dataset.owner, btn.dataset.kind, btn.dataset.id);
+});
+
 $('feedLikeBtn').addEventListener('click', async () => {
   if (!feedDetailItem) return;
   const item = feedDetailItem;
@@ -4701,8 +4892,13 @@ $('feedLikeBtn').addEventListener('click', async () => {
   $('feedLikeCount').textContent = item.likeCount;
   updateFeedCardCounts(item);
   try {
-    if (wasLiked) await socialUnlikeActivity(item.ownerUid, item.kind, item.id, settings.social.uid);
-    else await socialLikeActivity(item.ownerUid, item.kind, item.id, settings.social.uid);
+    if (wasLiked) {
+      await socialUnlikeActivity(item.ownerUid, item.kind, item.id, settings.social.uid);
+    } else {
+      await socialLikeActivity(item.ownerUid, item.kind, item.id, {
+        uid: settings.social.uid, username: settings.social.username, displayName: settings.social.displayName,
+      });
+    }
   } catch (err) {
     console.error('like toggle failed', err);
     feedDetailLikedByMe = wasLiked;
