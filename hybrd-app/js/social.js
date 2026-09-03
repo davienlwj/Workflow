@@ -102,10 +102,27 @@ function extractBalancedObjectLiteral(text) {
   return null;
 }
 
+/** Starts sign-in via a full-page redirect to Google, not a popup - popups
+ *  are unreliable on mobile Safari/PWAs (there's an async gap while the SDK
+ *  loads between the tap and the popup opening, which can break the
+ *  popup's channel back to the opener and surface as an opaque "requested
+ *  action is invalid" page). The page navigates away here; this promise
+ *  never resolves in the normal case. Call completeRedirectSignIn() on the
+ *  next load to pick up the result once Google sends the user back. */
 export async function signInWithGoogle() {
   requireInit();
   const provider = new authMod.GoogleAuthProvider();
-  const { user } = await authMod.signInWithPopup(auth, provider);
+  await authMod.signInWithRedirect(auth, provider);
+}
+
+/** Call once at startup (after initApp): resolves with the signed-in user
+ *  if this load is Google redirecting back after signInWithGoogle(), or
+ *  null on an ordinary load. */
+export async function completeRedirectSignIn() {
+  requireInit();
+  const result = await authMod.getRedirectResult(auth);
+  if (!result) return null;
+  const { user } = result;
   return { uid: user.uid, displayName: user.displayName, photoURL: user.photoURL };
 }
 

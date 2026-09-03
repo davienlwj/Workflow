@@ -370,9 +370,14 @@ Calendar and intervals.icu integrations above.
    **Add project** (the free Spark plan is plenty for personal use).
 2. **Build → Authentication → Get started**, enable the **Google**
    sign-in provider.
-3. **Build → Firestore Database → Create database** (production mode,
+3. Still in Authentication, **Settings → Authorized domains** → **Add
+   domain** → add the domain the app is actually served from (e.g.
+   `<username>.github.io`). Firebase only auto-authorizes `localhost` and
+   its own `*.firebaseapp.com`/`*.web.app` domains - sign-in fails on any
+   other domain (including GitHub Pages) until you add it here.
+4. **Build → Firestore Database → Create database** (production mode,
    any region).
-4. **Firestore Database → Rules**, replace the default with the rules
+5. **Firestore Database → Rules**, replace the default with the rules
    below, then **Publish**. These are what actually make a workout
    visible only to its owner and their followers - without them, either
    nobody can read anything, or (if left wide open) everybody could read
@@ -409,7 +414,7 @@ Calendar and intervals.icu integrations above.
    }
    ```
 
-5. **Project settings** (gear icon) → **Your apps** → **Web app** (the
+6. **Project settings** (gear icon) → **Your apps** → **Web app** (the
    `</>` icon) → register one → copy the `firebaseConfig` object shown.
    These values aren't secret (they identify your project, not
    authenticate as you - the Security Rules above are what actually
@@ -418,9 +423,12 @@ Calendar and intervals.icu integrations above.
 ### 2. Connect it in Settings
 
 **Settings → Social**, paste the whole `firebaseConfig` object (exactly as
-Firebase showed it, unquoted keys and all - no need to convert it to
-JSON), then **Sign in with Google**. First time in, pick a username - this
-is how people find you to follow you (there's no browsing/discovery, only
+Firebase showed it - the full snippet with the import lines and comments
+is fine too, not just the bare object), then **Sign in with Google**. This
+sends the whole page to Google's sign-in and back (not a popup - popups
+are unreliable on mobile Safari/PWAs), so expect the app to briefly
+navigate away and reload. First time in, pick a username - this is how
+people find you to follow you (there's no browsing/discovery, only
 exact-username lookup, so you'll need to share yours out of band, same as
 a phone number).
 
