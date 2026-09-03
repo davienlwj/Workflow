@@ -408,10 +408,19 @@ export function saveShoes(shoes) {
 
 export function addShoe(name) {
   const shoes = loadShoes();
-  const record = { id: `shoe-${makeId()}`, name };
+  const record = { id: `shoe-${makeId()}`, name, startKm: 0 };
   shoes.push(record);
   saveShoes(shoes);
   return record;
+}
+
+export function updateShoe(id, patch) {
+  const shoes = loadShoes();
+  const idx = shoes.findIndex((s) => s.id === id);
+  if (idx === -1) return null;
+  shoes[idx] = { ...shoes[idx], ...patch };
+  saveShoes(shoes);
+  return shoes[idx];
 }
 
 export function deleteShoe(id) {
