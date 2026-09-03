@@ -1,6 +1,6 @@
 /*
  * Exercise library for the watch's exercise picker, generated from
- * ../../vo2max/js/exercises.js (id, name, and a precomputed primary
+ * ../../hybrd-app/js/exercises.js (id, name, and a precomputed primary
  * "group" per exercise - the RADAR_GROUP_FOR rollup of muscles[0],
  * matching how that file's radar chart already groups them). Ids must
  * stay identical to the phone app's for a synced workout's exerciseId
@@ -8,7 +8,7 @@
  * included - only the built-in library is loggable from the watch.
  *
  * Regenerate by re-running the generator this file's history came
- * from against a changed vo2max/js/exercises.js, rather than hand-editing.
+ * from against a changed hybrd-app/js/exercises.js, rather than hand-editing.
  */
 
 export const GROUPS = [

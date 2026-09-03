@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lthrZoneTable, rhrZoneTable, targetZone, hrZoneDurations } from '../vo2max/js/zones.js';
+import { lthrZoneTable, rhrZoneTable, targetZone, hrZoneDurations } from '../hybrd-app/js/zones.js';
 
 const settings = {
   restingHR: 54,

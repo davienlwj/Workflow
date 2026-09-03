@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sessionToICS } from '../vo2max/js/ics.js';
+import { sessionToICS } from '../hybrd-app/js/ics.js';
 
 const baseSession = {
   id: 'abc123',
@@ -37,7 +37,7 @@ test('sessionToICS produces a well-formed VEVENT with correct dates', () => {
   assert.match(ics, /^BEGIN:VCALENDAR\r\n/);
   assert.match(ics, /\r\nEND:VCALENDAR\r\n$/);
   assert.match(ics, /BEGIN:VEVENT/);
-  assert.match(ics, /UID:abc123@vo2max-tracker/);
+  assert.match(ics, /UID:abc123@hybrd-app-tracker/);
   assert.match(ics, /DTSTART;VALUE=DATE:20260818/);
   // All-day events use an exclusive DTEND: the day after.
   assert.match(ics, /DTEND;VALUE=DATE:20260819/);

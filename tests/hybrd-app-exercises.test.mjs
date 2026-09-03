@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   EXERCISES, MUSCLES, EQUIPMENT, RADAR_GROUPS, RADAR_GROUP_FOR, MUSCLE_LABEL,
   exerciseById, searchExercises,
-} from '../vo2max/js/exercises.js';
+} from '../hybrd-app/js/exercises.js';
 
 test('every exercise has a unique id', () => {
   const ids = EXERCISES.map((e) => e.id);

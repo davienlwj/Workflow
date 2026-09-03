@@ -5,7 +5,7 @@
  * localStorage are otherwise two sandboxes with no way to reach each other.
  * The watch always pushes its *full* local workout history (not just new
  * ones); the phone dedups on read by watchWorkoutId. See setting/index.js
- * and ../../vo2max/js/gistSync.js for the two ends of this.
+ * and ../../hybrd-app/js/gistSync.js for the two ends of this.
  *
  * Deleting a workout on the phone writes its id to the Gist's
  * deletedWorkoutIds list (the phone's one write - see gistSync.js's

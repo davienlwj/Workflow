@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { muscleDiagramHTML, MUSCLE_META } from '../vo2max/js/muscleDiagram.js';
-import { EXERCISES, MUSCLES } from '../vo2max/js/exercises.js';
+import { muscleDiagramHTML, MUSCLE_META } from '../hybrd-app/js/muscleDiagram.js';
+import { EXERCISES, MUSCLES } from '../hybrd-app/js/exercises.js';
 
-const ICONS_DIR = fileURLToPath(new URL('../vo2max/icons/muscles/', import.meta.url));
+const ICONS_DIR = fileURLToPath(new URL('../hybrd-app/icons/muscles/', import.meta.url));
 
 test('every image referenced by any muscleDiagramHTML output actually exists on disk', () => {
   const referenced = new Set();

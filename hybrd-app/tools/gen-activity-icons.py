@@ -28,7 +28,7 @@ if that's ever worth revisiting.
 Requires Pillow, numpy, potracer and shapely
 (`pip install pillow numpy potracer shapely`; potracer imports as `potrace`).
 
-    python3 vo2max/tools/gen-activity-icons.py
+    python3 hybrd-app/tools/gen-activity-icons.py
 """
 
 import re

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mileageTrendSVG, muscleRadarSVG } from '../vo2max/js/chart.js';
-import { RADAR_GROUPS } from '../vo2max/js/exercises.js';
+import { mileageTrendSVG, muscleRadarSVG } from '../hybrd-app/js/chart.js';
+import { RADAR_GROUPS } from '../hybrd-app/js/exercises.js';
 
 test('mileageTrendSVG shows the empty state when every bucket is zero', () => {
   assert.match(mileageTrendSVG([{ label: 'Aug', km: 0 }, { label: 'Sep', km: 0 }]), /No distance logged for this range yet/);

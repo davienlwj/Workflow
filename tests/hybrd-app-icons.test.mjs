@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runIconSVG, dumbbellIconSVG } from '../vo2max/js/icons.js';
+import { runIconSVG, dumbbellIconSVG } from '../hybrd-app/js/icons.js';
 
 test('runIconSVG returns a valid, tagged svg', () => {
   const svg = runIconSVG();

@@ -7,24 +7,24 @@ keeps working offline once it has loaded once.
 ## Put it on your Home Screen
 
 Served over HTTPS (or `localhost`), from this folder specifically —
-`/vo2max/` is its own installable app, separate from the calendar at the
+`/hybrd-app/` is its own installable app, separate from the calendar at the
 repo root.
 
-**iPhone / iPad** — open `/vo2max/` in Safari, tap Share, then *Add to Home
+**iPhone / iPad** — open `/hybrd-app/` in Safari, tap Share, then *Add to Home
 Screen*. It launches full screen with no browser chrome.
 
 **Android** — open in Chrome, tap the ⋮ menu, then *Add to Home screen*.
 
 If this repo is deployed via `.github/workflows/pages.yml`, the app lives at
-`https://<username>.github.io/<repo>/vo2max/`.
+`https://<username>.github.io/<repo>/hybrd-app/`.
 
 ### Running it locally
 
 ```sh
-python3 -m http.server 8000        # then open http://localhost:8000/vo2max/
-npm test                            # runs this app's tests alongside the calendar's
-npm run icons:vo2max                # regenerate the app icons
-npm run muscle-diagram:vo2max       # regenerate the muscle-diagram image assets
+python3 -m http.server 8000   # then open http://localhost:8000/hybrd-app/
+npm test                      # runs this app's tests alongside the calendar's
+npm run icons:hybrd-app       # regenerate the app icons
+npm run muscle-diagram:hybrd-app   # regenerate the muscle-diagram image assets
 ```
 
 ## What's in it
@@ -361,7 +361,7 @@ fixed numbers:
 Zones are built as contiguous bands (one zone's top is the next zone's
 bottom minus one), which is why the displayed bpm ranges land exactly on
 values like 146–158 rather than whatever a lone `round()` of each bound
-would give. `../tests/vo2max-zones.test.mjs` pins the exact bpm bands for
+would give. `../tests/hybrd-app-zones.test.mjs` pins the exact bpm bands for
 the defaults in this app.
 
 ## Share your workout (or run)
@@ -465,5 +465,5 @@ tools/gen-icons.py           crops/centers it into the icon set (needs Pillow, n
 tools/muscle-chart-source.jpg the anatomy illustration the muscle diagrams are built from
 tools/gen-muscle-diagram.py  recolors it lighter grey and cuts an orange highlight overlay per
                               muscle group (needs Pillow, numpy, scipy) -> icons/muscles/
-../tests/vo2max-*.test.mjs   zone, progress-stats, workout, exercise, muscle-diagram, icons, chart and ics-export test suites
+../tests/hybrd-app-*.test.mjs   zone, progress-stats, workout, exercise, muscle-diagram, icons, chart and ics-export test suites
 ```
