@@ -811,7 +811,30 @@
   <div class="actions-row">
     <button type="button" id="routineActionsStart" class="primary block">Start Workout</button>
     <button type="button" id="routineActionsEdit" class="ghost-btn block">Edit</button>
+    <button type="button" id="routineActionsShare" class="ghost-btn block">Share</button>
     <button type="button" id="routineActionsDelete" class="danger-btn block">Delete</button>
+  </div>
+</section>
+
+<!-- Routine share-target sheet (popup, opened by tapping Share above - pick who to send it to) -->
+<section id="routineShareSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Share routine">
+  <div class="grabber"></div>
+  <h2 class="view-title">Share Routine</h2>
+  <ul id="routineShareList" class="history-list"></ul>
+  <p id="routineShareEmpty" class="empty" hidden>Follow someone first to share a routine with them.</p>
+  <div class="actions">
+    <button type="button" id="routineShareCancel" class="ghost-btn block">Cancel</button>
+  </div>
+</section>
+
+<!-- Incoming routine share sheet (popup, opened by tapping a "shared a routine with you" notification) -->
+<section id="routineIncomingShareSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Routine shared with you">
+  <div class="grabber"></div>
+  <h2 id="routineIncomingShareTitle" class="view-title"></h2>
+  <p id="routineIncomingShareMeta" class="field-hint"></p>
+  <div class="actions-row">
+    <button type="button" id="routineIncomingShareAccept" class="primary block">Accept</button>
+    <button type="button" id="routineIncomingShareDecline" class="ghost-btn block">Decline</button>
   </div>
 </section>
 

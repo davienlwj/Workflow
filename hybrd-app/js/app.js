@@ -54,6 +54,7 @@ import {
   isLikedByMe as socialIsLikedByMe, likeActivity as socialLikeActivity, unlikeActivity as socialUnlikeActivity,
   fetchComments as socialFetchComments, addComment as socialAddComment, deleteComment as socialDeleteComment,
   countLikesAndComments as socialCountLikesAndComments, fetchNotifications as socialFetchNotifications,
+  shareRoutine as socialShareRoutine, deleteRoutineShare as socialDeleteRoutineShare,
 } from './social.js';
 import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
@@ -1454,6 +1455,8 @@ function closeAllSheets() {
   closeStartChoiceSheet();
   closeRoutinesSheet();
   closeRoutineActionsSheet();
+  closeRoutineShareSheet();
+  closeRoutineIncomingShareSheet();
   closeRoutineBuilderSheet();
   closeShareCardSheet();
   closeFeedWorkout();
@@ -2755,6 +2758,7 @@ function routineRowHTML(routine) {
           <span class="history-date">${escapeHTML(routine.name)}</span>
         </div>
         <div class="history-meta"><span>${count} exercise${count === 1 ? '' : 's'}</span></div>
+        ${routine.sharedBy ? `<div class="history-notes">Routine by @${escapeHTML(routine.sharedBy)}</div>` : ''}
       </button>
     </li>
   `;
@@ -2812,7 +2816,9 @@ function openRoutineActionsSheet(routine) {
   routineActionsId = routine.id;
   $('routineActionsTitle').textContent = routine.name;
   const count = routine.exerciseIds.length;
-  $('routineActionsMeta').textContent = `${count} exercise${count === 1 ? '' : 's'}`;
+  $('routineActionsMeta').textContent = routine.sharedBy
+    ? `${count} exercise${count === 1 ? '' : 's'} · Routine by @${routine.sharedBy}`
+    : `${count} exercise${count === 1 ? '' : 's'}`;
   $('scrim').hidden = false;
   $('routineActionsSheet').hidden = false;
   $('routineActionsSheet').scrollTop = 0;
@@ -2859,6 +2865,153 @@ $('routineActionsDelete').addEventListener('click', () => {
 });
 
 $('addRoutineTabBtn').addEventListener('click', () => openRoutineBuilderSheet());
+
+/* --------------------------------------------------------- routine share */
+
+// The routine currently being shared - set while routineShareSheet (the
+// "who do you want to send this to" picker) is open.
+let routineToShare = null;
+
+$('routineActionsShare').addEventListener('click', () => {
+  const routine = routines.find((r) => r.id === routineActionsId);
+  if (!routine) return;
+  if (!settings.social.enabled || !settings.social.username || socialNeedsReconnect) {
+    toast('Sign in (menu → Account) to share routines');
+    return;
+  }
+  closeRoutineActionsSheet();
+  openRoutineShareSheet(routine);
+});
+
+async function openRoutineShareSheet(routine) {
+  routineToShare = routine;
+  $('routineShareList').innerHTML = '';
+  $('routineShareEmpty').hidden = true;
+  $('scrim').hidden = false;
+  $('routineShareSheet').hidden = false;
+  $('routineShareSheet').scrollTop = 0;
+  // Fetched fresh rather than trusting followingCache - the Lift tab
+  // doesn't otherwise keep it warm the way visiting Feed does.
+  try {
+    followingCache = await socialFetchFollowing(settings.social.uid);
+    $('routineShareList').innerHTML = followingCache.map((f) => `
+      <li>
+        <button type="button" class="history-item routine-share-target" data-uid="${f.uid}">
+          <div class="history-top"><span class="history-date">@${escapeHTML(f.username)}</span></div>
+          ${f.displayName ? `<div class="history-meta"><span>${escapeHTML(f.displayName)}</span></div>` : ''}
+        </button>
+      </li>
+    `).join('');
+    $('routineShareEmpty').hidden = followingCache.length > 0;
+  } catch (err) {
+    console.error('routine share: fetch following failed', err);
+    $('routineShareEmpty').hidden = false;
+  }
+}
+
+function closeRoutineShareSheet() {
+  routineToShare = null;
+  $('scrim').hidden = true;
+  $('routineShareSheet').hidden = true;
+}
+
+$('routineShareCancel').addEventListener('click', closeRoutineShareSheet);
+
+$('routineShareList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.routine-share-target');
+  if (!btn) return;
+  const target = followingCache.find((f) => f.uid === btn.dataset.uid);
+  const routine = routineToShare;
+  if (!routine || !target) return;
+  try {
+    const exerciseDefs = routine.exerciseIds
+      .map((id) => {
+        const ex = findExercise(id);
+        return ex ? { id: ex.id, name: ex.name, muscles: ex.muscles || [], equipment: ex.equipment || null } : null;
+      })
+      .filter(Boolean);
+    await socialShareRoutine(
+      settings.social.uid,
+      { username: settings.social.username, displayName: settings.social.displayName },
+      target.uid,
+      routine,
+      exerciseDefs,
+    );
+    toast(`Shared with @${target.username}`);
+    closeRoutineShareSheet();
+  } catch (err) {
+    console.error('share routine failed', err);
+    toast("Couldn't share - try again.");
+  }
+});
+
+/** Same problem/fix as registerFeedCustomExercises: a routine shared with
+ *  me can reference a custom exercise I don't have locally yet - the
+ *  share embeds each exercise's own name/muscles/equipment (see
+ *  social.js's shareRoutine) so it can be registered here before the
+ *  routine itself is saved. */
+function registerRoutineShareCustomExercises(exerciseDefs) {
+  const existingIds = new Set(allExercises().map((e) => e.id));
+  let added = false;
+  for (const def of exerciseDefs || []) {
+    if (!def?.id || !def.name || existingIds.has(def.id)) continue;
+    addCustomExercise({ id: def.id, name: def.name, equipment: def.equipment || 'Bodyweight', muscles: def.muscles || [] });
+    existingIds.add(def.id);
+    added = true;
+  }
+  if (added) customExercises = loadCustomExercises();
+}
+
+// The incoming share currently being viewed - set while
+// routineIncomingShareSheet (opened from a Notifications row) is open.
+let incomingRoutineShare = null;
+
+function openRoutineIncomingShareSheet(share) {
+  incomingRoutineShare = share;
+  $('routineIncomingShareTitle').textContent = share.routineName;
+  const count = (share.exerciseIds || []).length;
+  const who = share.fromDisplayName || (share.fromUsername ? `@${share.fromUsername}` : 'Someone');
+  $('routineIncomingShareMeta').textContent = `${count} exercise${count === 1 ? '' : 's'} · from ${who}`;
+  $('scrim').hidden = false;
+  $('routineIncomingShareSheet').hidden = false;
+  $('routineIncomingShareSheet').scrollTop = 0;
+}
+
+function closeRoutineIncomingShareSheet() {
+  incomingRoutineShare = null;
+  $('scrim').hidden = true;
+  $('routineIncomingShareSheet').hidden = true;
+}
+
+$('routineIncomingShareAccept').addEventListener('click', async () => {
+  const share = incomingRoutineShare;
+  if (!share) return;
+  registerRoutineShareCustomExercises(share.exerciseDefs);
+  addRoutine({ name: share.routineName, exerciseIds: share.exerciseIds, sharedBy: share.fromUsername });
+  routines = loadRoutines();
+  renderRoutinesList();
+  closeRoutineIncomingShareSheet();
+  toast(`Added "${share.routineName}"`);
+  try {
+    await socialDeleteRoutineShare(settings.social.uid, share.shareId);
+  } catch (err) {
+    console.error('delete routine share failed', err);
+  }
+  await refreshNotifications();
+});
+
+$('routineIncomingShareDecline').addEventListener('click', async () => {
+  const share = incomingRoutineShare;
+  if (!share) return;
+  closeRoutineIncomingShareSheet();
+  try {
+    await socialDeleteRoutineShare(settings.social.uid, share.shareId);
+  } catch (err) {
+    console.error('delete routine share failed', err);
+  }
+  await refreshNotifications();
+  toast('Declined');
+});
 
 /* ------------------------------------------------------- routine builder */
 
@@ -4775,19 +4928,22 @@ function notificationText(n) {
   if (n.type === 'follow') return `${notificationWho(n)} started following you`;
   if (n.type === 'like') return `${notificationWho(n)} liked your ${kindWord}`;
   if (n.type === 'post') return `${notificationWho(n)} completed a ${kindWord}`;
+  if (n.type === 'routine-share') return `${notificationWho(n)} shared a routine with you: "${n.routineName}"`;
   return `${notificationWho(n)} commented: "${n.text}"`;
 }
 
 /** Small type icon prefixing each notification row - a follow/like/comment
  *  reuses the icon that concept already has everywhere else in the app
- *  (heart/comment for likes/comments); a post reuses the run/dumbbell
- *  pictogram the Dashboard's own recent-activity list already uses to
- *  tell the two apart, so "someone posted" reads the same way here as it
- *  does there. */
+ *  (heart/comment for likes/comments); a post (or a routine share, same
+ *  dumbbell-territory concept) reuses the run/dumbbell pictogram the
+ *  Dashboard's own recent-activity list already uses to tell the two
+ *  apart, so "someone posted"/"someone shared a routine" reads the same
+ *  way here as it does there. */
 function notificationIconSVG(n) {
   if (n.type === 'follow') return personIconSVG();
   if (n.type === 'like') return heartIconSVG();
   if (n.type === 'comment') return commentIconSVG();
+  if (n.type === 'routine-share') return dumbbellIconSVG();
   return n.activityKind === 'run' ? runIconSVG() : dumbbellIconSVG();
 }
 
@@ -4844,6 +5000,10 @@ $('notificationsList').addEventListener('click', async (e) => {
   if (!n) return;
   if (n.type === 'follow') {
     openProfile(n.fromUid, n.fromUsername, n.fromDisplayName);
+    return;
+  }
+  if (n.type === 'routine-share') {
+    openRoutineIncomingShareSheet(n);
     return;
   }
   // like/comment/post all point at a specific activity - activityOwnerUid
