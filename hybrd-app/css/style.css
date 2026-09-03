@@ -1196,9 +1196,6 @@ button.mileage-plan-row-open {
 .history-meta { font-size: 13px; color: var(--dim); display: flex; gap: 10px; flex-wrap: wrap; }
 .history-notes { font-size: 13px; color: var(--dimmer); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.routine-row { display: flex; align-items: center; gap: 8px; }
-.routine-row .routine-item { flex: 1; }
-
 /* ----------------------------------------------------------------- feed */
 
 /* Feed cards' share-card thumbnail - same visual convention as
@@ -1313,7 +1310,7 @@ button.mileage-plan-row-open {
    8px item-to-item gap down to the button below it. */
 #addShoeBtn { margin-top: 8px; }
 
-.routine-delete, .routine-edit {
+.routine-delete {
   background: transparent;
   border: 1px solid var(--line);
   border-radius: 8px;

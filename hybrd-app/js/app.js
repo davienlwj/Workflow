@@ -1453,6 +1453,7 @@ function closeAllSheets() {
   closeCalDaySheet();
   closeStartChoiceSheet();
   closeRoutinesSheet();
+  closeRoutineActionsSheet();
   closeRoutineBuilderSheet();
   closeShareCardSheet();
   closeFeedWorkout();
@@ -2748,15 +2749,13 @@ $('startChoiceRoutine').addEventListener('click', () => {
 function routineRowHTML(routine) {
   const count = routine.exerciseIds.length;
   return `
-    <li class="routine-row">
+    <li>
       <button type="button" class="history-item routine-item" data-id="${routine.id}">
         <div class="history-top">
           <span class="history-date">${escapeHTML(routine.name)}</span>
         </div>
         <div class="history-meta"><span>${count} exercise${count === 1 ? '' : 's'}</span></div>
       </button>
-      <button type="button" class="routine-edit" data-id="${routine.id}" aria-label="Edit routine">✎</button>
-      <button type="button" class="routine-delete" data-id="${routine.id}" aria-label="Delete routine">✕</button>
     </li>
   `;
 }
@@ -2785,24 +2784,11 @@ function closeRoutinesSheet() {
 
 $('routinesClose').addEventListener('click', closeRoutinesSheet);
 
+// "Select Routine" (reached via Start Workout) is a fast picker mid-flow -
+// tapping a routine there starts it immediately, no menu in the way.
+// Editing/deleting a routine happens from the Lift tab's own list instead
+// (see routineActionsSheet below).
 $('routinesList').addEventListener('click', (e) => {
-  const editBtn = e.target.closest('.routine-edit');
-  if (editBtn) {
-    const routine = routines.find((r) => r.id === editBtn.dataset.id);
-    if (!routine) return;
-    closeRoutinesSheet();
-    openRoutineBuilderSheet(routine.exerciseIds, routine);
-    return;
-  }
-  const deleteBtn = e.target.closest('.routine-delete');
-  if (deleteBtn) {
-    if (!confirm('Delete this routine?')) return;
-    deleteRoutine(deleteBtn.dataset.id);
-    routines = loadRoutines();
-    renderRoutinesList();
-    toast('Routine deleted');
-    return;
-  }
   const item = e.target.closest('.routine-item');
   if (!item) return;
   const routine = routines.find((r) => r.id === item.dataset.id);
@@ -2816,29 +2802,60 @@ $('addRoutineBtn').addEventListener('click', () => {
   openRoutineBuilderSheet();
 });
 
+// null while routineActionsSheet is closed, the routine's id while it's
+// open - same "what am I acting on" role editingShoeId plays for the shoe
+// sheet, which this mirrors: tap a routine card to get Start/Edit/Delete
+// in one place instead of icon buttons crowding the row.
+let routineActionsId = null;
+
+function openRoutineActionsSheet(routine) {
+  routineActionsId = routine.id;
+  $('routineActionsTitle').textContent = routine.name;
+  const count = routine.exerciseIds.length;
+  $('routineActionsMeta').textContent = `${count} exercise${count === 1 ? '' : 's'}`;
+  $('scrim').hidden = false;
+  $('routineActionsSheet').hidden = false;
+  $('routineActionsSheet').scrollTop = 0;
+}
+
+function closeRoutineActionsSheet() {
+  routineActionsId = null;
+  $('scrim').hidden = true;
+  $('routineActionsSheet').hidden = true;
+}
+
 $('routinesTabList').addEventListener('click', (e) => {
-  const editBtn = e.target.closest('.routine-edit');
-  if (editBtn) {
-    const routine = routines.find((r) => r.id === editBtn.dataset.id);
-    if (!routine) return;
-    openRoutineBuilderSheet(routine.exerciseIds, routine);
-    return;
-  }
-  const deleteBtn = e.target.closest('.routine-delete');
-  if (deleteBtn) {
-    if (!confirm('Delete this routine?')) return;
-    deleteRoutine(deleteBtn.dataset.id);
-    routines = loadRoutines();
-    renderRoutinesList();
-    toast('Routine deleted');
-    return;
-  }
   const item = e.target.closest('.routine-item');
   if (!item) return;
   const routine = routines.find((r) => r.id === item.dataset.id);
   if (!routine) return;
+  openRoutineActionsSheet(routine);
+});
+
+$('routineActionsStart').addEventListener('click', () => {
+  const routine = routines.find((r) => r.id === routineActionsId);
+  if (!routine) return;
   if (liveSession) { toast('Finish or cancel your live workout first'); return; }
+  closeRoutineActionsSheet();
   openLiveWorkoutSheet(routine.exerciseIds);
+});
+
+$('routineActionsEdit').addEventListener('click', () => {
+  const routine = routines.find((r) => r.id === routineActionsId);
+  if (!routine) return;
+  closeRoutineActionsSheet();
+  openRoutineBuilderSheet(routine.exerciseIds, routine);
+});
+
+$('routineActionsDelete').addEventListener('click', () => {
+  const routine = routines.find((r) => r.id === routineActionsId);
+  if (!routine) return;
+  if (!confirm('Delete this routine?')) return;
+  deleteRoutine(routine.id);
+  routines = loadRoutines();
+  renderRoutinesList();
+  closeRoutineActionsSheet();
+  toast('Routine deleted');
 });
 
 $('addRoutineTabBtn').addEventListener('click', () => openRoutineBuilderSheet());
