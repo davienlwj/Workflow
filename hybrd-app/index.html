@@ -539,6 +539,28 @@
   </form>
 </section>
 
+<!-- Shoe sheet (popup, opened by tapping "+ Add shoe" or an existing shoe in Shoe Mileage) -->
+<section id="shoeSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Shoe">
+  <div class="grabber"></div>
+  <form id="shoeForm" class="form">
+    <label class="field">
+      <span>Name</span>
+      <input id="shoeName" type="text" required>
+    </label>
+    <label class="field">
+      <span>Starting mileage (km)</span>
+      <input id="shoeStartKm" type="number" step="0.01" min="0" inputmode="decimal">
+    </label>
+    <p class="field-hint">Any distance this shoe already had before you started tracking it here - runs logged against it in the app add on top.</p>
+
+    <div class="actions">
+      <button type="button" id="shoeDelete" class="danger-btn" hidden>Delete</button>
+      <button type="button" id="shoeCancel" class="ghost-btn">Cancel</button>
+      <button type="submit" id="shoeSave" class="primary">Save</button>
+    </div>
+  </form>
+</section>
+
 <!-- Calendar day sheet (popup, opened by tapping a date on the Dashboard calendar) -->
 <section id="calDaySheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Day activity">
   <div class="grabber"></div>

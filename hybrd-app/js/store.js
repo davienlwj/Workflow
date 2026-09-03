@@ -406,9 +406,9 @@ export function saveShoes(shoes) {
   localStorage.setItem(SHOES_KEY, JSON.stringify(shoes));
 }
 
-export function addShoe(name) {
+export function addShoe(name, startKm = 0) {
   const shoes = loadShoes();
-  const record = { id: `shoe-${makeId()}`, name, startKm: 0 };
+  const record = { id: `shoe-${makeId()}`, name, startKm };
   shoes.push(record);
   saveShoes(shoes);
   return record;
