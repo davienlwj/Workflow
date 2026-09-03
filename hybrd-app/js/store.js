@@ -439,6 +439,10 @@ export function exportAll() {
     mileagePlan: loadMileagePlan(),
     plannedActivities: loadPlannedActivities(),
     shoes: loadShoes(),
+    // A workout being actively lifted when you hit Export shouldn't vanish
+    // on import just because it hadn't been saved yet - null when nothing
+    // was in progress, same shape loadLiveWorkout()/saveLiveWorkout() use.
+    liveWorkout: loadLiveWorkout(),
     exportedAt: new Date().toISOString(),
   }, null, 2);
 }
@@ -455,4 +459,8 @@ export function importAll(json) {
   if (data.mileagePlan?.startDate && Array.isArray(data.mileagePlan.weeks)) saveMileagePlan(data.mileagePlan);
   if (Array.isArray(data.plannedActivities)) savePlannedActivities(data.plannedActivities);
   if (Array.isArray(data.shoes)) saveShoes(data.shoes);
+  if ('liveWorkout' in data) {
+    if (data.liveWorkout) saveLiveWorkout(data.liveWorkout);
+    else clearLiveWorkout();
+  }
 }

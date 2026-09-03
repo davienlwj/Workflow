@@ -1308,6 +1308,11 @@ button.mileage-plan-row-open {
 #addRoutineBtn { margin-bottom: 8px; }
 #routinesList { margin-bottom: 8px; }
 
+/* Same 0px-gap issue again: "+ Add shoe" sits directly against
+   #shoeMileageList with nothing between them to carry the list's own
+   8px item-to-item gap down to the button below it. */
+#addShoeBtn { margin-top: 8px; }
+
 .routine-delete, .routine-edit {
   background: transparent;
   border: 1px solid var(--line);

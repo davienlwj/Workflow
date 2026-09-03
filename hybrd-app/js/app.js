@@ -5168,6 +5168,16 @@ $('sFile').addEventListener('change', async () => {
     sessions = loadSessions();
     workouts = loadWorkouts();
     customExercises = loadCustomExercises();
+    routines = loadRoutines();
+    customBrands = loadCustomBrands();
+    customSessionTypes = loadCustomSessionTypes();
+    mileagePlan = loadMileagePlan();
+    plannedActivities = loadPlannedActivities();
+    shoes = loadShoes();
+    // Only picks up an imported in-progress workout when nothing's
+    // actively being lifted right now - resuming mid-session would
+    // clobber the live sheet/timer state of whatever's actually running.
+    if (!liveSession) resumeLiveWorkoutIfAny();
     renderAll();
     clearSaved($('settingsSaveBtn'));
     toast('Data imported');
