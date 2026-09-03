@@ -2941,7 +2941,13 @@ $('routineShareList').addEventListener('click', async (e) => {
     closeRoutineShareSheet();
   } catch (err) {
     console.error('share routine failed', err);
-    toast("Couldn't share - try again.");
+    // A stale Firestore ruleset (routineShares added after the user last
+    // pasted the README's rules block) surfaces as exactly this error -
+    // worth calling out by name rather than a generic "try again" that
+    // hides the actual fix.
+    toast(err?.code === 'permission-denied'
+      ? "Couldn't share - re-paste the Security Rules (README) in Firebase Console"
+      : "Couldn't share - try again.");
   }
 });
 
