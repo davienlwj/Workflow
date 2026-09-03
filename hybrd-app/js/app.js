@@ -9,6 +9,7 @@ import {
   loadCustomSessionTypes, addCustomSessionType,
   loadMileagePlan, saveMileagePlan,
   loadPlannedActivities, addOrReplacePlannedActivity, deletePlannedActivity,
+  loadShoes, addShoe, deleteShoe,
   exportAll, importAll,
 } from './store.js';
 import {
@@ -92,6 +93,7 @@ let customBrands = loadCustomBrands();
 let customSessionTypes = loadCustomSessionTypes();
 let mileagePlan = loadMileagePlan();
 let plannedActivities = loadPlannedActivities();
+let shoes = loadShoes();
 let planTargetDate = null; // the date #planRunSheet/#planWorkoutSheet is currently editing a plan for
 // Set right before opening the real Log/Workout form from a planned
 // entry's "Start" - the plan is only actually deleted once that real
@@ -388,6 +390,18 @@ function readExtraFields(prefix, sport) {
  *  toggles (run-only). `session` is the data to populate from - {} for a
  *  freshly reset Log form or when the user switches Activity mid-entry,
  *  since a different sport's fields don't carry over. */
+/** Fills a Shoe <select> with "No shoe", every saved shoe, then "+ Add new
+ *  shoe…" - falls back to "No shoe" if `selectedId` doesn't match any
+ *  (e.g. the shoe was since deleted). */
+function populateShoeSelect(select, selectedId) {
+  select.innerHTML = [
+    '<option value="">No shoe</option>',
+    ...shoes.map((s) => `<option value="${s.id}">${escapeHTML(s.name)}</option>`),
+    '<option value="__new__">+ Add new shoe…</option>',
+  ].join('');
+  select.value = selectedId && shoes.some((s) => s.id === selectedId) ? selectedId : '';
+}
+
 function applySportFieldsToForm(prefix, sport, session = {}) {
   setMetricField(prefix, sport, session);
   setExtraFields(prefix, sport, session);
@@ -404,6 +418,9 @@ function applySportFieldsToForm(prefix, sport, session = {}) {
   $(`${prefix}WorkoutLabel`).hidden = sport !== 'run';
   const hint = $(`${prefix}DistanceHint`);
   if (hint) hint.hidden = sport !== 'run';
+  $(`${prefix}ShoeField`).hidden = sport !== 'run';
+  $(`${prefix}NewShoeRow`).hidden = true;
+  if (sport === 'run') populateShoeSelect($(`${prefix}ShoeSelect`), session.shoeId ?? null);
 }
 
 // Warm up / cool down are optional phases toggled on/off per session, each
@@ -444,6 +461,24 @@ for (const prefix of ['log', 'edit']) {
       $(`${prefix}${phase}Fields`).hidden = !$(`${prefix}${phase}Toggle`).checked;
     });
   }
+
+  $(`${prefix}ShoeSelect`).addEventListener('change', () => {
+    const revealNewShoe = $(`${prefix}ShoeSelect`).value === '__new__';
+    $(`${prefix}NewShoeRow`).hidden = !revealNewShoe;
+    if (revealNewShoe) $(`${prefix}NewShoeName`).focus();
+  });
+
+  $(`${prefix}NewShoeAdd`).addEventListener('click', () => {
+    const name = $(`${prefix}NewShoeName`).value.trim();
+    if (!name) { toast('Enter a shoe name'); return; }
+    const shoe = addShoe(name);
+    shoes = loadShoes();
+    $(`${prefix}NewShoeName`).value = '';
+    $(`${prefix}NewShoeRow`).hidden = true;
+    populateShoeSelect($(`${prefix}ShoeSelect`), shoe.id);
+    renderShoeMileage();
+    toast(`Added ${shoe.name}`);
+  });
 }
 
 function resetLogForm() {
@@ -514,11 +549,13 @@ function readSessionForm(prefix) {
     maxHR: numOrNull($(`${prefix}RunMaxHR`).value),
   };
   if (sport === 'run') {
+    const shoeVal = $(`${prefix}ShoeSelect`).value;
     return {
       ...base,
       avgPace: parsePaceMinKm($(`${prefix}AvgPace`).value),
       warmup: readPhaseFields(prefix, 'Warmup'),
       cooldown: readPhaseFields(prefix, 'Cooldown'),
+      shoeId: shoeVal && shoeVal !== '__new__' ? shoeVal : null,
     };
   }
   if (sport === 'ride') return { ...base, avgSpeedKmh: numOrNull($(`${prefix}AvgPace`).value), ...readExtraFields(prefix, sport) };
@@ -1524,7 +1561,40 @@ function renderRunTab() {
   $('mileageTotal').textContent = `${totalMileage(sessions)} km total`;
 
   renderRacesCard();
+  renderShoeMileage();
 }
+
+/** Total distance logged against each shoe (any session with that shoeId,
+ *  not just sport 'run' - a shoe could reasonably get reused for a
+ *  stairmaster session etc.). No graphs, just name + km, per the ask. */
+function renderShoeMileage() {
+  $('shoeMileageList').innerHTML = shoes.map((shoe) => {
+    const km = sessions
+      .filter((s) => s.shoeId === shoe.id)
+      .reduce((sum, s) => sum + (s.distanceKm || 0), 0);
+    return `
+      <li class="routine-row">
+        <div class="history-item" style="cursor:default">
+          <div class="history-top"><span class="history-date">${escapeHTML(shoe.name)}</span></div>
+          <div class="history-meta"><span class="mono">${Math.round(km * 100) / 100}km</span></div>
+        </div>
+        <button type="button" class="routine-delete" data-id="${shoe.id}" aria-label="Delete ${escapeHTML(shoe.name)}">✕</button>
+      </li>
+    `;
+  }).join('');
+  $('shoeMileageEmpty').hidden = shoes.length > 0;
+}
+
+$('shoeMileageList').addEventListener('click', (e) => {
+  const btn = e.target.closest('.routine-delete');
+  if (!btn) return;
+  const shoe = shoes.find((s) => s.id === btn.dataset.id);
+  if (!shoe) return;
+  if (!confirm(`Delete "${shoe.name}"? Runs already logged against it keep their mileage, they just won't show a shoe anymore.`)) return;
+  deleteShoe(shoe.id);
+  shoes = loadShoes();
+  renderShoeMileage();
+});
 
 /** The Run tab's target-race line: name/date/countdown plus whichever of
  *  location/distance/goal time/notes were actually filled in - empty

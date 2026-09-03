@@ -106,6 +106,10 @@
     <div id="mileageChartWrap" class="chart-wrap"></div>
     <p id="mileageTotal" class="mileage-total-footer mono"></p>
 
+    <h2 class="section-title">Shoe Mileage</h2>
+    <ul id="shoeMileageList" class="history-list"></ul>
+    <p id="shoeMileageEmpty" class="empty" hidden>No shoes added yet - pick one after your next run.</p>
+
     <h2 class="section-title">All sessions</h2>
     <ul id="historyList" class="history-list"></ul>
     <p id="historyEmpty" class="empty" hidden>No sessions logged yet.</p>
@@ -488,6 +492,15 @@
       </div>
     </div>
 
+    <label class="field" id="editShoeField">
+      <span>Shoe</span>
+      <select id="editShoeSelect"></select>
+    </label>
+    <div id="editNewShoeRow" class="row" hidden>
+      <input id="editNewShoeName" type="text" placeholder="Shoe name" autocomplete="off" spellcheck="false" maxlength="60">
+      <button type="button" id="editNewShoeAdd" class="ghost-btn">Add</button>
+    </div>
+
     <label class="field">
       <span>Session RPE <output id="editRPEOut" class="mono"></output>/10</span>
       <input id="editRPE" type="range" min="1" max="10" step="1">
@@ -641,6 +654,15 @@
           <input id="logCooldownMaxHR" type="number" min="60" max="230" placeholder="bpm">
         </label>
       </div>
+    </div>
+
+    <label class="field" id="logShoeField">
+      <span>Shoe</span>
+      <select id="logShoeSelect"></select>
+    </label>
+    <div id="logNewShoeRow" class="row" hidden>
+      <input id="logNewShoeName" type="text" placeholder="Shoe name" autocomplete="off" spellcheck="false" maxlength="60">
+      <button type="button" id="logNewShoeAdd" class="ghost-btn">Add</button>
     </div>
 
     <label class="field">
