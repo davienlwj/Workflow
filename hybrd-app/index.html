@@ -166,6 +166,8 @@
       </div>
       <p id="feedSearchStatus" class="field-hint" hidden></p>
 
+      <p id="feedLoading" class="empty" hidden>Loading…</p>
+
       <h2 class="section-title">Following</h2>
       <ul id="followingList" class="history-list"></ul>
       <p id="followingEmpty" class="empty" hidden>Not following anyone yet — search a username above.</p>
@@ -180,6 +182,7 @@
   <section id="view-profile" class="view" hidden>
     <button type="button" id="profileBack" class="ghost-btn small">← Back to Feed</button>
     <h1 id="profileTitle" class="view-title"></h1>
+    <p id="profileLoading" class="empty" hidden>Loading…</p>
     <ul id="profileActivityList" class="history-list"></ul>
     <p id="profileActivityEmpty" class="empty" hidden>No activity yet.</p>
   </section>
@@ -188,6 +191,7 @@
   <section id="view-notifications" class="view" hidden>
     <h1 class="view-title">Notifications</h1>
     <p id="notificationsSignedOut" class="empty" hidden>Sign in (menu → Account) to see who's following, liking, and commenting on your posts.</p>
+    <p id="notificationsLoading" class="empty" hidden>Loading…</p>
     <ul id="notificationsList" class="history-list"></ul>
     <p id="notificationsEmpty" class="empty" hidden>Nothing yet - follows, likes, and comments on your posts show up here.</p>
   </section>
@@ -195,8 +199,7 @@
   <!-- ACCOUNT -->
   <section id="view-account" class="view" hidden>
     <h1 class="view-title">Account</h1>
-    <p class="field-hint">Sign in with Google to follow friends and share your workouts with them. Stays signed in on this device until you sign out.</p>
-    <p id="socialStatus" class="field-hint">Sign in with Google to follow friends and share your workouts.</p>
+    <p id="socialStatus" class="field-hint">Follow friends and share your workouts with them - stays signed in on this device until you sign out.</p>
     <div id="socialGoogleButtonWrap">
       <div id="socialGoogleButton"></div>
     </div>
@@ -1086,7 +1089,7 @@
   <p id="feedWorkoutNotes" class="wo-last-performance" hidden></p>
 
   <div class="feed-like-row">
-    <button type="button" id="feedLikeBtn" class="ghost-btn" aria-pressed="false">♥ <span id="feedLikeCount">0</span></button>
+    <button type="button" id="feedLikeBtn" class="ghost-btn" aria-pressed="false"><span id="feedLikeCount">0</span></button>
     <button type="button" id="feedSaveRoutine" class="ghost-btn" hidden>Save as routine</button>
   </div>
 

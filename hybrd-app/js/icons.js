@@ -59,3 +59,28 @@ export function raceFlagIconSVG(extraClass = '') {
     <path d="M4,1 L6,1 L6,23 L4,23 Z M6,3 L20,6.5 L6,10 Z" fill="currentColor" fill-rule="evenodd"/>
   </svg>`;
 }
+
+// Standard filled heart silhouette, for a feed activity's like count/button
+// - state (liked or not) reads through the button's own aria-pressed
+// styling (fill/background swap, same as every other pressed-state control
+// in this app), not by swapping to a hollow variant, so this is the only
+// heart glyph needed.
+export function heartIconSVG(extraClass = '') {
+  return `<svg viewBox="0 0 24 24" class="glyph-icon glyph-heart ${extraClass}" xmlns="${NS}" aria-hidden="true">
+    <path d="M12,21.35 L10.55,20.03 C5.4,15.36 2,12.28 2,8.5 C2,5.42 4.42,3 7.5,3 C9.24,3 10.91,3.81 12,5.09 C13.09,3.81 14.76,3 16.5,3 C19.58,3 22,5.42 22,8.5 C22,12.28 18.6,15.36 13.45,20.04 Z" fill="currentColor"/>
+  </svg>`;
+}
+
+// Plain speech-bubble silhouette, for a feed activity's comment count.
+export function commentIconSVG(extraClass = '') {
+  return `<svg viewBox="0 0 24 24" class="glyph-icon glyph-comment ${extraClass}" xmlns="${NS}" aria-hidden="true">
+    <path d="M4,4 L20,4 C21.1,4 22,4.9 22,6 L22,15 C22,16.1 21.1,17 20,17 L8,17 L4,21 Z" fill="currentColor" fill-rule="evenodd"/>
+  </svg>`;
+}
+
+// Plain person silhouette (head + shoulders), for a new-follower notification.
+export function personIconSVG(extraClass = '') {
+  return `<svg viewBox="0 0 24 24" class="glyph-icon glyph-person ${extraClass}" xmlns="${NS}" aria-hidden="true">
+    <path d="M12,2 C14.2,2 16,3.8 16,6 C16,8.2 14.2,10 12,10 C9.8,10 8,8.2 8,6 C8,3.8 9.8,2 12,2 Z M4,22 C4,17.03 7.58,13 12,13 C16.42,13 20,17.03 20,22 Z" fill="currentColor"/>
+  </svg>`;
+}
