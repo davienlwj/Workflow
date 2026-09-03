@@ -432,6 +432,34 @@ export async function countLikesAndComments(ownerUid, kind, activityId) {
   return { likeCount: likes.data().count, commentCount: comments.data().count };
 }
 
+/** Shares a routine with someone else - writes a pending share doc into
+ *  the recipient's own `routineShares` subcollection (only they, and I as
+ *  its sender, can touch it - see the Security Rules). Embeds a full
+ *  exercise-id/name/muscles/equipment snapshot (not just ids), same
+ *  problem/fix as publishWorkout's own exercise embed, so accepting it
+ *  works even for a custom exercise the recipient doesn't have locally. */
+export async function shareRoutine(fromUid, fromProfile, targetUid, routine, exerciseDefs) {
+  requireInit();
+  const ref = fsMod.doc(fsMod.collection(db, 'users', targetUid, 'routineShares'));
+  await fsMod.setDoc(ref, {
+    fromUid,
+    fromUsername: fromProfile.username,
+    fromDisplayName: fromProfile.displayName ?? null,
+    routineName: routine.name,
+    exerciseIds: routine.exerciseIds,
+    exerciseDefs,
+    sentAt: new Date().toISOString(),
+  });
+  return ref.id;
+}
+
+/** Removes a pending routine share once it's been accepted or declined -
+ *  a one-time invite, not a record kept around afterward. */
+export async function deleteRoutineShare(myUid, shareId) {
+  requireInit();
+  await fsMod.deleteDoc(fsMod.doc(db, 'users', myUid, 'routineShares', shareId));
+}
+
 const NOTIFICATIONS_LIMIT = 50;
 
 /** Everyone who followed me, liked or commented on one of my activities,
@@ -452,7 +480,7 @@ const NOTIFICATIONS_LIMIT = 50;
 export async function fetchNotifications(myUid) {
   requireInit();
   const empty = { docs: [] };
-  const [followersSnap, likesSnap, commentsSnap, following] = await Promise.all([
+  const [followersSnap, likesSnap, commentsSnap, following, routineSharesSnap] = await Promise.all([
     fsMod.getDocs(fsMod.query(
       fsMod.collection(db, 'users', myUid, 'followers'),
       fsMod.orderBy('followedAt', 'desc'),
@@ -471,6 +499,11 @@ export async function fetchNotifications(myUid) {
       fsMod.limit(NOTIFICATIONS_LIMIT),
     )).catch((err) => { console.error('notifications: comments fetch failed', err); return empty; }),
     fetchFollowing(myUid).catch((err) => { console.error('notifications: following fetch failed', err); return []; }),
+    fsMod.getDocs(fsMod.query(
+      fsMod.collection(db, 'users', myUid, 'routineShares'),
+      fsMod.orderBy('sentAt', 'desc'),
+      fsMod.limit(NOTIFICATIONS_LIMIT),
+    )).catch((err) => { console.error('notifications: routine shares fetch failed', err); return empty; }),
   ]);
 
   const follows = followersSnap.docs.map((d) => ({
@@ -513,8 +546,19 @@ export async function fetchNotifications(myUid) {
     activityKind: item.kind,
     activityId: item.id,
   }));
+  const routineShares = routineSharesSnap.docs.map((d) => ({
+    type: 'routine-share',
+    at: d.data().sentAt,
+    fromUid: d.data().fromUid,
+    fromUsername: d.data().fromUsername,
+    fromDisplayName: d.data().fromDisplayName,
+    shareId: d.id,
+    routineName: d.data().routineName,
+    exerciseIds: d.data().exerciseIds,
+    exerciseDefs: d.data().exerciseDefs,
+  }));
 
-  return [...follows, ...likes, ...comments, ...posts]
+  return [...follows, ...likes, ...comments, ...posts, ...routineShares]
     .sort((a, b) => (b.at || '').localeCompare(a.at || ''))
     .slice(0, NOTIFICATIONS_LIMIT);
 }

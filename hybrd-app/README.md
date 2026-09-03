@@ -445,6 +445,10 @@ This only needs doing once, by whoever's Firebase project backs the app
            allow read: if request.auth != null && request.auth.uid == uid;
            allow write: if request.auth != null && request.auth.uid == followerUid;
          }
+         match /routineShares/{shareId} {
+           allow read, delete: if request.auth != null && request.auth.uid == uid;
+           allow create: if request.auth != null && request.resource.data.fromUid == request.auth.uid;
+         }
          match /workouts/{activityId} {
            allow write: if request.auth != null && request.auth.uid == uid;
            allow read: if request.auth != null
@@ -505,12 +509,13 @@ This only needs doing once, by whoever's Firebase project backs the app
    ```
 
    If you already had Social set up before, you're missing whichever of
-   these came later than your last paste - `runs`, `likes`/`comments`, or
-   the `resource.data.ownerUid == request.auth.uid` branch each of those
-   two reads now also allows (needed for the Notifications tab's
-   collection-group queries below). Paste the whole block again regardless
-   of which parts you already have; it's safe to replace the existing
-   rules outright rather than hand-merge.
+   these came later than your last paste - `runs`, `likes`/`comments`, the
+   `resource.data.ownerUid == request.auth.uid` branch each of those two
+   reads now also allows (needed for the Notifications tab's
+   collection-group queries below), or `routineShares` (needed for
+   sharing a routine from the Lift tab). Paste the whole block again
+   regardless of which parts you already have; it's safe to replace the
+   existing rules outright rather than hand-merge.
 
    The Notifications tab also needs two **composite indexes** the Rules
    above don't create by themselves - Firestore builds these lazily, so
@@ -553,6 +558,14 @@ everyone who can see that activity (its owner and their followers), same
 audience as the activity itself. Unfollowing, editing your username, and
 account deletion aren't in here yet - do those from the Firebase console
 directly if you ever need to.
+
+A routine (Lift tab → tap one → **Share**) can be sent to anyone you
+follow - it shows up as a Notification they can Accept or Decline. Accept
+saves it straight into their own Routines list, tagged "Routine by
+@you" so it's clear where it came from; Decline just dismisses it. Unlike
+activities, a shared routine is a one-time, one-to-one invite - it's not
+visible to anyone but its recipient, and it's gone (accepted or not) the
+moment they act on it.
 
 **Sign out** only stops syncing on that device going forward - workouts
 you've already published stay visible to your followers, same as
