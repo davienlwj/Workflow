@@ -419,8 +419,9 @@ This only needs doing once, by whoever's Firebase project backs the app
 4. **Build → Firestore Database → Create database** (production mode,
    any region).
 5. **Firestore Database → Rules**, replace the default with the rules
-   below, then **Publish**. These are what actually make a workout
-   visible only to its owner and their followers - without them, either
+   below, then **Publish**. These are what actually make a workout/run
+   visible only to its owner and their followers (and a like/comment on one
+   visible/postable only by the same audience) - without them, either
    nobody can read anything, or (if left wide open) everybody could read
    everything.
 
@@ -444,16 +445,66 @@ This only needs doing once, by whoever's Firebase project backs the app
            allow read: if request.auth != null && request.auth.uid == uid;
            allow write: if request.auth != null && request.auth.uid == followerUid;
          }
-         match /workouts/{workoutId} {
+         match /workouts/{activityId} {
            allow write: if request.auth != null && request.auth.uid == uid;
            allow read: if request.auth != null
              && (request.auth.uid == uid
                || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+           match /likes/{likerUid} {
+             allow read: if request.auth != null
+               && (request.auth.uid == uid
+                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+             allow create, delete: if request.auth != null && request.auth.uid == likerUid
+               && (request.auth.uid == uid
+                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+           }
+           match /comments/{commentId} {
+             allow read: if request.auth != null
+               && (request.auth.uid == uid
+                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+             allow create: if request.auth != null
+               && request.resource.data.authorUid == request.auth.uid
+               && (request.auth.uid == uid
+                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+             allow delete: if request.auth != null
+               && (request.auth.uid == uid || resource.data.authorUid == request.auth.uid);
+           }
+         }
+         match /runs/{activityId} {
+           allow write: if request.auth != null && request.auth.uid == uid;
+           allow read: if request.auth != null
+             && (request.auth.uid == uid
+               || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+           match /likes/{likerUid} {
+             allow read: if request.auth != null
+               && (request.auth.uid == uid
+                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+             allow create, delete: if request.auth != null && request.auth.uid == likerUid
+               && (request.auth.uid == uid
+                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+           }
+           match /comments/{commentId} {
+             allow read: if request.auth != null
+               && (request.auth.uid == uid
+                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+             allow create: if request.auth != null
+               && request.resource.data.authorUid == request.auth.uid
+               && (request.auth.uid == uid
+                 || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+             allow delete: if request.auth != null
+               && (request.auth.uid == uid || resource.data.authorUid == request.auth.uid);
+           }
          }
        }
      }
    }
    ```
+
+   If you set Social up before runs/likes/comments existed, you already
+   have the `usernames`/`users`/`following`/`followers`/`workouts` rules
+   above - this just adds the new `runs` collection and each activity's
+   `likes`/`comments` subcollections. Paste the whole block again; it's
+   safe to replace the existing rules outright rather than hand-merge.
 
 6. **Project settings** (gear icon) → **Your apps** → **Web app** (the
    `</>` icon) → register one → copy the `firebaseConfig` object shown, and
@@ -464,14 +515,26 @@ This only needs doing once, by whoever's Firebase project backs the app
 
 ### How it works
 
-Once signed in, every workout you save **auto-publishes** to your cloud
-profile going forward (no per-workout share toggle, same "everything
-syncs automatically" shape as Calendar/watch sync), and deleting it
-locally un-publishes it. Follow someone by their exact username in the
-**Feed** tab's search box; a workout is visible only to its owner and
-whoever follows them - never public to the internet. Unfollowing, editing
-your username, and account deletion aren't in here yet - do those from
-the Firebase console directly if you ever need to.
+Once signed in, every workout **and** run/ride/swim/etc. session you save
+**auto-publishes** to your cloud profile going forward (no per-activity
+share toggle, same "everything syncs automatically" shape as Calendar/
+watch sync), and deleting it locally un-publishes it. Follow someone by
+their exact username in the **Feed** tab's search box; an activity is
+visible only to its owner and whoever follows them - never public to the
+internet.
+
+Each feed card shows a thumbnail - the same shareable PNG summary card the
+Share button on a workout/session already generates (see `js/shareCard.js`),
+rendered fresh from the activity's own data rather than fetched from
+storage. It's rendered using only what's embedded in the activity itself,
+never the *viewer's* own bodyweight or PR history, so a friend's workout
+never gets misrepresented using your numbers.
+
+Tap a card to open it, like it, and leave a comment - both visible to
+everyone who can see that activity (its owner and their followers), same
+audience as the activity itself. Unfollowing, editing your username, and
+account deletion aren't in here yet - do those from the Firebase console
+directly if you ever need to.
 
 **Sign out** only stops syncing on that device going forward - workouts
 you've already published stay visible to your followers, same as

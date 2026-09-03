@@ -47,7 +47,11 @@ import {
   signOutSocial, getRestoredUser, isValidUsername, claimUsername as socialClaimUsername,
   getUserProfile as socialGetUserProfile, findUserByUsername as socialFindUserByUsername,
   followUser as socialFollowUser, unfollowUser as socialUnfollowUser, fetchFollowing as socialFetchFollowing,
-  publishWorkout as socialPublishWorkout, unpublishWorkout as socialUnpublishWorkout, fetchFeed as socialFetchFeed,
+  publishWorkout as socialPublishWorkout, unpublishWorkout as socialUnpublishWorkout,
+  publishRun as socialPublishRun, unpublishRun as socialUnpublishRun, fetchFeed as socialFetchFeed,
+  isLikedByMe as socialIsLikedByMe, likeActivity as socialLikeActivity, unlikeActivity as socialUnlikeActivity,
+  fetchComments as socialFetchComments, addComment as socialAddComment, deleteComment as socialDeleteComment,
+  countLikesAndComments as socialCountLikesAndComments,
 } from './social.js';
 import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
@@ -610,6 +614,7 @@ $('logForm').addEventListener('submit', (e) => {
   const saved = addSession(form);
   sessions = loadSessions();
   syncSessionToGoogle(saved);
+  publishSessionToSocial(saved);
   if (pendingRunPlanId) {
     deletePlannedActivity(pendingRunPlanId);
     pendingRunPlanId = null;
@@ -1480,7 +1485,7 @@ $('editForm').addEventListener('submit', (e) => {
   if (!editingId) return;
   const saved = updateSession(editingId, readSessionForm('edit'));
   sessions = loadSessions();
-  if (saved) syncSessionToGoogle(saved);
+  if (saved) { syncSessionToGoogle(saved); publishSessionToSocial(saved); }
   closeEditSheet();
   renderAll();
   toast('Session updated');
@@ -1492,7 +1497,7 @@ $('editDelete').addEventListener('click', () => {
   const toDelete = sessions.find((s) => s.id === editingId);
   deleteSession(editingId);
   sessions = loadSessions();
-  if (toDelete) deleteSessionFromGoogle(toDelete);
+  if (toDelete) { deleteSessionFromGoogle(toDelete); unpublishSessionFromSocial(toDelete.id); }
   closeEditSheet();
   renderAll();
   toast('Session deleted');
@@ -3901,7 +3906,7 @@ function importNewIntervalsActivities(activities, vo2maxByDate = new Map()) {
     if (mapped.sport !== 'run') continue;
     if (manualRunDates.has(mapped.date)) continue;
     if (vo2maxByDate.has(mapped.date)) mapped.vo2max = vo2maxByDate.get(mapped.date);
-    addSession(mapped);
+    publishSessionToSocial(addSession(mapped));
     count += 1;
   }
   if (count > 0) sessions = loadSessions();
@@ -4220,10 +4225,26 @@ async function refreshFeed() {
   try {
     followingCache = await socialFetchFollowing(settings.social.uid);
     feedCache = await socialFetchFeed(settings.social.uid);
+    await enrichFeedCounts(feedCache);
   } catch (err) {
     console.error('feed refresh failed', err);
   }
   renderFeedTab();
+}
+
+/** Fills in each feed item's like/comment count in place, via a cheap
+ *  count() query per activity rather than fetching every like/comment doc -
+ *  best-effort per item, so one failed count doesn't blank the rest. */
+async function enrichFeedCounts(items) {
+  await Promise.all(items.map(async (item) => {
+    try {
+      const counts = await socialCountLikesAndComments(item.ownerUid, item.kind, item.id);
+      item.likeCount = counts.likeCount;
+      item.commentCount = counts.commentCount;
+    } catch (err) {
+      console.error('feed count fetch failed', err);
+    }
+  }));
 }
 
 /** Finishes a sign-in (from the Google button's callback, or a past one
@@ -4310,6 +4331,25 @@ async function unpublishWorkoutFromSocial(workoutId) {
   }
 }
 
+/** Same as publishWorkoutToSocial, for a run/ride/swim/etc. session. */
+async function publishSessionToSocial(session) {
+  if (!settings.social.enabled || !settings.social.username) return;
+  try {
+    await socialPublishRun(settings.social.uid, session);
+  } catch (err) {
+    console.error('social publish failed', err);
+  }
+}
+
+async function unpublishSessionFromSocial(sessionId) {
+  if (!settings.social.enabled || !settings.social.username) return;
+  try {
+    await socialUnpublishRun(settings.social.uid, sessionId);
+  } catch (err) {
+    console.error('social unpublish failed', err);
+  }
+}
+
 $('socialClaimUsername').addEventListener('click', async () => {
   const name = $('socialUsernameInput').value.trim();
   if (!isValidUsername(name)) { toast('Usernames are 3-20 characters: letters, numbers, underscore.'); return; }
@@ -4334,6 +4374,9 @@ $('socialDisconnect').addEventListener('click', async () => {
   saveSettings(settings);
   followingCache = [];
   feedCache = [];
+  closeFeedWorkout();
+  feedThumbUrls.forEach((url) => URL.revokeObjectURL(url));
+  feedThumbUrls.clear();
   renderSocialStatus();
   renderFeedTab();
   toast('Signed out');
@@ -4345,6 +4388,81 @@ function feedWorkoutVolume(w) {
   return (w.exercises || []).reduce((sum, ex) => sum + (ex.sets || [])
     .filter((s) => s.type !== 'warmup' && s.weight != null)
     .reduce((s, set) => s + set.weight * (set.reps || 0), 0), 0);
+}
+
+/** The exercise catalog for a feed workout, built from each exercise's own
+ *  embedded def (see social.js's publishWorkout) rather than the viewer's
+ *  local exercise library - a follower may not have every custom exercise
+ *  the owner used. */
+function feedExerciseCatalog(item) {
+  return (item.exercises || []).map((e) => e.exercise).filter(Boolean);
+}
+
+/** Share-card data for a feed workout, built only from what's embedded in
+ *  the feed item itself - deliberately NOT the viewer's own bodyweight/PR
+ *  history (buildShareCardBlob's usual source for these), since that would
+ *  render someone else's workout using the *viewer's* numbers. bodyweightKg
+ *  null and newPRs empty are workoutVolume/workoutSummaryByExercise's own
+ *  safe defaults (bodyweight-relative sets just count their added weight,
+ *  same as feedWorkoutVolume above) rather than a guess at the owner's. */
+function buildFeedWorkoutShareData(item) {
+  const catalog = feedExerciseCatalog(item);
+  return {
+    workoutName: item.name || null,
+    dateLabel: fmtDateLong(item.date),
+    durationMs: item.durationMs ?? null,
+    totalVolume: workoutVolume(item, catalog, null),
+    exerciseRows: workoutSummaryByExercise(item, catalog, null),
+    newPRs: [],
+  };
+}
+
+// object URL cache, keyed "kind:id" - reused across feed re-renders within
+// a session rather than regenerated every time.
+const feedThumbUrls = new Map();
+let feedThumbGen = 0;
+
+async function renderFeedThumbnailBlob(item) {
+  const key = `${item.kind}:${item.id}`;
+  if (feedThumbUrls.has(key)) return feedThumbUrls.get(key);
+  const blob = item.kind === 'run'
+    ? await renderRunShareCard(buildRunShareCardData(item))
+    : await renderWorkoutShareCard(buildFeedWorkoutShareData(item));
+  const url = URL.createObjectURL(blob);
+  feedThumbUrls.set(key, url);
+  return url;
+}
+
+/** Fills in each card's thumbnail <img> after the fact, one at a time
+ *  (rather than all at once) to keep canvas rendering off the main thread's
+ *  back for as short a burst as possible on a phone. Guarded by
+ *  feedThumbGen so a stale pass from a superseded render never overwrites
+ *  a newer one's images. */
+async function hydrateFeedThumbnails(items) {
+  const gen = ++feedThumbGen;
+  for (const item of items) {
+    if (feedThumbGen !== gen) return;
+    try {
+      const url = await renderFeedThumbnailBlob(item);
+      if (feedThumbGen !== gen) return;
+      const img = document.querySelector(`.feed-thumb-img[data-thumb-key="${item.kind}:${item.id}"]`);
+      if (img) { img.src = url; img.classList.add('loaded'); }
+    } catch (err) {
+      console.error('feed thumbnail render failed', err);
+    }
+  }
+}
+
+function feedCardMetaHTML(item) {
+  if (item.kind === 'run') {
+    const bits = [
+      item.distanceKm != null ? `${item.distanceKm}km` : null,
+      item.durationMin != null ? `${item.durationMin}min` : null,
+    ].filter(Boolean);
+    return bits.map((t) => `<span class="mono">${escapeHTML(t)}</span>`).join('');
+  }
+  const exCount = (item.exercises || []).length;
+  return `<span>${exCount} exercise${exCount === 1 ? '' : 's'}</span><span class="mono">${feedWorkoutVolume(item)}kg volume</span>`;
 }
 
 function renderFeedTab() {
@@ -4364,25 +4482,28 @@ function renderFeedTab() {
   `).join('');
   $('followingEmpty').hidden = followingCache.length > 0;
 
-  $('feedList').innerHTML = feedCache.map((w) => {
-    const exCount = (w.exercises || []).length;
+  $('feedList').innerHTML = feedCache.map((item) => {
+    const title = item.kind === 'run' ? sessionBadgeLabel(item) : (item.name || '');
     return `
       <li>
-        <button type="button" class="history-item" data-owner="${w.ownerUid}" data-id="${w.id}">
+        <button type="button" class="history-item feed-item" data-owner="${item.ownerUid}" data-id="${item.id}" data-kind="${item.kind}">
+          <div class="feed-thumb-wrap"><img class="feed-thumb-img" data-thumb-key="${item.kind}:${item.id}" alt=""></div>
           <div class="history-top">
-            <span class="history-date">${fmtDateLong(w.date)}</span>
-            <span class="pill pill-type">@${escapeHTML(w.ownerUsername)}</span>
+            <span class="history-date">${fmtDateLong(item.date)}</span>
+            <span class="pill pill-type">@${escapeHTML(item.ownerUsername)}</span>
           </div>
-          <div class="history-meta">
-            <span>${exCount} exercise${exCount === 1 ? '' : 's'}</span>
-            <span class="mono">${feedWorkoutVolume(w)}kg volume</span>
+          <div class="history-meta">${feedCardMetaHTML(item)}</div>
+          ${title ? `<div class="history-notes">${escapeHTML(title)}</div>` : ''}
+          <div class="feed-engagement">
+            <span>♥ ${item.likeCount || 0}</span>
+            <span>💬 ${item.commentCount || 0}</span>
           </div>
-          ${w.name ? `<div class="history-notes">${escapeHTML(w.name)}</div>` : ''}
         </button>
       </li>
     `;
   }).join('');
   $('feedEmpty').hidden = feedCache.length > 0;
+  hydrateFeedThumbnails(feedCache);
 }
 
 $('feedSearchBtn').addEventListener('click', async () => {
@@ -4413,43 +4534,196 @@ $('followingList').addEventListener('click', async (e) => {
   await refreshFeed();
 });
 
-function openFeedWorkout(ownerUid, workoutId) {
-  const w = feedCache.find((x) => x.ownerUid === ownerUid && x.id === workoutId);
-  if (!w) return;
-  $('feedWorkoutTitle').textContent = w.name || 'Workout';
-  $('feedWorkoutMeta').textContent = `@${w.ownerUsername} · ${fmtDateLong(w.date)}${w.durationMs ? ` · ${fmtElapsed(w.durationMs)}` : ''}`;
-  $('feedWorkoutExercises').innerHTML = (w.exercises || []).map((ex) => {
-    const name = ex.exercise?.name || 'Exercise';
-    const muscles = (ex.exercise?.muscles || []).map((m) => MUSCLE_LABEL[m] || m).join(', ');
-    const setsText = (ex.sets || []).map((s) => `${s.weight != null ? `${s.weight}kg` : 'BW'}×${s.reps ?? '?'}`).join(', ') || 'No sets logged';
-    return `
-      <div class="wo-exercise-block">
-        <div class="wo-exercise-header">
-          <div>
-            <div class="wo-exercise-name">${escapeHTML(name)}</div>
-            <div class="wo-exercise-meta">${escapeHTML(muscles)}</div>
-          </div>
-        </div>
-        <p class="wo-last-performance">${escapeHTML(setsText)}</p>
+// The feed item currently open in #feedWorkoutSheet, so the like/comment
+// handlers below (bound once, not per-item) know what they're acting on -
+// and so a slow refreshFeedDetailEngagement()/comment fetch that resolves
+// after the sheet moved on to a different item (or closed) can tell and
+// discard its result instead of overwriting the wrong sheet.
+let feedDetailItem = null;
+let feedDetailLikedByMe = false;
+
+function updateFeedCardCounts(item) {
+  const row = document.querySelector(
+    `.feed-item[data-owner="${item.ownerUid}"][data-id="${item.id}"][data-kind="${item.kind}"] .feed-engagement`,
+  );
+  if (row) row.innerHTML = `<span>♥ ${item.likeCount || 0}</span><span>💬 ${item.commentCount || 0}</span>`;
+}
+
+function renderFeedComments(comments) {
+  $('feedCommentsList').innerHTML = comments.map((c) => `
+    <li class="feed-comment">
+      <div class="feed-comment-body">
+        <span class="feed-comment-author">@${escapeHTML(c.authorUsername)}</span>
+        <span>${escapeHTML(c.text)}</span>
       </div>
-    `;
-  }).join('');
-  $('feedWorkoutNotes').hidden = !w.notes;
-  $('feedWorkoutNotes').textContent = w.notes || '';
+      ${c.authorUid === settings.social.uid
+        ? `<button type="button" class="routine-delete feed-comment-delete" data-id="${c.id}" aria-label="Delete comment">✕</button>`
+        : ''}
+    </li>
+  `).join('');
+  $('feedCommentsEmpty').hidden = comments.length > 0;
+}
+
+/** Fetches "did I already like this" and the comment thread for the sheet
+ *  that's currently open - separate from openFeedWorkout itself so the
+ *  sheet's static content (title/exercises or run stats) shows instantly
+ *  while these two extra reads are still in flight. */
+async function refreshFeedDetailEngagement(item) {
+  try {
+    const [liked, comments] = await Promise.all([
+      socialIsLikedByMe(item.ownerUid, item.kind, item.id, settings.social.uid),
+      socialFetchComments(item.ownerUid, item.kind, item.id),
+    ]);
+    if (feedDetailItem !== item) return;
+    feedDetailLikedByMe = liked;
+    $('feedLikeBtn').setAttribute('aria-pressed', String(liked));
+    renderFeedComments(comments);
+  } catch (err) {
+    console.error('feed engagement fetch failed', err);
+  }
+}
+
+function openFeedWorkout(ownerUid, kind, id) {
+  const item = feedCache.find((x) => x.ownerUid === ownerUid && x.kind === kind && x.id === id);
+  if (!item) return;
+  feedDetailItem = item;
+  feedDetailLikedByMe = false;
+  const isRun = kind === 'run';
+
+  $('feedWorkoutTitle').textContent = isRun ? sessionBadgeLabel(item) : (item.name || 'Workout');
+  const durationLabel = isRun
+    ? (item.durationMin != null ? ` · ${item.durationMin}min` : '')
+    : (item.durationMs ? ` · ${fmtElapsed(item.durationMs)}` : '');
+  $('feedWorkoutMeta').textContent = `@${item.ownerUsername} · ${fmtDateLong(item.date)}${durationLabel}`;
+
+  $('feedWorkoutExercises').hidden = isRun;
+  $('feedRunStats').hidden = !isRun;
+  if (isRun) {
+    const metric = sessionMetric(item);
+    const bits = [
+      item.distanceKm != null ? `${item.distanceKm}km` : null,
+      metric.text,
+      item.avgHR != null ? `${item.avgHR}bpm avg HR` : null,
+      item.maxHR != null ? `${item.maxHR}bpm max HR` : null,
+    ].filter(Boolean);
+    $('feedRunStats').innerHTML = bits.map((t) => `<span>${escapeHTML(t)}</span>`).join('');
+  } else {
+    $('feedWorkoutExercises').innerHTML = (item.exercises || []).map((ex) => {
+      const name = ex.exercise?.name || 'Exercise';
+      const muscles = (ex.exercise?.muscles || []).map((m) => MUSCLE_LABEL[m] || m).join(', ');
+      const setsText = (ex.sets || []).map((s) => `${s.weight != null ? `${s.weight}kg` : 'BW'}×${s.reps ?? '?'}`).join(', ') || 'No sets logged';
+      return `
+        <div class="wo-exercise-block">
+          <div class="wo-exercise-header">
+            <div>
+              <div class="wo-exercise-name">${escapeHTML(name)}</div>
+              <div class="wo-exercise-meta">${escapeHTML(muscles)}</div>
+            </div>
+          </div>
+          <p class="wo-last-performance">${escapeHTML(setsText)}</p>
+        </div>
+      `;
+    }).join('');
+  }
+
+  $('feedWorkoutNotes').hidden = !item.notes;
+  $('feedWorkoutNotes').textContent = item.notes || '';
+
+  $('feedWorkoutThumb').removeAttribute('src');
+  renderFeedThumbnailBlob(item).then((url) => {
+    if (feedDetailItem === item) $('feedWorkoutThumb').src = url;
+  }).catch((err) => console.error('feed detail thumbnail render failed', err));
+
+  $('feedLikeCount').textContent = item.likeCount || 0;
+  $('feedLikeBtn').setAttribute('aria-pressed', 'false');
+  $('feedCommentsList').innerHTML = '';
+  $('feedCommentsEmpty').hidden = true;
+  $('feedCommentInput').value = '';
+
   $('scrim').hidden = false;
   $('feedWorkoutSheet').hidden = false;
+  refreshFeedDetailEngagement(item);
 }
 
 function closeFeedWorkout() {
   $('scrim').hidden = true;
   $('feedWorkoutSheet').hidden = true;
+  feedDetailItem = null;
 }
 
 $('feedWorkoutClose').addEventListener('click', closeFeedWorkout);
 $('feedList').addEventListener('click', (e) => {
   const btn = e.target.closest('.history-item');
   if (!btn) return;
-  openFeedWorkout(btn.dataset.owner, btn.dataset.id);
+  openFeedWorkout(btn.dataset.owner, btn.dataset.kind, btn.dataset.id);
+});
+
+$('feedLikeBtn').addEventListener('click', async () => {
+  if (!feedDetailItem) return;
+  const item = feedDetailItem;
+  const wasLiked = feedDetailLikedByMe;
+  feedDetailLikedByMe = !wasLiked;
+  $('feedLikeBtn').setAttribute('aria-pressed', String(feedDetailLikedByMe));
+  item.likeCount = Math.max(0, (item.likeCount || 0) + (wasLiked ? -1 : 1));
+  $('feedLikeCount').textContent = item.likeCount;
+  updateFeedCardCounts(item);
+  try {
+    if (wasLiked) await socialUnlikeActivity(item.ownerUid, item.kind, item.id, settings.social.uid);
+    else await socialLikeActivity(item.ownerUid, item.kind, item.id, settings.social.uid);
+  } catch (err) {
+    console.error('like toggle failed', err);
+    feedDetailLikedByMe = wasLiked;
+    item.likeCount = Math.max(0, item.likeCount + (wasLiked ? 1 : -1));
+    if (feedDetailItem === item) {
+      $('feedLikeBtn').setAttribute('aria-pressed', String(wasLiked));
+      $('feedLikeCount').textContent = item.likeCount;
+    }
+    updateFeedCardCounts(item);
+    toast('Could not update like');
+  }
+});
+
+async function submitFeedComment() {
+  if (!feedDetailItem) return;
+  const text = $('feedCommentInput').value.trim();
+  if (!text) return;
+  const item = feedDetailItem;
+  try {
+    await socialAddComment(
+      item.ownerUid, item.kind, item.id,
+      { uid: settings.social.uid, username: settings.social.username },
+      text,
+    );
+    $('feedCommentInput').value = '';
+    item.commentCount = (item.commentCount || 0) + 1;
+    updateFeedCardCounts(item);
+    const comments = await socialFetchComments(item.ownerUid, item.kind, item.id);
+    if (feedDetailItem === item) renderFeedComments(comments);
+  } catch (err) {
+    console.error('comment failed', err);
+    toast('Could not post comment');
+  }
+}
+
+$('feedCommentSend').addEventListener('click', submitFeedComment);
+$('feedCommentInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); submitFeedComment(); }
+});
+
+$('feedCommentsList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.feed-comment-delete');
+  if (!btn || !feedDetailItem) return;
+  const item = feedDetailItem;
+  try {
+    await socialDeleteComment(item.ownerUid, item.kind, item.id, btn.dataset.id);
+    item.commentCount = Math.max(0, (item.commentCount || 0) - 1);
+    updateFeedCardCounts(item);
+    const comments = await socialFetchComments(item.ownerUid, item.kind, item.id);
+    if (feedDetailItem === item) renderFeedComments(comments);
+  } catch (err) {
+    console.error('comment delete failed', err);
+    toast('Could not delete comment');
+  }
 });
 
 /* ------------------------------------------------------------- SETTINGS */

@@ -221,15 +221,24 @@ export async function fetchFollowing(myUid) {
 }
 
 /** Publishes one workout to the signed-in user's cloud profile, embedding
- *  each exercise's own name/muscles (not just its id) so a follower's app
- *  can render it correctly even for a custom exercise they don't have
- *  locally - same problem/fix as the watch sync's
- *  registerWatchCustomExercises (see app.js). */
+ *  each exercise's own name/muscles/equipment (not just its id) so a
+ *  follower's app can render it correctly even for a custom exercise they
+ *  don't have locally - same problem/fix as the watch sync's
+ *  registerWatchCustomExercises (see app.js). equipment specifically is
+ *  needed for a follower's feed to compute volume/exercise rows the same
+ *  way the owner's own device would (see app.js's buildFeedWorkoutShareData)
+ *  - without it, a Bodyweight-equipment exercise's weightless sets would
+ *  silently be treated as not logged at all. */
 export async function publishWorkout(uid, workout, exerciseById) {
   requireInit();
   const exercises = workout.exercises.map((e) => {
     const ex = exerciseById(e.exerciseId);
-    return { ...e, exercise: ex ? { id: ex.id, name: ex.name, muscles: ex.muscles || [] } : null };
+    return {
+      ...e,
+      exercise: ex ? {
+        id: ex.id, name: ex.name, muscles: ex.muscles || [], equipment: ex.equipment || null,
+      } : null,
+    };
   });
   await fsMod.setDoc(fsMod.doc(db, 'users', uid, 'workouts', workout.id), {
     date: workout.date,
@@ -246,6 +255,29 @@ export async function unpublishWorkout(uid, workoutId) {
   await fsMod.deleteDoc(fsMod.doc(db, 'users', uid, 'workouts', workoutId));
 }
 
+/** Publishes a run/ride/swim/etc. session as-is - unlike a workout, a
+ *  session has no local-only reference data (no exercise ids to resolve),
+ *  so every field on it is already safe to store verbatim. `id` becomes the
+ *  doc id instead of a field, and the two sync-linkage ids are dropped
+ *  (meaningless to anyone but the owner's own device). */
+export async function publishRun(uid, session) {
+  requireInit();
+  const { id, intervalsActivityId, gcalEventId, ...rest } = session;
+  await fsMod.setDoc(fsMod.doc(db, 'users', uid, 'runs', session.id), {
+    ...rest,
+    publishedAt: new Date().toISOString(),
+  });
+}
+
+export async function unpublishRun(uid, runId) {
+  requireInit();
+  await fsMod.deleteDoc(fsMod.doc(db, 'users', uid, 'runs', runId));
+}
+
+function activityCollection(kind) {
+  return kind === 'run' ? 'runs' : 'workouts';
+}
+
 /** Pure merge/sort step, split out from fetchFeed so it's testable without
  *  a live Firestore connection - see tests/hybrd-app-social.test.mjs. */
 export function mergeFeed(perPersonArrays) {
@@ -254,29 +286,94 @@ export function mergeFeed(perPersonArrays) {
     .sort((a, b) => b.date.localeCompare(a.date) || (b.publishedAt || '').localeCompare(a.publishedAt || ''));
 }
 
-/** Fetches the most recent workouts from everyone `myUid` follows, merged
- *  newest-first. One query per followed person, merged client-side rather
- *  than a fan-out feed collection - simple, and plenty for a personal
- *  friend-group scale. */
+/** Fetches the most recent workouts AND run/ride/swim/etc. sessions from
+ *  everyone `myUid` follows, merged newest-first and tagged with `kind` so
+ *  the feed can render/open each appropriately. Two queries per followed
+ *  person (one per collection), merged client-side rather than a fan-out
+ *  feed collection - simple, and plenty for a personal friend-group scale. */
 export async function fetchFeed(myUid) {
   requireInit();
   const following = await fetchFollowing(myUid);
   const perPerson = await Promise.all(
     following.map(async (person) => {
-      const q = fsMod.query(
-        fsMod.collection(db, 'users', person.uid, 'workouts'),
-        fsMod.orderBy('date', 'desc'),
-        fsMod.limit(FEED_LIMIT_PER_PERSON),
-      );
-      const snap = await fsMod.getDocs(q);
-      return snap.docs.map((d) => ({
-        id: d.id,
-        ownerUid: person.uid,
-        ownerUsername: person.username,
-        ownerDisplayName: person.displayName,
-        ...d.data(),
-      }));
+      const owner = { ownerUid: person.uid, ownerUsername: person.username, ownerDisplayName: person.displayName };
+      const fetchKind = async (kind) => {
+        const q = fsMod.query(
+          fsMod.collection(db, 'users', person.uid, activityCollection(kind)),
+          fsMod.orderBy('date', 'desc'),
+          fsMod.limit(FEED_LIMIT_PER_PERSON),
+        );
+        const snap = await fsMod.getDocs(q);
+        return snap.docs.map((d) => ({ id: d.id, kind, ...owner, ...d.data() }));
+      };
+      const [workoutItems, runItems] = await Promise.all([fetchKind('workout'), fetchKind('run')]);
+      return [...workoutItems, ...runItems];
     }),
   );
   return mergeFeed(perPerson);
+}
+
+/** True if `myUid` has already liked this activity - checked only when its
+ *  detail sheet opens (not per feed card, to keep the feed list itself
+ *  cheap - see countLikesAndComments for the card-level counts). */
+export async function isLikedByMe(ownerUid, kind, activityId, myUid) {
+  requireInit();
+  const snap = await fsMod.getDoc(fsMod.doc(db, 'users', ownerUid, activityCollection(kind), activityId, 'likes', myUid));
+  return snap.exists();
+}
+
+export async function likeActivity(ownerUid, kind, activityId, myUid) {
+  requireInit();
+  await fsMod.setDoc(fsMod.doc(db, 'users', ownerUid, activityCollection(kind), activityId, 'likes', myUid), {
+    likedAt: new Date().toISOString(),
+  });
+}
+
+export async function unlikeActivity(ownerUid, kind, activityId, myUid) {
+  requireInit();
+  await fsMod.deleteDoc(fsMod.doc(db, 'users', ownerUid, activityCollection(kind), activityId, 'likes', myUid));
+}
+
+/** Oldest-first, for a normal chat-like comment thread. */
+export async function fetchComments(ownerUid, kind, activityId) {
+  requireInit();
+  const q = fsMod.query(
+    fsMod.collection(db, 'users', ownerUid, activityCollection(kind), activityId, 'comments'),
+    fsMod.orderBy('createdAt', 'asc'),
+  );
+  const snap = await fsMod.getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+export async function addComment(ownerUid, kind, activityId, author, text) {
+  requireInit();
+  const ref = fsMod.doc(fsMod.collection(db, 'users', ownerUid, activityCollection(kind), activityId, 'comments'));
+  await fsMod.setDoc(ref, {
+    authorUid: author.uid,
+    authorUsername: author.username,
+    text,
+    createdAt: new Date().toISOString(),
+  });
+  return ref.id;
+}
+
+export async function deleteComment(ownerUid, kind, activityId, commentId) {
+  requireInit();
+  await fsMod.deleteDoc(fsMod.doc(db, 'users', ownerUid, activityCollection(kind), activityId, 'comments', commentId));
+}
+
+/** Live like/comment counts for one activity, via count() aggregation
+ *  queries rather than fetching every doc - cheap regardless of how many
+ *  likes/comments pile up. Used to show counts on each feed card without
+ *  needing denormalized counters (which would need followers to have
+ *  field-scoped write access to someone else's activity doc - not worth
+ *  the security-rules complexity at this scale). */
+export async function countLikesAndComments(ownerUid, kind, activityId) {
+  requireInit();
+  const activityRef = fsMod.doc(db, 'users', ownerUid, activityCollection(kind), activityId);
+  const [likes, comments] = await Promise.all([
+    fsMod.getCountFromServer(fsMod.collection(activityRef, 'likes')),
+    fsMod.getCountFromServer(fsMod.collection(activityRef, 'comments')),
+  ]);
+  return { likeCount: likes.data().count, commentCount: comments.data().count };
 }
