@@ -56,13 +56,16 @@ function requireInit() {
  *  strips the wrapper and evaluates the object literal itself rather than
  *  asking the user to hand-convert it to JSON. Trusted input (the user's
  *  own paste into their own local app), same trust level as every other
- *  settings field. */
+ *  settings field. Tolerant of pasting more than just the object too - the
+ *  whole snippet Firebase shows (import lines, comments, the
+ *  initializeApp/getAnalytics calls after it) - by finding the first
+ *  balanced {...} block in whatever was pasted and ignoring the rest,
+ *  rather than requiring an exact "const firebaseConfig = ...;" shape. */
 export function parseFirebaseConfigInput(raw) {
-  const body = (raw || '')
-    .trim()
-    .replace(/^(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*/, '')
-    .replace(/;\s*$/, '');
-  if (!body) throw new Error('Paste the firebaseConfig object from your Firebase project settings.');
+  const text = (raw || '').trim();
+  if (!text) throw new Error('Paste the firebaseConfig object from your Firebase project settings.');
+  const body = extractBalancedObjectLiteral(text);
+  if (!body) throw new Error("Couldn't read that - paste the whole firebaseConfig object, e.g. { apiKey: \"...\", ... }.");
   let config;
   try {
     // eslint-disable-next-line no-new-func
@@ -74,6 +77,29 @@ export function parseFirebaseConfigInput(raw) {
   const missing = required.filter((k) => !config || typeof config[k] !== 'string' || !config[k]);
   if (missing.length > 0) throw new Error(`Missing ${missing.join(', ')} in that config.`);
   return config;
+}
+
+/** Returns the {...} object being assigned in `text` (brace-depth matched,
+ *  so it's correct even with nested objects or trailing code that has its
+ *  own braces) - or null if there's no balanced pair. Anchors on the first
+ *  "= {" rather than just the first "{", since the full snippet Firebase
+ *  shows starts with `import { initializeApp } from ...` - an unrelated
+ *  balanced brace pair that would otherwise be mistaken for the config
+ *  object. Falls back to the first "{" for a bare object literal with no
+ *  "=" at all (e.g. pasting just `{ apiKey: ..., ... }`). */
+function extractBalancedObjectLiteral(text) {
+  const assignMatch = text.match(/=\s*\{/);
+  const start = assignMatch ? assignMatch.index + assignMatch[0].length - 1 : text.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}') {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
 }
 
 export async function signInWithGoogle() {
