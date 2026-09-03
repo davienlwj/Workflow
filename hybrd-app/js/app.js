@@ -43,6 +43,13 @@ import {
 } from './intervals.js';
 import { fetchGistData, markWorkoutDeleted } from './gistSync.js';
 import {
+  initApp as socialInitApp, parseFirebaseConfigInput, signInWithGoogle as socialSignInWithGoogle,
+  signOutSocial, getRestoredUser, isValidUsername, claimUsername as socialClaimUsername,
+  getUserProfile as socialGetUserProfile, findUserByUsername as socialFindUserByUsername,
+  followUser as socialFollowUser, unfollowUser as socialUnfollowUser, fetchFollowing as socialFetchFollowing,
+  publishWorkout as socialPublishWorkout, unpublishWorkout as socialUnpublishWorkout, fetchFeed as socialFetchFeed,
+} from './social.js';
+import {
   EXERCISES, MUSCLES, MUSCLE_LABEL, EQUIPMENT, BRANDS, RADAR_GROUP_LABEL, RADAR_GROUP_FOR,
   exerciseById, searchExercises,
 } from './exercises.js';
@@ -162,7 +169,7 @@ function bodyweightKg() {
 
 /* ------------------------------------------------------------- tab views */
 
-const VIEW_LABEL = { dashboard: 'Dashboard', run: 'Run', workout: 'Lift', settings: 'Settings' };
+const VIEW_LABEL = { dashboard: 'Dashboard', run: 'Run', workout: 'Lift', feed: 'Feed', settings: 'Settings' };
 
 const menuItems = document.querySelectorAll('.menu-item');
 menuItems.forEach((btn) => {
@@ -3278,6 +3285,7 @@ function finishLiveWorkout(data) {
   workouts = loadWorkouts();
   const newPRs = newPRsInWorkout(workouts, saved, allExercises(), bodyweightKg());
   syncWorkoutToGoogle(saved);
+  publishWorkoutToSocial(saved);
   if (pendingWorkoutPlanId) {
     deletePlannedActivity(pendingWorkoutPlanId);
     pendingWorkoutPlanId = null;
@@ -3346,7 +3354,7 @@ $('workoutForm').addEventListener('submit', (e) => {
     const saved = updateWorkout(workoutEditingId, data);
     toast('Workout updated');
     workouts = loadWorkouts();
-    if (saved) syncWorkoutToGoogle(saved);
+    if (saved) { syncWorkoutToGoogle(saved); publishWorkoutToSocial(saved); }
   } else {
     const saved = addWorkout(data);
     workouts = loadWorkouts();
@@ -3354,6 +3362,7 @@ $('workoutForm').addEventListener('submit', (e) => {
     if (newPRs.length > 0) toast(newPRToastMessage(newPRs), 3400);
     else toast('Workout saved');
     syncWorkoutToGoogle(saved);
+    publishWorkoutToSocial(saved);
     if (pendingWorkoutPlanId) {
       deletePlannedActivity(pendingWorkoutPlanId);
       pendingWorkoutPlanId = null;
@@ -3386,6 +3395,7 @@ $('woDelete').addEventListener('click', () => {
   workouts = loadWorkouts();
   if (toDelete) deleteWorkoutFromGoogle(toDelete);
   if (toDelete?.watchWorkoutId) deleteWatchWorkoutFromGist(toDelete);
+  if (toDelete) unpublishWorkoutFromSocial(toDelete.id);
   closeWorkoutSheet();
   renderAll();
   toast('Workout deleted');
@@ -4174,6 +4184,274 @@ $('watchSyncDisconnect').addEventListener('click', () => {
 
 $('watchSyncNow').addEventListener('click', () => { syncWatchWorkouts(); });
 
+/* ---------------------------------------------------------------- social */
+
+// Set when Firebase's own restored session comes back empty (signed out
+// elsewhere, or the session expired) - same purpose as the other
+// integrations' own *NeedsReconnect flags.
+let socialNeedsReconnect = false;
+let followingCache = []; // [{uid, username, displayName, photoURL}]
+let feedCache = []; // merged, date-desc workouts from everyone followed
+
+function renderSocialStatus() {
+  $('socialConfig').value = settings.social.firebaseConfig ? JSON.stringify(settings.social.firebaseConfig, null, 2) : '';
+  const { enabled, username, displayName } = settings.social;
+  $('socialDisconnect').hidden = !enabled;
+  $('socialUsernameRow').hidden = !(enabled && !username && !socialNeedsReconnect);
+  if (!enabled) {
+    $('socialStatus').textContent = 'Not connected.';
+    $('socialConnect').hidden = false;
+  } else if (socialNeedsReconnect) {
+    $('socialStatus').textContent = 'Sign-in expired - tap Connect to sign in again.';
+    $('socialConnect').hidden = false;
+  } else if (!username) {
+    $('socialStatus').textContent = `Signed in as ${displayName || 'you'} - pick a username below to finish setup.`;
+    $('socialConnect').hidden = true;
+  } else {
+    $('socialStatus').textContent = `Signed in as ${displayName || `@${username}`} (@${username}).`;
+    $('socialConnect').hidden = true;
+  }
+}
+
+/** Refetches who I follow and their recent workouts, then re-renders the
+ *  Feed tab. Best-effort - a failed fetch just leaves the last-known
+ *  cache on screen rather than blanking it. */
+async function refreshFeed() {
+  if (!settings.social.enabled || !settings.social.username || socialNeedsReconnect) {
+    renderFeedTab();
+    return;
+  }
+  try {
+    followingCache = await socialFetchFollowing(settings.social.uid);
+    feedCache = await socialFetchFeed(settings.social.uid);
+  } catch (err) {
+    console.error('feed refresh failed', err);
+  }
+  renderFeedTab();
+}
+
+async function initSocialSession() {
+  try {
+    await socialInitApp(settings.social.firebaseConfig);
+    const user = await getRestoredUser();
+    if (!user) {
+      socialNeedsReconnect = true;
+      renderSocialStatus();
+      renderFeedTab();
+      return;
+    }
+    socialNeedsReconnect = false;
+    if (user.uid !== settings.social.uid || user.displayName !== settings.social.displayName) {
+      settings = { ...settings, social: { ...settings.social, uid: user.uid, displayName: user.displayName } };
+      saveSettings(settings);
+    }
+    renderSocialStatus();
+    await refreshFeed();
+  } catch (err) {
+    console.error('social session restore failed', err);
+    socialNeedsReconnect = true;
+    renderSocialStatus();
+  }
+}
+
+/** Mirrors a saved workout to the signed-in user's cloud profile, visible
+ *  to their followers. Best-effort and silent on failure, like the watch
+ *  and Google Calendar syncs - a network hiccup never blocks saving
+ *  locally. No-ops until a username is claimed (nothing to attribute the
+ *  workout to yet). */
+async function publishWorkoutToSocial(workout) {
+  if (!settings.social.enabled || !settings.social.username) return;
+  try {
+    await socialPublishWorkout(settings.social.uid, workout, findExercise);
+  } catch (err) {
+    console.error('social publish failed', err);
+  }
+}
+
+async function unpublishWorkoutFromSocial(workoutId) {
+  if (!settings.social.enabled || !settings.social.username) return;
+  try {
+    await socialUnpublishWorkout(settings.social.uid, workoutId);
+  } catch (err) {
+    console.error('social unpublish failed', err);
+  }
+}
+
+$('socialConnect').addEventListener('click', async () => {
+  let config;
+  try {
+    config = parseFirebaseConfigInput($('socialConfig').value);
+  } catch (err) {
+    toast(err.message);
+    return;
+  }
+  try {
+    await socialInitApp(config);
+    const user = await socialSignInWithGoogle();
+    const profile = await socialGetUserProfile(user.uid);
+    settings = {
+      ...settings,
+      social: {
+        firebaseConfig: config,
+        enabled: true,
+        uid: user.uid,
+        displayName: user.displayName,
+        username: profile?.username || null,
+      },
+    };
+    saveSettings(settings);
+    socialNeedsReconnect = false;
+    renderSocialStatus();
+    toast(profile?.username ? `Signed in as @${profile.username}` : 'Signed in - pick a username below');
+    await refreshFeed();
+  } catch (err) {
+    console.error('social connect failed', err);
+    toast(err.message || 'Could not sign in');
+  }
+});
+
+$('socialClaimUsername').addEventListener('click', async () => {
+  const name = $('socialUsernameInput').value.trim();
+  if (!isValidUsername(name)) { toast('Usernames are 3-20 characters: letters, numbers, underscore.'); return; }
+  try {
+    const claimed = await socialClaimUsername(settings.social.uid, name, { displayName: settings.social.displayName });
+    settings = { ...settings, social: { ...settings.social, username: claimed } };
+    saveSettings(settings);
+    $('socialUsernameInput').value = '';
+    renderSocialStatus();
+    toast(`You're @${claimed}`);
+    await refreshFeed();
+  } catch (err) {
+    toast(err.message || 'Could not claim that username');
+  }
+});
+
+$('socialDisconnect').addEventListener('click', async () => {
+  if (!confirm('Disconnect Social? Workouts already shared stay visible to your followers - only future publishing/following stops on this device.')) return;
+  await signOutSocial();
+  socialNeedsReconnect = false;
+  settings = { ...settings, social: { ...settings.social, enabled: false } };
+  saveSettings(settings);
+  followingCache = [];
+  feedCache = [];
+  renderSocialStatus();
+  renderFeedTab();
+  toast('Disconnected');
+});
+
+/* ------------------------------------------------------------------ feed */
+
+function feedWorkoutVolume(w) {
+  return (w.exercises || []).reduce((sum, ex) => sum + (ex.sets || [])
+    .filter((s) => s.type !== 'warmup' && s.weight != null)
+    .reduce((s, set) => s + set.weight * (set.reps || 0), 0), 0);
+}
+
+function renderFeedTab() {
+  const signedIn = Boolean(settings.social.enabled && settings.social.username && !socialNeedsReconnect);
+  $('feedSignedOut').hidden = signedIn;
+  $('feedSignedInBody').hidden = !signedIn;
+  if (!signedIn) return;
+
+  $('followingList').innerHTML = followingCache.map((f) => `
+    <li>
+      <div class="history-item">
+        <div class="history-top"><span class="history-date">@${escapeHTML(f.username)}</span></div>
+        ${f.displayName ? `<div class="history-meta"><span>${escapeHTML(f.displayName)}</span></div>` : ''}
+      </div>
+      <button type="button" class="routine-delete" data-uid="${f.uid}" aria-label="Unfollow @${escapeHTML(f.username)}">✕</button>
+    </li>
+  `).join('');
+  $('followingEmpty').hidden = followingCache.length > 0;
+
+  $('feedList').innerHTML = feedCache.map((w) => {
+    const exCount = (w.exercises || []).length;
+    return `
+      <li>
+        <button type="button" class="history-item" data-owner="${w.ownerUid}" data-id="${w.id}">
+          <div class="history-top">
+            <span class="history-date">${fmtDateLong(w.date)}</span>
+            <span class="pill pill-type">@${escapeHTML(w.ownerUsername)}</span>
+          </div>
+          <div class="history-meta">
+            <span>${exCount} exercise${exCount === 1 ? '' : 's'}</span>
+            <span class="mono">${feedWorkoutVolume(w)}kg volume</span>
+          </div>
+          ${w.name ? `<div class="history-notes">${escapeHTML(w.name)}</div>` : ''}
+        </button>
+      </li>
+    `;
+  }).join('');
+  $('feedEmpty').hidden = feedCache.length > 0;
+}
+
+$('feedSearchBtn').addEventListener('click', async () => {
+  const name = $('feedSearchInput').value.trim();
+  if (!name) return;
+  $('feedSearchStatus').hidden = false;
+  $('feedSearchStatus').textContent = 'Searching…';
+  try {
+    if (name.toLowerCase() === settings.social.username) { $('feedSearchStatus').textContent = "That's you!"; return; }
+    const user = await socialFindUserByUsername(name);
+    if (!user) { $('feedSearchStatus').textContent = 'No one with that username.'; return; }
+    if (followingCache.some((f) => f.uid === user.uid)) { $('feedSearchStatus').textContent = `Already following @${user.username}.`; return; }
+    await socialFollowUser(settings.social.uid, user);
+    $('feedSearchInput').value = '';
+    $('feedSearchStatus').hidden = true;
+    toast(`Following @${user.username}`);
+    await refreshFeed();
+  } catch (err) {
+    console.error('follow failed', err);
+    $('feedSearchStatus').textContent = "Couldn't follow - try again.";
+  }
+});
+
+$('followingList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.routine-delete');
+  if (!btn) return;
+  await socialUnfollowUser(settings.social.uid, btn.dataset.uid);
+  await refreshFeed();
+});
+
+function openFeedWorkout(ownerUid, workoutId) {
+  const w = feedCache.find((x) => x.ownerUid === ownerUid && x.id === workoutId);
+  if (!w) return;
+  $('feedWorkoutTitle').textContent = w.name || 'Workout';
+  $('feedWorkoutMeta').textContent = `@${w.ownerUsername} · ${fmtDateLong(w.date)}${w.durationMs ? ` · ${fmtElapsed(w.durationMs)}` : ''}`;
+  $('feedWorkoutExercises').innerHTML = (w.exercises || []).map((ex) => {
+    const name = ex.exercise?.name || 'Exercise';
+    const muscles = (ex.exercise?.muscles || []).map((m) => MUSCLE_LABEL[m] || m).join(', ');
+    const setsText = (ex.sets || []).map((s) => `${s.weight != null ? `${s.weight}kg` : 'BW'}×${s.reps ?? '?'}`).join(', ') || 'No sets logged';
+    return `
+      <div class="wo-exercise-block">
+        <div class="wo-exercise-header">
+          <div>
+            <div class="wo-exercise-name">${escapeHTML(name)}</div>
+            <div class="wo-exercise-meta">${escapeHTML(muscles)}</div>
+          </div>
+        </div>
+        <p class="wo-last-performance">${escapeHTML(setsText)}</p>
+      </div>
+    `;
+  }).join('');
+  $('feedWorkoutNotes').hidden = !w.notes;
+  $('feedWorkoutNotes').textContent = w.notes || '';
+  $('scrim').hidden = false;
+  $('feedWorkoutSheet').hidden = false;
+}
+
+function closeFeedWorkout() {
+  $('scrim').hidden = true;
+  $('feedWorkoutSheet').hidden = true;
+}
+
+$('feedWorkoutClose').addEventListener('click', closeFeedWorkout);
+$('feedList').addEventListener('click', (e) => {
+  const btn = e.target.closest('.history-item');
+  if (!btn) return;
+  openFeedWorkout(btn.dataset.owner, btn.dataset.id);
+});
+
 /* ------------------------------------------------------------- SETTINGS */
 
 function renderSettingsForm() {
@@ -4194,6 +4472,7 @@ function renderSettingsForm() {
   renderGCalStatus();
   renderIntervalsStatus();
   renderWatchSyncStatus();
+  renderSocialStatus();
 }
 
 $('sTheme').addEventListener('click', (e) => {
@@ -4212,6 +4491,7 @@ $('settingsForm').addEventListener('submit', (e) => {
     googleCalendar: settings.googleCalendar,
     intervals: settings.intervals,
     watchSync: settings.watchSync,
+    social: settings.social,
     profile: {
       name: $('sName').value.trim(),
       dob: $('sDob').value,
@@ -4277,6 +4557,7 @@ function renderAll() {
   renderWorkoutTab();
   renderZones();
   renderSettingsForm();
+  renderFeedTab();
 }
 
 resetLogForm();
@@ -4289,6 +4570,9 @@ if (settings.intervals.enabled) {
 }
 if (settings.watchSync.enabled) {
   syncWatchWorkouts({ silent: true });
+}
+if (settings.social.enabled) {
+  initSocialSession();
 }
 
 // The boot splash (index.html) has done its job now that the real UI is

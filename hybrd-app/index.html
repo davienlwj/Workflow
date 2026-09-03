@@ -47,6 +47,7 @@
     <button type="button" class="menu-item" data-view="dashboard" role="menuitem" aria-selected="true">Dashboard</button>
     <button type="button" class="menu-item" data-view="run" role="menuitem" aria-selected="false">Run</button>
     <button type="button" class="menu-item" data-view="workout" role="menuitem" aria-selected="false">Lift</button>
+    <button type="button" class="menu-item" data-view="feed" role="menuitem" aria-selected="false">Feed</button>
     <button type="button" class="menu-item" data-view="settings" role="menuitem" aria-selected="false">Settings</button>
   </nav>
 </header>
@@ -143,6 +144,30 @@
     <input id="exerciseSearchInput" type="text" class="wo-picker-search" placeholder="Search exercises…">
     <div id="exerciseSummaryList" class="exercise-summary-list"></div>
     <p id="exerciseSummaryEmpty" class="empty" hidden>No workouts logged yet — the exercises you log will show up here with their progress.</p>
+  </section>
+
+  <!-- FEED -->
+  <section id="view-feed" class="view" hidden>
+    <h1 class="view-title">Feed</h1>
+
+    <p id="feedSignedOut" class="empty" hidden>Sign in to Social (Settings → Social) to follow people and see their workouts here.</p>
+
+    <div id="feedSignedInBody" hidden>
+      <h2 class="section-title">Find people</h2>
+      <div class="row">
+        <input id="feedSearchInput" type="text" placeholder="username" autocomplete="off" spellcheck="false">
+        <button type="button" id="feedSearchBtn" class="ghost-btn">Follow</button>
+      </div>
+      <p id="feedSearchStatus" class="field-hint" hidden></p>
+
+      <h2 class="section-title">Following</h2>
+      <ul id="followingList" class="history-list"></ul>
+      <p id="followingEmpty" class="empty" hidden>Not following anyone yet — search a username above.</p>
+
+      <h2 class="section-title">Feed</h2>
+      <ul id="feedList" class="history-list"></ul>
+      <p id="feedEmpty" class="empty" hidden>No workouts yet — check back once someone you follow logs one.</p>
+    </div>
   </section>
 
   <!-- SETTINGS -->
@@ -287,6 +312,29 @@
           <button type="button" id="watchSyncDisconnect" class="ghost-btn" hidden>Disconnect</button>
         </div>
         <button type="button" id="watchSyncNow" class="ghost-btn block" hidden>Sync now</button>
+      </div>
+    </details>
+
+    <details class="settings-details">
+      <summary class="section-title">Social</summary>
+      <div class="settings-details-body form">
+        <p class="field-hint">Follow people and see their workouts in the Feed tab. Needs a free Firebase project you create and own - no backend I run, same shape as the Google Calendar/intervals.icu sections above. Firebase console → Add project → Build → Authentication → enable the Google sign-in provider → Build → Firestore Database → Create database (production mode) → Rules, and paste in the rules from the README. Then Project settings → your apps → Web app → copy the config object shown there and paste it below.</p>
+        <label class="field">
+          <span>Firebase config</span>
+          <textarea id="socialConfig" rows="6" placeholder="const firebaseConfig = { apiKey: &quot;...&quot;, authDomain: &quot;...&quot;, ... }" spellcheck="false"></textarea>
+        </label>
+        <p id="socialStatus" class="field-hint">Not connected.</p>
+        <div id="socialUsernameRow" class="field" hidden>
+          <span>Pick a username - this is how people find you</span>
+          <div class="row">
+            <input id="socialUsernameInput" type="text" placeholder="letters, numbers, underscore" autocomplete="off" spellcheck="false" maxlength="20">
+            <button type="button" id="socialClaimUsername" class="ghost-btn">Save</button>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" id="socialConnect" class="ghost-btn">Sign in with Google</button>
+          <button type="button" id="socialDisconnect" class="ghost-btn" hidden>Disconnect</button>
+        </div>
       </div>
     </details>
 
@@ -988,6 +1036,17 @@
       <button type="button" id="exEditCancel" class="ghost-btn">Cancel</button>
       <button type="button" id="exEditSave" class="primary">Save changes</button>
     </div>
+  </div>
+</section>
+
+<section id="feedWorkoutSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Workout">
+  <div class="grabber"></div>
+  <h2 id="feedWorkoutTitle" class="view-title"></h2>
+  <p id="feedWorkoutMeta" class="exercise-summary-meta"></p>
+  <div id="feedWorkoutExercises"></div>
+  <p id="feedWorkoutNotes" class="wo-last-performance" hidden></p>
+  <div class="actions">
+    <button type="button" id="feedWorkoutClose" class="ghost-btn block">Close</button>
   </div>
 </section>
 

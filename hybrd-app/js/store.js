@@ -54,6 +54,13 @@ export const DEFAULT_SETTINGS = {
     enabled: false, // true once connected at least once - auto-sync only runs while this is true
     lastSyncedAt: null, // ISO timestamp of the last successful check, shown in the status line
   },
+  social: {
+    firebaseConfig: null, // the Firebase project config object, pasted whole from the Firebase console
+    enabled: false, // true once signed in - workouts auto-publish/unpublish while this is true
+    uid: null, // Firebase Auth uid, once signed in
+    username: null, // the handle other people follow you by (chosen once, on first sign-in)
+    displayName: null, // from the Google account signed in with
+  },
 };
 
 function clone(value) {
@@ -73,6 +80,7 @@ export function loadSettings() {
       googleCalendar: { ...DEFAULT_SETTINGS.googleCalendar, ...(parsed.googleCalendar || {}) },
       intervals: { ...DEFAULT_SETTINGS.intervals, ...(parsed.intervals || {}) },
       watchSync: { ...DEFAULT_SETTINGS.watchSync, ...(parsed.watchSync || {}) },
+      social: { ...DEFAULT_SETTINGS.social, ...(parsed.social || {}) },
     };
   } catch {
     return clone(DEFAULT_SETTINGS);
