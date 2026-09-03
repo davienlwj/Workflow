@@ -801,6 +801,18 @@
   </div>
 </section>
 
+<!-- Routine actions sheet (popup, opened by tapping a routine on the Lift tab) -->
+<section id="routineActionsSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Routine">
+  <div class="grabber"></div>
+  <h2 id="routineActionsTitle" class="view-title"></h2>
+  <p id="routineActionsMeta" class="field-hint"></p>
+  <div class="actions-row">
+    <button type="button" id="routineActionsStart" class="primary block">Start Workout</button>
+    <button type="button" id="routineActionsEdit" class="ghost-btn block">Edit</button>
+    <button type="button" id="routineActionsDelete" class="danger-btn block">Delete</button>
+  </div>
+</section>
+
 <!-- Routine builder sheet (popup, name + pick exercises, opened from Routines or "Save as Routine") -->
 <section id="routineBuilderSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="New routine">
   <div class="grabber"></div>
