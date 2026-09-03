@@ -2813,13 +2813,13 @@ $('routineNewExSave').addEventListener('click', () => {
  *  by "Save as Routine" on the finish-workout summary), or in edit mode
  *  for an existing routine when `editingRoutine` is passed (its own
  *  exerciseIds are what should be passed as `exerciseIds` too). */
-function openRoutineBuilderSheet(exerciseIds = [], editingRoutine = null) {
+function openRoutineBuilderSheet(exerciseIds = [], editingRoutine = null, suggestedName = null) {
   routineSelectedIds = [...new Set(exerciseIds)];
   editingRoutineId = editingRoutine?.id ?? null;
   swappingIndex = null;
   $('routineBuilderTitle').textContent = editingRoutine ? 'Edit Routine' : 'New Routine';
   $('routineSave').textContent = editingRoutine ? 'Save changes' : 'Save routine';
-  $('routineName').value = editingRoutine?.name ?? '';
+  $('routineName').value = editingRoutine?.name ?? suggestedName ?? '';
   $('routinePickerSearch').value = '';
   $('routinePickerHint').hidden = true;
   renderRoutinePickerChips();
@@ -4084,6 +4084,27 @@ function registerWatchCustomExercises(watchCustomExercises) {
   return count;
 }
 
+/** Same problem/fix as registerWatchCustomExercises, for a feed workout's
+ *  embedded exercises: a follower opening "Save as routine" needs every
+ *  exerciseId it references to resolve locally, including ones from the
+ *  owner's own custom library. Unlike the watch import, the feed embed
+ *  carries the real equipment/muscles (see social.js's publishWorkout), so
+ *  this uses those rather than guessing Bodyweight for everything. Checked
+ *  against allExercises() (built-ins included), not just customExercises -
+ *  a feed exercise that happens to already be a stock one needs no action. */
+function registerFeedCustomExercises(item) {
+  const existingIds = new Set(allExercises().map((e) => e.id));
+  let added = false;
+  for (const e of item.exercises || []) {
+    const def = e.exercise;
+    if (!def?.id || !def.name || existingIds.has(def.id)) continue;
+    addCustomExercise({ id: def.id, name: def.name, equipment: def.equipment || 'Bodyweight', muscles: def.muscles || [] });
+    existingIds.add(def.id);
+    added = true;
+  }
+  if (added) customExercises = loadCustomExercises();
+}
+
 /** Imports every not-yet-seen watch workout (deduped by watchWorkoutId,
  *  the stable id the watch stamps on each finished workout - see
  *  hybrd-watch/utils/liveWorkout.js), returning how many were added.
@@ -4598,6 +4619,7 @@ function openFeedWorkout(ownerUid, kind, id) {
 
   $('feedWorkoutExercises').hidden = isRun;
   $('feedRunStats').hidden = !isRun;
+  $('feedSaveRoutine').hidden = isRun;
   if (isRun) {
     const metric = sessionMetric(item);
     const bits = [
@@ -4652,6 +4674,17 @@ function closeFeedWorkout() {
 }
 
 $('feedWorkoutClose').addEventListener('click', closeFeedWorkout);
+
+$('feedSaveRoutine').addEventListener('click', () => {
+  if (!feedDetailItem || feedDetailItem.kind !== 'workout') return;
+  const item = feedDetailItem;
+  registerFeedCustomExercises(item);
+  const ids = [...new Set((item.exercises || []).map((e) => e.exerciseId))];
+  if (ids.length === 0) { toast('No exercises to save'); return; }
+  closeFeedWorkout();
+  openRoutineBuilderSheet(ids, null, item.name || `@${item.ownerUsername}'s workout`);
+});
+
 $('feedList').addEventListener('click', (e) => {
   const btn = e.target.closest('.history-item');
   if (!btn) return;
