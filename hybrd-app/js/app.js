@@ -49,7 +49,8 @@ import {
   getUserProfile as socialGetUserProfile, findUserByUsername as socialFindUserByUsername,
   followUser as socialFollowUser, unfollowUser as socialUnfollowUser, fetchFollowing as socialFetchFollowing,
   publishWorkout as socialPublishWorkout, unpublishWorkout as socialUnpublishWorkout,
-  publishRun as socialPublishRun, unpublishRun as socialUnpublishRun, fetchFeed as socialFetchFeed,
+  publishRun as socialPublishRun, unpublishRun as socialUnpublishRun,
+  fetchFeed as socialFetchFeed, fetchUserActivities as socialFetchUserActivities,
   isLikedByMe as socialIsLikedByMe, likeActivity as socialLikeActivity, unlikeActivity as socialUnlikeActivity,
   fetchComments as socialFetchComments, addComment as socialAddComment, deleteComment as socialDeleteComment,
   countLikesAndComments as socialCountLikesAndComments,
@@ -175,7 +176,9 @@ function bodyweightKg() {
 
 /* ------------------------------------------------------------- tab views */
 
-const VIEW_LABEL = { dashboard: 'Dashboard', run: 'Run', workout: 'Lift', feed: 'Feed', account: 'Account', settings: 'Settings' };
+const VIEW_LABEL = {
+  dashboard: 'Dashboard', run: 'Run', workout: 'Lift', feed: 'Feed', profile: 'Profile', account: 'Account', settings: 'Settings',
+};
 
 const menuItems = document.querySelectorAll('.menu-item');
 menuItems.forEach((btn) => {
@@ -4556,6 +4559,32 @@ function feedCardMetaHTML(item) {
   return `<span>${exCount} exercise${exCount === 1 ? '' : 's'}</span><span class="mono">${feedWorkoutVolume(item)}kg volume</span>`;
 }
 
+/** One activity card - shared by the main Feed list and a profile page's
+ *  activity list, since both are "a feed, just scoped differently" and
+ *  need the exact same thumbnail/like/comment wiring (openFeedWorkout
+ *  finds the tapped item by owner+kind+id across whichever list is
+ *  currently showing it - see its own comment). */
+function feedCardHTML(item) {
+  const title = item.kind === 'run' ? sessionBadgeLabel(item) : (item.name || '');
+  return `
+    <li>
+      <button type="button" class="history-item feed-item" data-owner="${item.ownerUid}" data-id="${item.id}" data-kind="${item.kind}">
+        <div class="feed-thumb-wrap"><img class="feed-thumb-img" data-thumb-key="${item.kind}:${item.id}" alt=""></div>
+        <div class="history-top">
+          <span class="history-date">${fmtDateLong(item.date)}</span>
+          <span class="pill pill-type">@${escapeHTML(item.ownerUsername)}</span>
+        </div>
+        <div class="history-meta">${feedCardMetaHTML(item)}</div>
+        ${title ? `<div class="history-notes">${escapeHTML(title)}</div>` : ''}
+        <div class="feed-engagement">
+          <span>♥ ${item.likeCount || 0}</span>
+          <span>💬 ${item.commentCount || 0}</span>
+        </div>
+      </button>
+    </li>
+  `;
+}
+
 function renderFeedTab() {
   const signedIn = Boolean(settings.social.enabled && settings.social.username && !socialNeedsReconnect);
   $('feedSignedOut').hidden = signedIn;
@@ -4563,39 +4592,51 @@ function renderFeedTab() {
   if (!signedIn) return;
 
   $('followingList').innerHTML = followingCache.map((f) => `
-    <li>
-      <div class="history-item">
+    <li class="routine-row">
+      <button type="button" class="history-item follow-open" data-uid="${f.uid}" data-username="${escapeHTML(f.username)}" data-display-name="${escapeHTML(f.displayName || '')}">
         <div class="history-top"><span class="history-date">@${escapeHTML(f.username)}</span></div>
         ${f.displayName ? `<div class="history-meta"><span>${escapeHTML(f.displayName)}</span></div>` : ''}
-      </div>
+      </button>
       <button type="button" class="routine-delete" data-uid="${f.uid}" aria-label="Unfollow @${escapeHTML(f.username)}">✕</button>
     </li>
   `).join('');
   $('followingEmpty').hidden = followingCache.length > 0;
 
-  $('feedList').innerHTML = feedCache.map((item) => {
-    const title = item.kind === 'run' ? sessionBadgeLabel(item) : (item.name || '');
-    return `
-      <li>
-        <button type="button" class="history-item feed-item" data-owner="${item.ownerUid}" data-id="${item.id}" data-kind="${item.kind}">
-          <div class="feed-thumb-wrap"><img class="feed-thumb-img" data-thumb-key="${item.kind}:${item.id}" alt=""></div>
-          <div class="history-top">
-            <span class="history-date">${fmtDateLong(item.date)}</span>
-            <span class="pill pill-type">@${escapeHTML(item.ownerUsername)}</span>
-          </div>
-          <div class="history-meta">${feedCardMetaHTML(item)}</div>
-          ${title ? `<div class="history-notes">${escapeHTML(title)}</div>` : ''}
-          <div class="feed-engagement">
-            <span>♥ ${item.likeCount || 0}</span>
-            <span>💬 ${item.commentCount || 0}</span>
-          </div>
-        </button>
-      </li>
-    `;
-  }).join('');
+  $('feedList').innerHTML = feedCache.map(feedCardHTML).join('');
   $('feedEmpty').hidden = feedCache.length > 0;
   hydrateFeedThumbnails(feedCache);
 }
+
+/* --------------------------------------------------------------- profile */
+
+let profileActivities = []; // whoever's #view-profile is currently showing
+
+function renderProfileActivities() {
+  $('profileActivityList').innerHTML = profileActivities.map(feedCardHTML).join('');
+  $('profileActivityEmpty').hidden = profileActivities.length > 0;
+  hydrateFeedThumbnails(profileActivities);
+}
+
+/** Opens #view-profile for one followed person - every run/workout
+ *  they've published, newest first, in the same card format as the main
+ *  Feed (openFeedWorkout looks a tapped card up in feedCache OR
+ *  profileActivities, so liking/commenting/opening the detail sheet works
+ *  identically from either list). */
+async function openProfile(uid, username, displayName) {
+  $('profileTitle').textContent = displayName ? `${displayName} (@${username})` : `@${username}`;
+  profileActivities = [];
+  renderProfileActivities();
+  switchView('profile');
+  try {
+    profileActivities = await socialFetchUserActivities(uid, { username, displayName });
+    await enrichFeedCounts(profileActivities);
+  } catch (err) {
+    console.error('profile fetch failed', err);
+  }
+  renderProfileActivities();
+}
+
+$('profileBack').addEventListener('click', () => switchView('feed'));
 
 $('feedSearchBtn').addEventListener('click', async () => {
   const name = $('feedSearchInput').value.trim();
@@ -4619,10 +4660,15 @@ $('feedSearchBtn').addEventListener('click', async () => {
 });
 
 $('followingList').addEventListener('click', async (e) => {
-  const btn = e.target.closest('.routine-delete');
-  if (!btn) return;
-  await socialUnfollowUser(settings.social.uid, btn.dataset.uid);
-  await refreshFeed();
+  const deleteBtn = e.target.closest('.routine-delete');
+  if (deleteBtn) {
+    await socialUnfollowUser(settings.social.uid, deleteBtn.dataset.uid);
+    await refreshFeed();
+    return;
+  }
+  const openBtn = e.target.closest('.follow-open');
+  if (!openBtn) return;
+  openProfile(openBtn.dataset.uid, openBtn.dataset.username, openBtn.dataset.displayName || null);
 });
 
 // The feed item currently open in #feedWorkoutSheet, so the like/comment
@@ -4634,10 +4680,15 @@ let feedDetailItem = null;
 let feedDetailLikedByMe = false;
 
 function updateFeedCardCounts(item) {
-  const row = document.querySelector(
+  // querySelectorAll, not just the first match - the same card can be on
+  // screen in both the main Feed and a profile page's activity list at
+  // once (one hidden, one visible), and hidden .view sections stay in the
+  // DOM rather than being removed.
+  document.querySelectorAll(
     `.feed-item[data-owner="${item.ownerUid}"][data-id="${item.id}"][data-kind="${item.kind}"] .feed-engagement`,
-  );
-  if (row) row.innerHTML = `<span>♥ ${item.likeCount || 0}</span><span>💬 ${item.commentCount || 0}</span>`;
+  ).forEach((row) => {
+    row.innerHTML = `<span>♥ ${item.likeCount || 0}</span><span>💬 ${item.commentCount || 0}</span>`;
+  });
 }
 
 function renderFeedComments(comments) {
@@ -4675,7 +4726,8 @@ async function refreshFeedDetailEngagement(item) {
 }
 
 function openFeedWorkout(ownerUid, kind, id) {
-  const item = feedCache.find((x) => x.ownerUid === ownerUid && x.kind === kind && x.id === id);
+  const matches = (x) => x.ownerUid === ownerUid && x.kind === kind && x.id === id;
+  const item = feedCache.find(matches) || profileActivities.find(matches);
   if (!item) return;
   feedDetailItem = item;
   feedDetailLikedByMe = false;
@@ -4756,6 +4808,12 @@ $('feedSaveRoutine').addEventListener('click', () => {
 });
 
 $('feedList').addEventListener('click', (e) => {
+  const btn = e.target.closest('.history-item');
+  if (!btn) return;
+  openFeedWorkout(btn.dataset.owner, btn.dataset.kind, btn.dataset.id);
+});
+
+$('profileActivityList').addEventListener('click', (e) => {
   const btn = e.target.closest('.history-item');
   if (!btn) return;
   openFeedWorkout(btn.dataset.owner, btn.dataset.kind, btn.dataset.id);

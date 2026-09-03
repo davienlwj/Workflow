@@ -291,38 +291,57 @@ export function mergeFeed(perPersonArrays) {
  *  the feed can render/open each appropriately. Two queries per followed
  *  person (one per collection), merged client-side rather than a fan-out
  *  feed collection - simple, and plenty for a personal friend-group scale. */
+/** One person's published workouts + runs, newest first - each collection
+ *  fetched independently, failures swallowed to an empty array rather than
+ *  left to reject (e.g. someone who hasn't pasted the newer Security Rules
+ *  yet still gets workouts even though the newer `runs` collection 404s/
+ *  permission-denies for everyone until they do). Shared by fetchFeed
+ *  (called once per followed person) and fetchUserActivities (a profile
+ *  page - one person, but every activity of theirs, not just the newest
+ *  FEED_LIMIT_PER_PERSON). */
+async function fetchActivitiesForOwner(owner) {
+  const fetchKind = async (kind) => {
+    try {
+      const q = fsMod.query(
+        fsMod.collection(db, 'users', owner.uid, activityCollection(kind)),
+        fsMod.orderBy('date', 'desc'),
+        fsMod.limit(FEED_LIMIT_PER_PERSON),
+      );
+      const snap = await fsMod.getDocs(q);
+      return snap.docs.map((d) => ({
+        id: d.id, kind, ownerUid: owner.uid, ownerUsername: owner.username, ownerDisplayName: owner.displayName, ...d.data(),
+      }));
+    } catch (err) {
+      console.error(`activity fetch failed for ${owner.uid}/${kind}`, err);
+      return [];
+    }
+  };
+  const [workoutItems, runItems] = await Promise.all([fetchKind('workout'), fetchKind('run')]);
+  return [...workoutItems, ...runItems];
+}
+
 export async function fetchFeed(myUid) {
   requireInit();
   const following = await fetchFollowing(myUid);
-  const perPerson = await Promise.all(
-    following.map(async (person) => {
-      const owner = { ownerUid: person.uid, ownerUsername: person.username, ownerDisplayName: person.displayName };
-      // Each collection fetched independently, failures swallowed to an
-      // empty array rather than left to reject - e.g. someone who hasn't
-      // pasted the newer Security Rules yet still has a working feed for
-      // workouts even though the newer `runs` collection 404s/permission-
-      // denies for everyone until they do. Without this, one bad query for
-      // one followed person's one activity kind would blank the *entire*
-      // feed (Promise.all rejects the whole batch on a single rejection).
-      const fetchKind = async (kind) => {
-        try {
-          const q = fsMod.query(
-            fsMod.collection(db, 'users', person.uid, activityCollection(kind)),
-            fsMod.orderBy('date', 'desc'),
-            fsMod.limit(FEED_LIMIT_PER_PERSON),
-          );
-          const snap = await fsMod.getDocs(q);
-          return snap.docs.map((d) => ({ id: d.id, kind, ...owner, ...d.data() }));
-        } catch (err) {
-          console.error(`feed fetch failed for ${person.uid}/${kind}`, err);
-          return [];
-        }
-      };
-      const [workoutItems, runItems] = await Promise.all([fetchKind('workout'), fetchKind('run')]);
-      return [...workoutItems, ...runItems];
-    }),
-  );
+  // Includes the viewer's own posts, not just people they follow - "myUid"
+  // isn't in their own `following` list (that would make them their own
+  // follower too, which the rest of this file never expects), so it's
+  // added here instead, using their own profile for the owner fields.
+  const myProfile = await getUserProfile(myUid);
+  const people = [{ uid: myUid, username: myProfile?.username, displayName: myProfile?.displayName }, ...following];
+  const perPerson = await Promise.all(people.map(fetchActivitiesForOwner));
   return mergeFeed(perPerson);
+}
+
+/** Every one of `uid`'s published activities, newest first - for their
+ *  profile page. Same visibility as the main feed (Security Rules only
+ *  let this succeed for the owner themselves or one of their followers).
+ * @param {{username, displayName}} profile already known by the caller
+ *   (e.g. from the Following list) - avoids an extra lookup. */
+export async function fetchUserActivities(uid, profile) {
+  requireInit();
+  const items = await fetchActivitiesForOwner({ uid, username: profile.username, displayName: profile.displayName });
+  return mergeFeed([items]);
 }
 
 /** True if `myUid` has already liked this activity - checked only when its
