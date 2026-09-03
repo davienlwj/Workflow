@@ -227,6 +227,26 @@ main.has-live-bar {
   font-weight: 600;
 }
 
+/* Profile's title + "Unfollow" sit side by side (name left, action right)
+   rather than Unfollow being a separate full-width block underneath -
+   min-width: 0 lets the title actually truncate against the button's
+   fixed width instead of forcing the row wider than the screen. */
+.profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 4px 0 16px;
+}
+.profile-header .view-title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-header .ghost-btn { flex-shrink: 0; }
+
 .section-title {
   font-size: 13px;
   text-transform: uppercase;

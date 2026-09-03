@@ -4738,7 +4738,6 @@ async function openProfile(uid, username, displayName) {
     const isFollowing = uid !== settings.social.uid && followingCache.some((f) => f.uid === uid);
     $('profileUnfollowBtn').hidden = !isFollowing;
     $('profileUnfollowBtn').dataset.uid = uid;
-    $('profileUnfollowBtn').textContent = profile.username ? `Unfollow @${profile.username}` : 'Unfollow';
     profileActivities = await socialFetchUserActivities(uid, profile);
     await enrichFeedCounts(profileActivities);
   } catch (err) {
