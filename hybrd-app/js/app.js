@@ -1454,6 +1454,7 @@ function closeAllSheets() {
   closeRoutinesSheet();
   closeRoutineBuilderSheet();
   closeShareCardSheet();
+  closeFeedWorkout();
   $('workoutSummarySheet').hidden = true;
   $('runSummarySheet').hidden = true;
   $('mileagePlanEditSheet').hidden = true;
