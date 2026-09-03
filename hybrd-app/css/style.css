@@ -1330,6 +1330,11 @@ button.mileage-plan-row-open {
    8px item-to-item gap down to the button below it. */
 #addShoeBtn { margin-top: 8px; }
 
+/* Same 0px-gap issue a third time: routineShareSheet's Cancel button
+   (in its .actions wrapper) sits directly against the following-list
+   above it. */
+#routineShareList { margin-bottom: 8px; }
+
 .routine-delete {
   background: transparent;
   border: 1px solid var(--line);
