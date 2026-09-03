@@ -27,6 +27,34 @@ test('parseFirebaseConfigInput reads the console-pasted snippet verbatim', () =>
   assert.equal(config.appId, '1:123:web:abc');
 });
 
+test('parseFirebaseConfigInput accepts the full console snippet (imports, comments, and code after the object)', () => {
+  const raw = `// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyAig6TTmhteMVaMNgb8fexC_DemXSfbv0g",
+  authDomain: "hybrd-app-e50c4.firebaseapp.com",
+  projectId: "hybrd-app-e50c4",
+  storageBucket: "hybrd-app-e50c4.firebasestorage.app",
+  messagingSenderId: "42353936182",
+  appId: "1:42353936182:web:659c753a2e49dff0439597",
+  measurementId: "G-023HVE12P2"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);`;
+  const config = parseFirebaseConfigInput(raw);
+  assert.equal(config.apiKey, 'AIzaSyAig6TTmhteMVaMNgb8fexC_DemXSfbv0g');
+  assert.equal(config.projectId, 'hybrd-app-e50c4');
+  assert.equal(config.appId, '1:42353936182:web:659c753a2e49dff0439597');
+});
+
 test('parseFirebaseConfigInput also accepts a bare object literal', () => {
   const config = parseFirebaseConfigInput('{ apiKey: "x", authDomain: "x", projectId: "x", appId: "x" }');
   assert.equal(config.apiKey, 'x');
