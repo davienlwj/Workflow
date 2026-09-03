@@ -44,7 +44,7 @@ import {
 import { fetchGistData, markWorkoutDeleted } from './gistSync.js';
 import {
   initApp as socialInitApp, parseFirebaseConfigInput, signInWithGoogle as socialSignInWithGoogle,
-  signOutSocial, getRestoredUser, isValidUsername, claimUsername as socialClaimUsername,
+  completeRedirectSignIn, signOutSocial, getRestoredUser, isValidUsername, claimUsername as socialClaimUsername,
   getUserProfile as socialGetUserProfile, findUserByUsername as socialFindUserByUsername,
   followUser as socialFollowUser, unfollowUser as socialUnfollowUser, fetchFollowing as socialFetchFollowing,
   publishWorkout as socialPublishWorkout, unpublishWorkout as socialUnpublishWorkout, fetchFeed as socialFetchFeed,
@@ -4230,9 +4230,43 @@ async function refreshFeed() {
   renderFeedTab();
 }
 
-async function initSocialSession() {
+/** Finishes a sign-in (whether just completed via redirect, or a past one
+ *  Firebase's own session restored) - looks up the profile to reuse an
+ *  already-claimed username (e.g. reconnecting on a new device) rather
+ *  than prompting for a new one every time. */
+async function finishSocialSignIn(user) {
+  const profile = await socialGetUserProfile(user.uid);
+  settings = {
+    ...settings,
+    social: {
+      firebaseConfig: settings.social.firebaseConfig,
+      enabled: true,
+      uid: user.uid,
+      displayName: user.displayName,
+      username: profile?.username || null,
+    },
+  };
+  saveSettings(settings);
+  socialNeedsReconnect = false;
+  renderSocialStatus();
+  toast(profile?.username ? `Signed in as @${profile.username}` : 'Signed in - pick a username below');
+  await refreshFeed();
+}
+
+/** Runs once at startup whenever a Firebase config has ever been saved
+ *  (not just when Social is already "enabled") - this load might be
+ *  Google redirecting back after tapping "Sign in with Google" (see
+ *  socialConnect below, which navigates away rather than resolving). */
+async function bootSocial() {
+  if (!settings.social.firebaseConfig) return;
   try {
     await socialInitApp(settings.social.firebaseConfig);
+    const redirected = await completeRedirectSignIn();
+    if (redirected) {
+      await finishSocialSignIn(redirected);
+      return;
+    }
+    if (!settings.social.enabled) return;
     const user = await getRestoredUser();
     if (!user) {
       socialNeedsReconnect = true;
@@ -4285,28 +4319,18 @@ $('socialConnect').addEventListener('click', async () => {
     toast(err.message);
     return;
   }
+  // Saved before navigating away: signInWithGoogle() below redirects the
+  // whole page to Google and back (more reliable than a popup on mobile
+  // Safari/PWAs), so nothing after this in the click handler actually
+  // runs - bootSocial() picks up the result on the next load using this.
+  settings = { ...settings, social: { ...settings.social, firebaseConfig: config } };
+  saveSettings(settings);
   try {
     await socialInitApp(config);
-    const user = await socialSignInWithGoogle();
-    const profile = await socialGetUserProfile(user.uid);
-    settings = {
-      ...settings,
-      social: {
-        firebaseConfig: config,
-        enabled: true,
-        uid: user.uid,
-        displayName: user.displayName,
-        username: profile?.username || null,
-      },
-    };
-    saveSettings(settings);
-    socialNeedsReconnect = false;
-    renderSocialStatus();
-    toast(profile?.username ? `Signed in as @${profile.username}` : 'Signed in - pick a username below');
-    await refreshFeed();
+    await socialSignInWithGoogle();
   } catch (err) {
     console.error('social connect failed', err);
-    toast(err.message || 'Could not sign in');
+    toast(err.message || 'Could not start sign-in');
   }
 });
 
@@ -4571,9 +4595,7 @@ if (settings.intervals.enabled) {
 if (settings.watchSync.enabled) {
   syncWatchWorkouts({ silent: true });
 }
-if (settings.social.enabled) {
-  initSocialSession();
-}
+bootSocial();
 
 // The boot splash (index.html) has done its job now that the real UI is
 // rendered - fade it out, then drop it from the DOM once the transition
