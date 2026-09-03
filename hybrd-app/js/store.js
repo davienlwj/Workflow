@@ -17,6 +17,7 @@ const CUSTOM_BRANDS_KEY = 'vo2max.customBrands.v1';
 const CUSTOM_SESSION_TYPES_KEY = 'vo2max.customSessionTypes.v1';
 const MILEAGE_PLAN_KEY = 'vo2max.mileagePlan.v1';
 const PLANNED_ACTIVITIES_KEY = 'vo2max.plannedActivities.v1';
+const SHOES_KEY = 'vo2max.shoes.v1';
 
 export const DEFAULT_SETTINGS = {
   theme: 'light', // 'light' | 'dark'
@@ -387,6 +388,36 @@ export function deletePlannedActivity(id) {
   savePlannedActivities(loadPlannedActivities().filter((p) => p.id !== id));
 }
 
+/** Running shoes, tracked by id (not name) so a run's shoeId keeps
+ *  pointing at the right shoe even if it's ever renamed - same shape as
+ *  routines above. */
+export function loadShoes() {
+  try {
+    const raw = localStorage.getItem(SHOES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveShoes(shoes) {
+  localStorage.setItem(SHOES_KEY, JSON.stringify(shoes));
+}
+
+export function addShoe(name) {
+  const shoes = loadShoes();
+  const record = { id: `shoe-${makeId()}`, name };
+  shoes.push(record);
+  saveShoes(shoes);
+  return record;
+}
+
+export function deleteShoe(id) {
+  saveShoes(loadShoes().filter((s) => s.id !== id));
+}
+
 export function exportAll() {
   return JSON.stringify({
     settings: loadSettings(),
@@ -398,6 +429,7 @@ export function exportAll() {
     customSessionTypes: loadCustomSessionTypes(),
     mileagePlan: loadMileagePlan(),
     plannedActivities: loadPlannedActivities(),
+    shoes: loadShoes(),
     exportedAt: new Date().toISOString(),
   }, null, 2);
 }
@@ -413,4 +445,5 @@ export function importAll(json) {
   if (Array.isArray(data.customSessionTypes)) saveCustomSessionTypes(data.customSessionTypes);
   if (data.mileagePlan?.startDate && Array.isArray(data.mileagePlan.weeks)) saveMileagePlan(data.mileagePlan);
   if (Array.isArray(data.plannedActivities)) savePlannedActivities(data.plannedActivities);
+  if (Array.isArray(data.shoes)) saveShoes(data.shoes);
 }
