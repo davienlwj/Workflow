@@ -4642,12 +4642,11 @@ function renderFeedTab() {
   $('feedLoading').hidden = feedLoaded;
 
   $('followingList').innerHTML = followingCache.map((f) => `
-    <li class="routine-row">
+    <li>
       <button type="button" class="history-item follow-open" data-uid="${f.uid}" data-username="${escapeHTML(f.username)}" data-display-name="${escapeHTML(f.displayName || '')}">
         <div class="history-top"><span class="history-date">@${escapeHTML(f.username)}</span></div>
         ${f.displayName ? `<div class="history-meta"><span>${escapeHTML(f.displayName)}</span></div>` : ''}
       </button>
-      <button type="button" class="routine-delete" data-uid="${f.uid}" aria-label="Unfollow @${escapeHTML(f.username)}">✕</button>
     </li>
   `).join('');
   $('followingEmpty').hidden = !feedLoaded || followingCache.length > 0;
@@ -4679,6 +4678,7 @@ function renderProfileActivities() {
  *  identically from either list). */
 async function openProfile(uid, username, displayName) {
   $('profileTitle').textContent = username ? (displayName ? `${displayName} (@${username})` : `@${username}`) : 'Profile';
+  $('profileUnfollowBtn').hidden = true;
   profileActivities = null;
   renderProfileActivities();
   switchView('profile');
@@ -4697,6 +4697,10 @@ async function openProfile(uid, username, displayName) {
     $('profileTitle').textContent = profile.username
       ? (profile.displayName ? `${profile.displayName} (@${profile.username})` : `@${profile.username}`)
       : 'Profile';
+    const isFollowing = uid !== settings.social.uid && followingCache.some((f) => f.uid === uid);
+    $('profileUnfollowBtn').hidden = !isFollowing;
+    $('profileUnfollowBtn').dataset.uid = uid;
+    $('profileUnfollowBtn').textContent = profile.username ? `Unfollow @${profile.username}` : 'Unfollow';
     profileActivities = await socialFetchUserActivities(uid, profile);
     await enrichFeedCounts(profileActivities);
   } catch (err) {
@@ -4707,6 +4711,15 @@ async function openProfile(uid, username, displayName) {
 }
 
 $('profileBack').addEventListener('click', () => switchView('feed'));
+
+$('profileUnfollowBtn').addEventListener('click', async () => {
+  const uid = $('profileUnfollowBtn').dataset.uid;
+  if (!uid) return;
+  await socialUnfollowUser(settings.social.uid, uid);
+  toast('Unfollowed');
+  switchView('feed');
+  await refreshFeed();
+});
 
 /* ---------------------------------------------------------- notifications */
 
@@ -4828,12 +4841,6 @@ $('feedSearchBtn').addEventListener('click', async () => {
 });
 
 $('followingList').addEventListener('click', async (e) => {
-  const deleteBtn = e.target.closest('.routine-delete');
-  if (deleteBtn) {
-    await socialUnfollowUser(settings.social.uid, deleteBtn.dataset.uid);
-    await refreshFeed();
-    return;
-  }
   const openBtn = e.target.closest('.follow-open');
   if (!openBtn) return;
   openProfile(openBtn.dataset.uid, openBtn.dataset.username, openBtn.dataset.displayName || null);
