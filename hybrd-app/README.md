@@ -360,11 +360,31 @@ Follow people and see their workouts in the **Feed** tab - the one feature
 in this app that isn't purely local. Everything else here lives only in
 your own browser's storage; a feed of *other people's* workouts needs
 somewhere to actually store their data, which local storage can't do. So
-this one integration needs a real backend - **Firebase** (Auth + Firestore),
-in the same "you own the project, no server I run" shape as the Google
-Calendar and intervals.icu integrations above.
+this one integration needs a real backend - **Firebase** (Auth + Firestore).
 
-### 1. Set up your own free Firebase project
+Unlike Google Calendar/intervals.icu above, this is **not** "bring your own
+project": everyone using this app shares the same Firebase project (see
+`DEFAULT_FIREBASE_CONFIG`/`DEFAULT_GOOGLE_CLIENT_ID` in `js/social.js`), so
+people can actually follow each other. If each person connected their own
+separate project, nobody would ever see anybody else's workouts - they'd
+each be alone in their own database. The project's config values aren't
+secret (they identify the project, not authenticate as anyone - the
+Security Rules below are what actually protects the data), so they're
+baked into the app rather than pasted in per-device.
+
+### For anyone using the app (including friends)
+
+Nothing to set up. Open the app, tap the menu (☰) → **Account** →
+**Sign in with Google**. First time in, pick a username - this is how
+people find you to follow you (there's no browsing/discovery, only
+exact-username lookup, so you'll need to share yours out of band, same as
+a phone number). You stay signed in on that device until you tap
+**Sign out**.
+
+### For the project owner: one-time Firebase setup
+
+This only needs doing once, by whoever's Firebase project backs the app
+(already done for the deployed app - kept here for reference/reconfiguring):
 
 1. [console.firebase.google.com](https://console.firebase.google.com) →
    **Add project** (the free Spark plan is plenty for personal use).
@@ -436,23 +456,11 @@ Calendar and intervals.icu integrations above.
    ```
 
 6. **Project settings** (gear icon) → **Your apps** → **Web app** (the
-   `</>` icon) → register one → copy the `firebaseConfig` object shown.
-   These values aren't secret (they identify your project, not
-   authenticate as you - the Security Rules above are what actually
-   protects the data), but the project is still yours alone.
-
-### 2. Connect it in Settings
-
-**Settings → Social**, paste the whole `firebaseConfig` object (exactly as
-Firebase showed it - the full snippet with the import lines and comments
-is fine too, not just the bare object) into **Firebase config**, and the
-**Web client ID** from step 2 above into **Google OAuth Client ID** -
-these are two different values, both needed. Tap **Continue**, which
-reveals Google's own Sign-In button below the field - tap that one to
-actually sign in. First time in, pick a username - this is how people
-find you to follow you (there's no browsing/discovery, only
-exact-username lookup, so you'll need to share yours out of band, same as
-a phone number).
+   `</>` icon) → register one → copy the `firebaseConfig` object shown, and
+   paste its values into `DEFAULT_FIREBASE_CONFIG` in `js/social.js`. Also
+   paste the Web client ID from step 2 into `DEFAULT_GOOGLE_CLIENT_ID`
+   there. Ship that change (commit/push/deploy) and everyone using the app
+   picks it up automatically - nothing for them to paste anywhere.
 
 ### How it works
 
@@ -465,7 +473,7 @@ whoever follows them - never public to the internet. Unfollowing, editing
 your username, and account deletion aren't in here yet - do those from
 the Firebase console directly if you ever need to.
 
-**Disconnect** only stops syncing on that device going forward - workouts
+**Sign out** only stops syncing on that device going forward - workouts
 you've already published stay visible to your followers, same as
 disconnecting Calendar or watch sync leaves already-synced data in place.
 

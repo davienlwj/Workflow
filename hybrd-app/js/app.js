@@ -43,7 +43,7 @@ import {
 } from './intervals.js';
 import { fetchGistData, markWorkoutDeleted } from './gistSync.js';
 import {
-  initApp as socialInitApp, parseFirebaseConfigInput, renderGoogleSignInButton,
+  initApp as socialInitApp, renderGoogleSignInButton, DEFAULT_FIREBASE_CONFIG, DEFAULT_GOOGLE_CLIENT_ID,
   signOutSocial, getRestoredUser, isValidUsername, claimUsername as socialClaimUsername,
   getUserProfile as socialGetUserProfile, findUserByUsername as socialFindUserByUsername,
   followUser as socialFollowUser, unfollowUser as socialUnfollowUser, fetchFollowing as socialFetchFollowing,
@@ -169,7 +169,7 @@ function bodyweightKg() {
 
 /* ------------------------------------------------------------- tab views */
 
-const VIEW_LABEL = { dashboard: 'Dashboard', run: 'Run', workout: 'Lift', feed: 'Feed', settings: 'Settings' };
+const VIEW_LABEL = { dashboard: 'Dashboard', run: 'Run', workout: 'Lift', feed: 'Feed', account: 'Account', settings: 'Settings' };
 
 const menuItems = document.querySelectorAll('.menu-item');
 menuItems.forEach((btn) => {
@@ -4194,17 +4194,14 @@ let followingCache = []; // [{uid, username, displayName, photoURL}]
 let feedCache = []; // merged, date-desc workouts from everyone followed
 
 function renderSocialStatus() {
-  $('socialConfig').value = settings.social.firebaseConfig ? JSON.stringify(settings.social.firebaseConfig, null, 2) : '';
-  $('socialGoogleClientId').value = settings.social.googleClientId || '';
   const { enabled, username, displayName } = settings.social;
   $('socialDisconnect').hidden = !enabled;
-  $('socialContinue').hidden = enabled;
+  $('socialGoogleButtonWrap').hidden = enabled;
   $('socialUsernameRow').hidden = !(enabled && !username && !socialNeedsReconnect);
-  if (enabled) $('socialGoogleButtonWrap').hidden = true;
   if (!enabled) {
-    $('socialStatus').textContent = 'Not connected.';
+    $('socialStatus').textContent = 'Sign in with Google to follow friends and share your workouts.';
   } else if (socialNeedsReconnect) {
-    $('socialStatus').textContent = 'Sign-in expired - disconnect and reconnect below.';
+    $('socialStatus').textContent = 'Sign-in expired - sign out and sign in again below.';
   } else if (!username) {
     $('socialStatus').textContent = `Signed in as ${displayName || 'you'} - pick a username below to finish setup.`;
   } else {
@@ -4252,30 +4249,40 @@ async function finishSocialSignIn(user) {
   await refreshFeed();
 }
 
-/** Runs once at startup, only when Social was already connected on a past
- *  visit - confirms Firebase's own persisted session is still valid before
- *  trusting settings.social.enabled. */
+/** Runs once at startup: sets up Firebase (the shared project - see
+ *  DEFAULT_FIREBASE_CONFIG in social.js), gets the Google Sign-In button
+ *  ready in the Account view, and - if this device was signed in before -
+ *  confirms Firebase's own persisted session is still valid before trusting
+ *  settings.social.enabled. Safe to run even if the user has never signed
+ *  in; the button just sits there ready for a first sign-in. */
 async function bootSocial() {
-  if (!settings.social.firebaseConfig || !settings.social.enabled) return;
   try {
-    await socialInitApp(settings.social.firebaseConfig);
+    await socialInitApp(DEFAULT_FIREBASE_CONFIG);
+    await renderGoogleSignInButton(
+      DEFAULT_GOOGLE_CLIENT_ID,
+      'socialGoogleButton',
+      (user) => finishSocialSignIn(user),
+      (err) => {
+        console.error('social sign-in failed', err);
+        toast(err.message || 'Could not sign in');
+      },
+    );
     const user = await getRestoredUser();
     if (!user) {
-      socialNeedsReconnect = true;
+      if (settings.social.enabled) socialNeedsReconnect = true;
       renderSocialStatus();
       renderFeedTab();
       return;
     }
     socialNeedsReconnect = false;
-    if (user.uid !== settings.social.uid || user.displayName !== settings.social.displayName) {
-      settings = { ...settings, social: { ...settings.social, uid: user.uid, displayName: user.displayName } };
+    if (!settings.social.enabled || user.uid !== settings.social.uid || user.displayName !== settings.social.displayName) {
+      settings = { ...settings, social: { ...settings.social, enabled: true, uid: user.uid, displayName: user.displayName } };
       saveSettings(settings);
     }
     renderSocialStatus();
     await refreshFeed();
   } catch (err) {
-    console.error('social session restore failed', err);
-    socialNeedsReconnect = true;
+    console.error('social init failed', err);
     renderSocialStatus();
   }
 }
@@ -4303,36 +4310,6 @@ async function unpublishWorkoutFromSocial(workoutId) {
   }
 }
 
-$('socialContinue').addEventListener('click', async () => {
-  let config;
-  try {
-    config = parseFirebaseConfigInput($('socialConfig').value);
-  } catch (err) {
-    toast(err.message);
-    return;
-  }
-  const googleClientId = $('socialGoogleClientId').value.trim();
-  if (!googleClientId) { toast('Paste the Google OAuth Client ID too - see the README.'); return; }
-  settings = { ...settings, social: { ...settings.social, firebaseConfig: config, googleClientId } };
-  saveSettings(settings);
-  try {
-    await socialInitApp(config);
-    $('socialGoogleButtonWrap').hidden = false;
-    await renderGoogleSignInButton(
-      googleClientId,
-      'socialGoogleButton',
-      (user) => finishSocialSignIn(user),
-      (err) => {
-        console.error('social sign-in failed', err);
-        toast(err.message || 'Could not sign in');
-      },
-    );
-  } catch (err) {
-    console.error('social continue failed', err);
-    toast(err.message || 'Could not set up sign-in');
-  }
-});
-
 $('socialClaimUsername').addEventListener('click', async () => {
   const name = $('socialUsernameInput').value.trim();
   if (!isValidUsername(name)) { toast('Usernames are 3-20 characters: letters, numbers, underscore.'); return; }
@@ -4350,7 +4327,7 @@ $('socialClaimUsername').addEventListener('click', async () => {
 });
 
 $('socialDisconnect').addEventListener('click', async () => {
-  if (!confirm('Disconnect Social? Workouts already shared stay visible to your followers - only future publishing/following stops on this device.')) return;
+  if (!confirm('Sign out? Workouts already shared stay visible to your followers - only future publishing/following stops on this device.')) return;
   await signOutSocial();
   socialNeedsReconnect = false;
   settings = { ...settings, social: { ...settings.social, enabled: false } };
@@ -4359,7 +4336,7 @@ $('socialDisconnect').addEventListener('click', async () => {
   feedCache = [];
   renderSocialStatus();
   renderFeedTab();
-  toast('Disconnected');
+  toast('Signed out');
 });
 
 /* ------------------------------------------------------------------ feed */
@@ -4495,7 +4472,6 @@ function renderSettingsForm() {
   renderGCalStatus();
   renderIntervalsStatus();
   renderWatchSyncStatus();
-  renderSocialStatus();
 }
 
 $('sTheme').addEventListener('click', (e) => {
@@ -4581,6 +4557,7 @@ function renderAll() {
   renderZones();
   renderSettingsForm();
   renderFeedTab();
+  renderSocialStatus();
 }
 
 resetLogForm();
