@@ -1016,7 +1016,7 @@ button.mileage-plan-row-open {
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 8px;
   margin-bottom: 14px;
 }
 
@@ -1832,7 +1832,7 @@ button.mileage-plan-row-open {
 .wo-exercise-header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -1897,7 +1897,7 @@ button.mileage-plan-row-open {
 .wo-set-row-heading {
   display: grid;
   grid-template-columns: 26px 22px 1fr 1fr 26px;
-  gap: 6px;
+  gap: 8px;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1909,13 +1909,13 @@ button.mileage-plan-row-open {
 .wo-set-rows {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .wo-set-row {
   display: grid;
   grid-template-columns: 26px 22px 1fr 1fr 26px;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 
@@ -2012,7 +2012,7 @@ button.mileage-plan-row-open {
   font-family: var(--font-mono);
 }
 
-.wo-picker-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.wo-picker-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .chip {
   background: transparent;
@@ -2033,7 +2033,7 @@ button.mileage-plan-row-open {
 .wo-picker-results {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   max-height: 220px;
   overflow-y: auto;
 }
