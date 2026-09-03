@@ -6,7 +6,10 @@ and files it.
 
 This repo also hosts [**VO2max Tracker**](hybrd-app/) (aka HYBR.D), a second,
 independent Home Screen app for logging a Norwegian 4x4 training block — see
-`hybrd-app/README.md` for its own install and usage notes. Both apps share the
+`hybrd-app/README.md` for its own install and usage notes, including its
+one opt-in **Social** feature (follow people, see their workouts in a
+Feed tab) - the one thing in either app backed by a real account/backend
+rather than just local storage. Both apps share the
 same GitHub Pages deployment and live at `/` and `/hybrd-app/` respectively.
 
 A third project, [**hybrd-watch**](hybrd-watch/), is a Zepp OS companion

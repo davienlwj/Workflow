@@ -2,7 +2,11 @@
 
 A personal training log for the Norwegian 4x4 VO2max protocol. No account, no
 server — everything is stored in `localStorage` on your device, and the app
-keeps working offline once it has loaded once.
+keeps working offline once it has loaded once. **Social** (see below) is the
+one opt-in exception: following people and seeing their workouts needs
+somewhere to store *their* data, so it's the one feature backed by a real
+account and a real (Firebase) backend — everything else stays exactly as
+described above whether or not you ever turn it on.
 
 ## Put it on your Home Screen
 
@@ -29,9 +33,10 @@ npm run muscle-diagram:hybrd-app   # regenerate the muscle-diagram image assets
 
 ## What's in it
 
-Nav is Dashboard / Run / Workout / Settings — cardio (Run) and strength
-(Workout) are tracked as separate, parallel domains throughout, with
-Dashboard as the place they come together.
+Nav is Dashboard / Run / Workout / Feed / Settings — cardio (Run) and
+strength (Workout) are tracked as separate, parallel domains throughout,
+with Dashboard as the place they come together. Feed is the one social
+piece - see "Social" below.
 
 - **Dashboard** — a month calendar grid at the top (every day that has
   something logged shows a small icon: a run gets the running-figure glyph,
@@ -349,6 +354,91 @@ gets it added automatically (as `Bodyweight`, no muscle group, since the
 watch has no picker for those) the first time such a workout comes in - edit
 it further in Settings anytime after, same as one you added by hand.
 
+## Social
+
+Follow people and see their workouts in the **Feed** tab - the one feature
+in this app that isn't purely local. Everything else here lives only in
+your own browser's storage; a feed of *other people's* workouts needs
+somewhere to actually store their data, which local storage can't do. So
+this one integration needs a real backend - **Firebase** (Auth + Firestore),
+in the same "you own the project, no server I run" shape as the Google
+Calendar and intervals.icu integrations above.
+
+### 1. Set up your own free Firebase project
+
+1. [console.firebase.google.com](https://console.firebase.google.com) →
+   **Add project** (the free Spark plan is plenty for personal use).
+2. **Build → Authentication → Get started**, enable the **Google**
+   sign-in provider.
+3. **Build → Firestore Database → Create database** (production mode,
+   any region).
+4. **Firestore Database → Rules**, replace the default with the rules
+   below, then **Publish**. These are what actually make a workout
+   visible only to its owner and their followers - without them, either
+   nobody can read anything, or (if left wide open) everybody could read
+   everything.
+
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /usernames/{name} {
+         allow get: if true;
+         allow create: if request.auth != null
+           && request.resource.data.uid == request.auth.uid
+           && (resource == null || resource.data.uid == request.auth.uid);
+       }
+       match /users/{uid} {
+         allow get: if true;
+         allow write: if request.auth != null && request.auth.uid == uid;
+         match /following/{targetUid} {
+           allow read, write: if request.auth != null && request.auth.uid == uid;
+         }
+         match /followers/{followerUid} {
+           allow read: if request.auth != null && request.auth.uid == uid;
+           allow write: if request.auth != null && request.auth.uid == followerUid;
+         }
+         match /workouts/{workoutId} {
+           allow write: if request.auth != null && request.auth.uid == uid;
+           allow read: if request.auth != null
+             && (request.auth.uid == uid
+               || exists(/databases/$(database)/documents/users/$(uid)/followers/$(request.auth.uid)));
+         }
+       }
+     }
+   }
+   ```
+
+5. **Project settings** (gear icon) → **Your apps** → **Web app** (the
+   `</>` icon) → register one → copy the `firebaseConfig` object shown.
+   These values aren't secret (they identify your project, not
+   authenticate as you - the Security Rules above are what actually
+   protects the data), but the project is still yours alone.
+
+### 2. Connect it in Settings
+
+**Settings → Social**, paste the whole `firebaseConfig` object (exactly as
+Firebase showed it, unquoted keys and all - no need to convert it to
+JSON), then **Sign in with Google**. First time in, pick a username - this
+is how people find you to follow you (there's no browsing/discovery, only
+exact-username lookup, so you'll need to share yours out of band, same as
+a phone number).
+
+### How it works
+
+Once signed in, every workout you save **auto-publishes** to your cloud
+profile going forward (no per-workout share toggle, same "everything
+syncs automatically" shape as Calendar/watch sync), and deleting it
+locally un-publishes it. Follow someone by their exact username in the
+**Feed** tab's search box; a workout is visible only to its owner and
+whoever follows them - never public to the internet. Unfollowing, editing
+your username, and account deletion aren't in here yet - do those from
+the Firebase console directly if you ever need to.
+
+**Disconnect** only stops syncing on that device going forward - workouts
+you've already published stay visible to your followers, same as
+disconnecting Calendar or watch sync leaves already-synced data in place.
+
 ## Zone math
 
 Both zone tables are computed live from your HR settings, not stored as
@@ -458,6 +548,8 @@ js/gistSync.js                GitHub Gist client for pulling in workouts logged 
                               (see the README's "Watch workout sync" section, and ../hybrd-watch/)
 js/shareCard.js               renders the Save-PNG cards (summary/muscles/PRs/zones/receipt) as
                               shareable PNGs (canvas-drawn, no backend) - see "Share your workout" below
+js/social.js                  Firebase Auth + Firestore client for the Feed tab - the one integration
+                              with a real backend (a Firebase project the user owns) - see "Social" below
 js/app.js                   rendering and events
 sw.js                        offline cache
 tools/icon-source.png        the orange wordmark logo the app icons are built from
