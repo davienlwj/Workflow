@@ -70,7 +70,7 @@ import {
   muscleSetBreakdown, muscleSetBreakdownDetailed, workoutSummaryByExercise,
 } from './workout.js';
 import {
-  runIconSVG, dumbbellIconSVG, swapIconSVG, raceFlagIconSVG,
+  runIconSVG, dumbbellIconSVG, swapIconSVG, raceFlagIconSVG, heartIconSVG, commentIconSVG, personIconSVG,
 } from './icons.js';
 
 let settings = loadSettings();
@@ -1579,7 +1579,7 @@ function renderShoeMileage() {
       .reduce((sum, s) => sum + (s.distanceKm || 0), 0);
     return `
       <li class="routine-row">
-        <div class="history-item" style="cursor:default">
+        <div class="history-item history-item-static">
           <div class="history-top"><span class="history-date">${escapeHTML(shoe.name)}</span></div>
           <div class="history-meta"><span class="mono">${Math.round(km * 100) / 100}km</span></div>
         </div>
@@ -4293,6 +4293,13 @@ $('watchSyncNow').addEventListener('click', () => { syncWatchWorkouts(); });
 let socialNeedsReconnect = false;
 let followingCache = []; // [{uid, username, displayName, photoURL}]
 let feedCache = []; // merged, date-desc workouts from everyone followed
+// True once refreshFeed has completed at least one real fetch - same
+// "loading" vs "genuinely empty" distinction as profileActivities/
+// notifications, so the tab doesn't flash "not following anyone"/"no
+// workouts yet" before the very first fetch (usually already resolved by
+// the time anyone actually looks, since bootSocial kicks it off, but not
+// guaranteed) has come back.
+let feedLoaded = false;
 
 function renderSocialStatus() {
   const { enabled, username, displayName } = settings.social;
@@ -4300,7 +4307,7 @@ function renderSocialStatus() {
   $('socialGoogleButtonWrap').hidden = enabled;
   $('socialUsernameRow').hidden = !(enabled && !username && !socialNeedsReconnect);
   if (!enabled) {
-    $('socialStatus').textContent = 'Sign in with Google to follow friends and share your workouts.';
+    $('socialStatus').textContent = 'Follow friends and share your workouts with them - stays signed in on this device until you sign out.';
   } else if (socialNeedsReconnect) {
     $('socialStatus').textContent = 'Sign-in expired - sign out and sign in again below.';
   } else if (!username) {
@@ -4325,6 +4332,7 @@ async function refreshFeed() {
   } catch (err) {
     console.error('feed refresh failed', err);
   }
+  feedLoaded = true;
   renderFeedTab();
 }
 
@@ -4585,8 +4593,8 @@ function feedCardHTML(item) {
         <div class="history-meta">${feedCardMetaHTML(item)}</div>
         ${title ? `<div class="history-notes">${escapeHTML(title)}</div>` : ''}
         <div class="feed-engagement">
-          <span>♥ ${item.likeCount || 0}</span>
-          <span>💬 ${item.commentCount || 0}</span>
+          <span>${heartIconSVG()}${item.likeCount || 0}</span>
+          <span>${commentIconSVG()}${item.commentCount || 0}</span>
         </div>
       </button>
     </li>
@@ -4599,6 +4607,8 @@ function renderFeedTab() {
   $('feedSignedInBody').hidden = !signedIn;
   if (!signedIn) return;
 
+  $('feedLoading').hidden = feedLoaded;
+
   $('followingList').innerHTML = followingCache.map((f) => `
     <li class="routine-row">
       <button type="button" class="history-item follow-open" data-uid="${f.uid}" data-username="${escapeHTML(f.username)}" data-display-name="${escapeHTML(f.displayName || '')}">
@@ -4608,21 +4618,26 @@ function renderFeedTab() {
       <button type="button" class="routine-delete" data-uid="${f.uid}" aria-label="Unfollow @${escapeHTML(f.username)}">✕</button>
     </li>
   `).join('');
-  $('followingEmpty').hidden = followingCache.length > 0;
+  $('followingEmpty').hidden = !feedLoaded || followingCache.length > 0;
 
   $('feedList').innerHTML = feedCache.map(feedCardHTML).join('');
-  $('feedEmpty').hidden = feedCache.length > 0;
+  $('feedEmpty').hidden = !feedLoaded || feedCache.length > 0;
   hydrateFeedThumbnails(feedCache);
 }
 
 /* --------------------------------------------------------------- profile */
 
-let profileActivities = []; // whoever's #view-profile is currently showing
+// null while a fetch is in flight, an array (possibly empty) once it's
+// resolved - distinct from "genuinely no activity yet", so switching
+// profiles doesn't flash the empty-state message (or worse, the *previous*
+// person's cards) before the new person's data has actually arrived.
+let profileActivities = null;
 
 function renderProfileActivities() {
-  $('profileActivityList').innerHTML = profileActivities.map(feedCardHTML).join('');
-  $('profileActivityEmpty').hidden = profileActivities.length > 0;
-  hydrateFeedThumbnails(profileActivities);
+  $('profileLoading').hidden = profileActivities !== null;
+  $('profileActivityList').innerHTML = (profileActivities || []).map(feedCardHTML).join('');
+  $('profileActivityEmpty').hidden = profileActivities === null || profileActivities.length > 0;
+  hydrateFeedThumbnails(profileActivities || []);
 }
 
 /** Opens #view-profile for one followed person - every run/workout
@@ -4631,15 +4646,30 @@ function renderProfileActivities() {
  *  profileActivities, so liking/commenting/opening the detail sheet works
  *  identically from either list). */
 async function openProfile(uid, username, displayName) {
-  $('profileTitle').textContent = displayName ? `${displayName} (@${username})` : `@${username}`;
-  profileActivities = [];
+  $('profileTitle').textContent = username ? (displayName ? `${displayName} (@${username})` : `@${username}`) : 'Profile';
+  profileActivities = null;
   renderProfileActivities();
   switchView('profile');
   try {
-    profileActivities = await socialFetchUserActivities(uid, { username, displayName });
+    // A caller can only pass along whatever it already has cached - a
+    // follow notification from before followUser started embedding the
+    // follower's own username/displayName, say, comes through with both
+    // missing. getUserProfile is the actual source of truth and a cheap
+    // single-doc read, so fall back to it whenever the username's missing
+    // rather than trusting a caller that might be stale or incomplete.
+    let profile = { username, displayName };
+    if (!profile.username) {
+      const fetched = await socialGetUserProfile(uid);
+      if (fetched) profile = { username: fetched.username, displayName: fetched.displayName };
+    }
+    $('profileTitle').textContent = profile.username
+      ? (profile.displayName ? `${profile.displayName} (@${profile.username})` : `@${profile.username}`)
+      : 'Profile';
+    profileActivities = await socialFetchUserActivities(uid, profile);
     await enrichFeedCounts(profileActivities);
   } catch (err) {
     console.error('profile fetch failed', err);
+    profileActivities = profileActivities ?? [];
   }
   renderProfileActivities();
 }
@@ -4648,7 +4678,11 @@ $('profileBack').addEventListener('click', () => switchView('feed'));
 
 /* ---------------------------------------------------------- notifications */
 
-let notifications = []; // whoever followed/liked/commented on my own posts, newest first
+// null while a fetch is in flight, an array (possibly empty) once it's
+// resolved - same "loading" vs "genuinely nothing here" distinction as
+// profileActivities above, so re-opening the tab doesn't flash "nothing
+// yet" before the refetch (this tab always refetches on open) resolves.
+let notifications = null;
 
 function notificationWho(n) {
   return n.fromDisplayName || (n.fromUsername ? `@${n.fromUsername}` : 'Someone');
@@ -4662,19 +4696,38 @@ function notificationText(n) {
   return `${notificationWho(n)} commented: "${n.text}"`;
 }
 
+/** Small type icon prefixing each notification row - a follow/like/comment
+ *  reuses the icon that concept already has everywhere else in the app
+ *  (heart/comment for likes/comments); a post reuses the run/dumbbell
+ *  pictogram the Dashboard's own recent-activity list already uses to
+ *  tell the two apart, so "someone posted" reads the same way here as it
+ *  does there. */
+function notificationIconSVG(n) {
+  if (n.type === 'follow') return personIconSVG();
+  if (n.type === 'like') return heartIconSVG();
+  if (n.type === 'comment') return commentIconSVG();
+  return n.activityKind === 'run' ? runIconSVG() : dumbbellIconSVG();
+}
+
 function renderNotificationsTab() {
   const signedIn = Boolean(settings.social.enabled && settings.social.username && !socialNeedsReconnect);
   $('notificationsSignedOut').hidden = signedIn;
-  if (!signedIn) { $('notificationsList').innerHTML = ''; $('notificationsEmpty').hidden = true; return; }
-  $('notificationsList').innerHTML = notifications.map((n, i) => `
+  if (!signedIn) {
+    $('notificationsLoading').hidden = true;
+    $('notificationsList').innerHTML = '';
+    $('notificationsEmpty').hidden = true;
+    return;
+  }
+  $('notificationsLoading').hidden = notifications !== null;
+  $('notificationsList').innerHTML = (notifications || []).map((n, i) => `
     <li>
       <button type="button" class="history-item" data-index="${i}">
-        <div class="history-top"><span class="history-date">${escapeHTML(notificationText(n))}</span></div>
+        <div class="history-top"><span class="history-date">${notificationIconSVG(n)}${escapeHTML(notificationText(n))}</span></div>
         <div class="history-meta"><span>${fmtDateLong((n.at || '').slice(0, 10))}</span></div>
       </button>
     </li>
   `).join('');
-  $('notificationsEmpty').hidden = notifications.length > 0;
+  $('notificationsEmpty').hidden = notifications === null || notifications.length > 0;
 }
 
 async function refreshNotifications() {
@@ -4683,10 +4736,13 @@ async function refreshNotifications() {
     renderNotificationsTab();
     return;
   }
+  notifications = null;
+  renderNotificationsTab();
   try {
     notifications = await socialFetchNotifications(settings.social.uid);
   } catch (err) {
     console.error('notifications refresh failed', err);
+    notifications = [];
   }
   renderNotificationsTab();
 }
@@ -4759,6 +4815,10 @@ $('followingList').addEventListener('click', async (e) => {
 let feedDetailItem = null;
 let feedDetailLikedByMe = false;
 
+// Static markup, set once - the button itself is never re-rendered from a
+// template, only its count span's textContent changes.
+$('feedLikeBtn').insertAdjacentHTML('afterbegin', heartIconSVG());
+
 function updateFeedCardCounts(item) {
   // querySelectorAll, not just the first match - the same card can be on
   // screen in both the main Feed and a profile page's activity list at
@@ -4767,7 +4827,7 @@ function updateFeedCardCounts(item) {
   document.querySelectorAll(
     `.feed-item[data-owner="${item.ownerUid}"][data-id="${item.id}"][data-kind="${item.kind}"] .feed-engagement`,
   ).forEach((row) => {
-    row.innerHTML = `<span>♥ ${item.likeCount || 0}</span><span>💬 ${item.commentCount || 0}</span>`;
+    row.innerHTML = `<span>${heartIconSVG()}${item.likeCount || 0}</span><span>${commentIconSVG()}${item.commentCount || 0}</span>`;
   });
 }
 

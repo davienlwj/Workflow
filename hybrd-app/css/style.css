@@ -1186,6 +1186,11 @@ button.mileage-plan-row-open {
   cursor: pointer;
 }
 
+/* A .history-item that's actually a plain <div>, not a <button> - e.g. the
+   Shoe Mileage list, which has nothing to tap - card look without the
+   pointer cursor implying it's interactive. */
+.history-item-static { cursor: default; }
+
 .history-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .history-date { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-weight: 700; font-size: 15px; }
 .history-meta { font-size: 13px; color: var(--dim); display: flex; gap: 10px; flex-wrap: wrap; }
@@ -1224,6 +1229,7 @@ button.mileage-plan-row-open {
 .feed-thumb-img.loaded { opacity: 1; }
 
 .feed-engagement { display: flex; gap: 14px; font-size: 13px; color: var(--dim); }
+.feed-engagement span { display: inline-flex; align-items: center; gap: 4px; }
 
 .feed-detail-thumb {
   display: block;
@@ -1237,6 +1243,12 @@ button.mileage-plan-row-open {
 }
 
 .feed-like-row { display: flex; gap: 8px; margin: 12px 0; }
+
+#feedLikeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 
 #feedLikeBtn[aria-pressed="true"] {
   background: var(--panel-2);
