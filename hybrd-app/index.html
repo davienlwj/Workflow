@@ -323,7 +323,17 @@
           <span>Firebase config</span>
           <textarea id="socialConfig" rows="6" placeholder="const firebaseConfig = { apiKey: &quot;...&quot;, authDomain: &quot;...&quot;, ... }" spellcheck="false"></textarea>
         </label>
+        <label class="field">
+          <span>Google OAuth Client ID</span>
+          <input id="socialGoogleClientId" type="text" placeholder="from Authentication → Sign-in method → Google → Web SDK configuration" autocomplete="off" spellcheck="false">
+        </label>
         <p id="socialStatus" class="field-hint">Not connected.</p>
+        <div class="actions">
+          <button type="button" id="socialContinue" class="ghost-btn">Continue</button>
+        </div>
+        <div id="socialGoogleButtonWrap" hidden>
+          <div id="socialGoogleButton"></div>
+        </div>
         <div id="socialUsernameRow" class="field" hidden>
           <span>Pick a username - this is how people find you</span>
           <div class="row">
@@ -332,7 +342,6 @@
           </div>
         </div>
         <div class="actions">
-          <button type="button" id="socialConnect" class="ghost-btn">Sign in with Google</button>
           <button type="button" id="socialDisconnect" class="ghost-btn" hidden>Disconnect</button>
         </div>
       </div>

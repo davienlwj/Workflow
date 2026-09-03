@@ -56,6 +56,9 @@ export const DEFAULT_SETTINGS = {
   },
   social: {
     firebaseConfig: null, // the Firebase project config object, pasted whole from the Firebase console
+    googleClientId: '', // Google OAuth Web Client ID (Firebase console -> Authentication -> Sign-in
+    // method -> Google -> Web SDK configuration) - separate from firebaseConfig, used to render
+    // Google's own Sign-In button (see social.js's renderGoogleSignInButton for why)
     enabled: false, // true once signed in - workouts auto-publish/unpublish while this is true
     uid: null, // Firebase Auth uid, once signed in
     username: null, // the handle other people follow you by (chosen once, on first sign-in)

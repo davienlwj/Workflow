@@ -43,8 +43,8 @@ import {
 } from './intervals.js';
 import { fetchGistData, markWorkoutDeleted } from './gistSync.js';
 import {
-  initApp as socialInitApp, parseFirebaseConfigInput, signInWithGoogle as socialSignInWithGoogle,
-  completeRedirectSignIn, signOutSocial, getRestoredUser, isValidUsername, claimUsername as socialClaimUsername,
+  initApp as socialInitApp, parseFirebaseConfigInput, renderGoogleSignInButton,
+  signOutSocial, getRestoredUser, isValidUsername, claimUsername as socialClaimUsername,
   getUserProfile as socialGetUserProfile, findUserByUsername as socialFindUserByUsername,
   followUser as socialFollowUser, unfollowUser as socialUnfollowUser, fetchFollowing as socialFetchFollowing,
   publishWorkout as socialPublishWorkout, unpublishWorkout as socialUnpublishWorkout, fetchFeed as socialFetchFeed,
@@ -4195,21 +4195,20 @@ let feedCache = []; // merged, date-desc workouts from everyone followed
 
 function renderSocialStatus() {
   $('socialConfig').value = settings.social.firebaseConfig ? JSON.stringify(settings.social.firebaseConfig, null, 2) : '';
+  $('socialGoogleClientId').value = settings.social.googleClientId || '';
   const { enabled, username, displayName } = settings.social;
   $('socialDisconnect').hidden = !enabled;
+  $('socialContinue').hidden = enabled;
   $('socialUsernameRow').hidden = !(enabled && !username && !socialNeedsReconnect);
+  if (enabled) $('socialGoogleButtonWrap').hidden = true;
   if (!enabled) {
     $('socialStatus').textContent = 'Not connected.';
-    $('socialConnect').hidden = false;
   } else if (socialNeedsReconnect) {
-    $('socialStatus').textContent = 'Sign-in expired - tap Connect to sign in again.';
-    $('socialConnect').hidden = false;
+    $('socialStatus').textContent = 'Sign-in expired - disconnect and reconnect below.';
   } else if (!username) {
     $('socialStatus').textContent = `Signed in as ${displayName || 'you'} - pick a username below to finish setup.`;
-    $('socialConnect').hidden = true;
   } else {
     $('socialStatus').textContent = `Signed in as ${displayName || `@${username}`} (@${username}).`;
-    $('socialConnect').hidden = true;
   }
 }
 
@@ -4230,7 +4229,7 @@ async function refreshFeed() {
   renderFeedTab();
 }
 
-/** Finishes a sign-in (whether just completed via redirect, or a past one
+/** Finishes a sign-in (from the Google button's callback, or a past one
  *  Firebase's own session restored) - looks up the profile to reuse an
  *  already-claimed username (e.g. reconnecting on a new device) rather
  *  than prompting for a new one every time. */
@@ -4239,7 +4238,7 @@ async function finishSocialSignIn(user) {
   settings = {
     ...settings,
     social: {
-      firebaseConfig: settings.social.firebaseConfig,
+      ...settings.social,
       enabled: true,
       uid: user.uid,
       displayName: user.displayName,
@@ -4253,20 +4252,13 @@ async function finishSocialSignIn(user) {
   await refreshFeed();
 }
 
-/** Runs once at startup whenever a Firebase config has ever been saved
- *  (not just when Social is already "enabled") - this load might be
- *  Google redirecting back after tapping "Sign in with Google" (see
- *  socialConnect below, which navigates away rather than resolving). */
+/** Runs once at startup, only when Social was already connected on a past
+ *  visit - confirms Firebase's own persisted session is still valid before
+ *  trusting settings.social.enabled. */
 async function bootSocial() {
-  if (!settings.social.firebaseConfig) return;
+  if (!settings.social.firebaseConfig || !settings.social.enabled) return;
   try {
     await socialInitApp(settings.social.firebaseConfig);
-    const redirected = await completeRedirectSignIn();
-    if (redirected) {
-      await finishSocialSignIn(redirected);
-      return;
-    }
-    if (!settings.social.enabled) return;
     const user = await getRestoredUser();
     if (!user) {
       socialNeedsReconnect = true;
@@ -4311,7 +4303,7 @@ async function unpublishWorkoutFromSocial(workoutId) {
   }
 }
 
-$('socialConnect').addEventListener('click', async () => {
+$('socialContinue').addEventListener('click', async () => {
   let config;
   try {
     config = parseFirebaseConfigInput($('socialConfig').value);
@@ -4319,18 +4311,25 @@ $('socialConnect').addEventListener('click', async () => {
     toast(err.message);
     return;
   }
-  // Saved before navigating away: signInWithGoogle() below redirects the
-  // whole page to Google and back (more reliable than a popup on mobile
-  // Safari/PWAs), so nothing after this in the click handler actually
-  // runs - bootSocial() picks up the result on the next load using this.
-  settings = { ...settings, social: { ...settings.social, firebaseConfig: config } };
+  const googleClientId = $('socialGoogleClientId').value.trim();
+  if (!googleClientId) { toast('Paste the Google OAuth Client ID too - see the README.'); return; }
+  settings = { ...settings, social: { ...settings.social, firebaseConfig: config, googleClientId } };
   saveSettings(settings);
   try {
     await socialInitApp(config);
-    await socialSignInWithGoogle();
+    $('socialGoogleButtonWrap').hidden = false;
+    await renderGoogleSignInButton(
+      googleClientId,
+      'socialGoogleButton',
+      (user) => finishSocialSignIn(user),
+      (err) => {
+        console.error('social sign-in failed', err);
+        toast(err.message || 'Could not sign in');
+      },
+    );
   } catch (err) {
-    console.error('social connect failed', err);
-    toast(err.message || 'Could not start sign-in');
+    console.error('social continue failed', err);
+    toast(err.message || 'Could not set up sign-in');
   }
 });
 
