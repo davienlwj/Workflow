@@ -1520,24 +1520,21 @@ button.mileage-plan-row-open {
 
 /* ------------------------------------------------------------ live workout */
 
-/* Timer (left) / volume (middle) / exercise (right), one row - the timer
-   stays the big 22px number, but "Total Volume: 640kg" and especially
-   "Current Exercise: <name>" are too long to hold that same size and
-   still fit next to it on a phone screen (measured: wraps into 3 lines of
-   giant text), so they're sized down instead. Exercise gets the
-   remaining flexible space with an ellipsis, since it's the one whose
-   length actually varies. */
+/* Timer alone on its own row (the big 22px number); volume + current
+   exercise sit together on a second row below it, smaller - wraps onto
+   its own line if it doesn't fit rather than truncating, since there's
+   no longer a big timer competing for the same row's width. */
 .wo-live-timer {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 4px;
   margin-bottom: 10px;
 }
 
 .wo-live-timer[hidden] { display: none; }
 
-.wo-live-timer-time { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.wo-live-timer-time { display: flex; align-items: center; gap: 8px; }
 
 .wo-live-dot {
   width: 8px;
@@ -1557,20 +1554,17 @@ button.mileage-plan-row-open {
   font-weight: 700;
 }
 
-#woLiveVolume, #woLiveExercise {
-  font-size: 13px;
-  font-weight: 700;
+.wo-live-timer-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 14px;
 }
 
-#woLiveVolume { flex-shrink: 0; }
-
-#woLiveExercise {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: right;
+#woLiveVolume, #woLiveExercise {
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .live-mini-bar {
