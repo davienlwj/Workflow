@@ -2647,8 +2647,8 @@ function updateLiveMiniBar() {
   const progress = computeLiveProgress();
   $('liveMiniExercise').textContent = progress.exercise;
   $('liveMiniSet').textContent = progress.setLabel;
-  $('woLiveExercise').textContent = progress.exercise;
-  $('woLiveVolume').textContent = `${computeLiveVolume()}kg`;
+  $('woLiveExercise').textContent = `Current Exercise: ${progress.exercise}`;
+  $('woLiveVolume').textContent = `Total Volume: ${computeLiveVolume()}kg`;
 }
 
 function tickLiveTimer() {
