@@ -2624,11 +2624,31 @@ function computeLiveProgress() {
   return { exercise: blocks.length ? 'All sets done' : 'No exercises yet', setLabel: '' };
 }
 
+/** Sum of weight x reps across every ticked (done) set currently in the
+ *  live sheet - only done sets, not everything typed in, since a future
+ *  set's weight/reps can already be pre-filled (see "+ Add set" carrying
+ *  the previous set's numbers forward) before it's actually been done.
+ *  Reuses workoutVolume so this stays consistent with how volume is
+ *  computed everywhere else (bodyweight-equipment load, warm-ups excluded). */
+function computeLiveVolume() {
+  const form = readWorkoutForm();
+  const doneOnly = {
+    ...form,
+    exercises: form.exercises.map((ex) => ({ ...ex, sets: (ex.sets || []).filter((s) => s.done) })),
+  };
+  return workoutVolume(doneOnly, allExercises(), bodyweightKg());
+}
+
+/** Refreshes every "where am I right now" readout for a live session - the
+ *  minimized mini-bar's exercise/set copy, and the same info (plus running
+ *  volume) shown at the top of the full sheet. */
 function updateLiveMiniBar() {
   if (!liveSession) return;
   const progress = computeLiveProgress();
   $('liveMiniExercise').textContent = progress.exercise;
   $('liveMiniSet').textContent = progress.setLabel;
+  $('woLiveExercise').textContent = progress.exercise;
+  $('woLiveVolume').textContent = `${computeLiveVolume()}kg`;
 }
 
 function tickLiveTimer() {
@@ -2707,6 +2727,7 @@ function openLiveWorkoutSheet(exerciseIds = []) {
   $('woSharePNG').hidden = false;
   saveLiveWorkoutState();
   startLiveTimer();
+  updateLiveMiniBar();
   hideLiveMiniBar();
   $('scrim').hidden = false;
   $('workoutSheet').hidden = false;
