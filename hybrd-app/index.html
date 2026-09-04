@@ -721,8 +721,14 @@
 <section id="workoutSheet" class="sheet" hidden aria-modal="true" role="dialog" aria-label="Log workout">
   <div class="grabber"></div>
   <div id="woLiveTimer" class="wo-live-timer" hidden>
-    <span class="wo-live-dot"></span>
-    <span id="woLiveTimerText" class="mono">00:00</span>
+    <div class="wo-live-timer-row">
+      <span class="wo-live-dot"></span>
+      <span id="woLiveTimerText" class="mono">00:00</span>
+    </div>
+    <div class="wo-live-timer-stats">
+      <span id="woLiveVolume" class="mono">0kg</span>
+      <span id="woLiveExercise"></span>
+    </div>
   </div>
   <form id="workoutForm" class="form" autocomplete="off">
     <label class="field">
