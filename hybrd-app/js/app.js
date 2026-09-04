@@ -2388,7 +2388,15 @@ $('woExerciseList').addEventListener('click', (e) => {
     const block = addSetBtn.closest('.wo-exercise-block');
     const rows = block.querySelector('.wo-set-rows');
     const last = lastPerformance(workouts, block.dataset.exerciseId);
-    rows.insertAdjacentHTML('beforeend', setRowHTML(rows.children.length, {}, last?.sets[rows.children.length]));
+    // Carries the weight/reps actually typed into the set right above -
+    // most sets of an exercise repeat the same numbers, so starting the
+    // new row pre-filled (still editable) beats retyping them every time.
+    const prevRow = rows.lastElementChild;
+    const carried = prevRow ? {
+      weight: numOrNull(prevRow.querySelector('.wo-set-weight').value),
+      reps: numOrNull(prevRow.querySelector('.wo-set-reps').value),
+    } : {};
+    rows.insertAdjacentHTML('beforeend', setRowHTML(rows.children.length, carried, last?.sets[rows.children.length]));
     syncLiveWorkout();
     return;
   }
